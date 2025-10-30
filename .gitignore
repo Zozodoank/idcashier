@@ -36,6 +36,9 @@ build/
 # Temporary files
 tmp/
 temp/
+.tmp.drivedownload/
+.tmp.driveupload/
+temp_upload/
 
 # OS generated files
 Thumbs.db
