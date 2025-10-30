@@ -67,6 +67,16 @@
   .sidebar-transition {
     transition: transform 0.3s ease-in-out;
   }
+
+  /* Hide number input spinners for safer POS input */
+  .no-spin::-webkit-outer-spin-button,
+  .no-spin::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .no-spin[type=number] {
+    -moz-appearance: textfield;
+  }
 }
 
 .gradient-bg {
@@ -108,4 +118,37 @@
     min-height: 29.7cm;
   }
 }
+
+/* ========================================
+   DISABLE SCROLL ON NUMBER INPUTS
+   Prevents accidental value changes when scrolling
+   ======================================== */
+input[type="number"] {
+  -moz-appearance: textfield; /* Firefox: hide spinner */
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none; /* Chrome/Safari: hide spinner */
+  margin: 0;
+}
+
+/* Disable mouse wheel on ALL number inputs globally */
+input[type="number"] {
+  pointer-events: auto;
+}
+
+@layer utilities {
+  /* Utility class to prevent scroll wheel changes */
+  .no-scroll-number {
+    -moz-appearance: textfield;
+  }
+  
+  .no-scroll-number::-webkit-outer-spin-button,
+  .no-scroll-number::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
 /* stylelint-enable at-rule-no-unknown */

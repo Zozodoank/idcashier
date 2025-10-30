@@ -1,0 +1,436 @@
+## Quick Start
+
+1. **Environment Setup**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Supabase configuration
+   ```
+
+2. **Supabase Setup**:
+   - Create a Supabase project at https://supabase.com/
+   - Get your Project URL and Anonymous Key from the API settings
+   - Update your `.env` file with these values
+   - Run the SQL schema from `supabase-schema.sql` in your Supabase SQL editor
+   - Insert initial user data (see STATIC_DEPLOYMENT_GUIDE.md)
+
+   **Warning**: RLS configuration is important for production security. Make sure to configure RLS policies properly. For best practices, refer to [Supabase RLS Documentation](https://supabase.com/docs/guides/auth/row-level-security). After setting up the database, run `npm run verify:rls` to verify the RLS configuration.
+
+3. **Email Configuration (For Password Reset and User Verification)**:
+   
+   **Local Development:**
+   - No configuration needed - emails are captured by Inbucket
+   - Access emails at http://localhost:54324
+   
+   **Production Deployment:**
+   - **idCashier Mail Server (Configured)**:
+     - SMTP Host: mail.idcashier.my.id
+     - Port: 465 (SSL/TLS)
+     - User: support@idcashier.my.id
+     - Password: Set in environment variables
+   
+   - **Alternative SMTP Providers**:
+     - **Gmail** (for small-scale): See `supabase/config.toml` for setup instructions
+     - **SendGrid** (for large-scale): Professional email delivery service
+     - **Mailgun**: Alternative email service
+     - **AWS SES**: Amazon's email service
+   
+   - **Configuration Steps**:
+     1. SMTP is already configured in `supabase/config.toml` with idCashier mail server
+     2. Set environment variables in Supabase Dashboard > Settings > Secrets:
+        - `EMAIL_PASSWORD=@Se06070786`
+        - `SITE_URL=https://idcashier.my.id`
+     3. For local development, add to `.env` file (see `.env` template below)
+   
+   - For detailed setup instructions, see `SUPABASE_SETUP.md`
+   - For troubleshooting, see [TROUBLESHOOTING.md#reset-password-issues](TROUBLESHOOTING.md#reset-password-issues)
+
+4. **Run the Application**:
+   ```bash
+   npm run dev
+   ```
+
+5. **Login Credentials**:
+   - Developer: jho.j80@gmail.com / @Se06070786
+   - Demo: demo@idcashier.my.id / Demo2025
+   - Note: All authentication is now handled by Supabase Auth
+   - New users must be registered through DeveloperPage or Edge Functions
+   - Passwords are securely hashed and stored in Supabase Auth (auth.users table)
+
+## API Endpoints
+
+### Authentication
+- **Fully integrated with Supabase Auth**
+- All auth operations use Supabase Edge Functions:
+  - `/auth-register` - Register new users (creates both auth.users and public.users)
+  - `/auth-login` - Login via Supabase Auth (no hardcoded passwords)
+  - `/auth-request-password-reset` - Request password reset email
+  - `/auth-reset-password` - Reset password with token
+- Password management is handled entirely by Supabase Auth
+- No passwords stored in public.users table
+
+### Registration with Payment Integration
+- `/register-with-payment` - Register new users with Duitku payment integration
+  - Handles user registration and payment processing in a single endpoint
+  - Integrates with Duitku payment gateway for secure payment processing
+  - Implements comprehensive validation and error handling
+  - For detailed documentation, see [REGISTER_WITH_PAYMENT.md](REGISTER_WITH_PAYMENT.md)
+
+### Data Operations
+- All data operations now use Supabase database directly (no backend API endpoints needed)
+
+## Development
+
+To run the application in development mode:
+
+```bash
+npm run dev
+```
+
+This will start the frontend development server on port 3000.
+
+Note: The application no longer requires a separate backend server as all operations are handled directly by Supabase.
+
+### Verifying Supabase Connection
+
+To verify that the Supabase connection is working correctly:
+1. Check the browser console for "✅ Supabase client initialized successfully" message
+2. Try logging in with the developer credentials
+3. Check that data loads correctly in the dashboard
+
+### Available Scripts
+
+- `npm run dev` - Start the development server on port 3000
+- `npm run build` - Build the application for production
+- `npm run verify:rls` - Check RLS status and policies
+- `npm run fix:rls` - Fix RLS configuration issues
+
+## User Guide
+
+### How to Use Password Reset
+
+The password reset feature uses Supabase Auth to securely reset passwords via email.
+
+**For Users:**
+
+1. **Request Password Reset:**
+   - Go to the login page at `/login`
+   - Click "Forgot Password?" link (or navigate directly to `/reset-password`)
+   - Enter your email address
+   - Click "Send Reset Link"
+   - You'll see a confirmation message
+
+2. **Check Your Email:**
+   - Open your email inbox (check spam folder if needed)
+   - Look for an email from idCashier (support@idcashier.my.id)
+   - The email contains a password reset link generated by Supabase Auth
+   - The link is valid for 1 hour
+
+3. **Reset Your Password:**
+   - Click the link in the email
+   - You'll be redirected to the password reset page with a secure token
+   - The page will show a form to enter your new password
+   - Enter your new password (minimum 6 characters)
+   - Confirm your new password
+   - Click "Reset Password"
+
+4. **Login with New Password:**
+   - After successful reset, you'll be redirected to the login page
+   - Use your email and new password to login via Supabase Auth
+
+**Important Notes:**
+- Password reset emails are sent via configured SMTP server (mail.idcashier.my.id)
+- You can only request 2 password reset emails per hour (Supabase rate limiting)
+- Reset links expire after 1 hour
+- Passwords are securely hashed and stored in Supabase Auth
+- If you don't receive the email, check your spam folder
+- For local development, emails appear in Inbucket at http://localhost:54324
+
+**Troubleshooting:**
+- If the reset link doesn't work, request a new one
+- Verify SMTP configuration is correct (see `supabase/config.toml`)
+- Check Supabase logs for email delivery errors
+- Ensure EMAIL_PASSWORD is set in Supabase Secrets
+- For more help, see [TROUBLESHOOTING.md#reset-password-issues](TROUBLESHOOTING.md#reset-password-issues)
+
+### Troubleshooting
+
+#### "Supabase credentials not found" Error
+This error occurs when the VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables are not set. Make sure:
+1. You have created a `.env` file from `.env.example`
+2. You have filled in your Supabase credentials
+3. You have restarted the development server after updating the environment variables
+
+#### Authentication Issues
+If you encounter authentication issues:
+1. Verify that you've inserted the developer account in the users table
+2. Check that your Supabase Auth settings are configured correctly
+3. Ensure that you're using the correct email and password
+
+#### Data Loading Issues
+If data is not loading correctly:
+1. Verify that you've run the schema SQL script in Supabase
+2. Check that your Supabase credentials are correct
+3. Ensure that the user has the proper permissions to access the data
+
+#### Error 406: Cannot coerce result to single JSON object
+This error occurs when Row Level Security (RLS) is enabled in Supabase but no policies allow access to the data.
+
+**Root Cause**: RLS misconfiguration preventing queries from returning results.
+
+**Quick Fix**: Run `npm run verify:rls` to check the current RLS status and policies.
+
+**Permanent Fix**: Run `npm run fix:rls` to apply proper RLS policies.
+
+For detailed troubleshooting steps, see [SUPABASE_RLS_VERIFICATION.md](SUPABASE_RLS_VERIFICATION.md).
+
+## Database Schema
+The database schema is defined in `supabase-schema.sql` which includes tables for:
+- Users
+- Customers
+- Categories
+- Suppliers
+- Products
+- Sales
+- Sale Items
+- Password Resets
+- Subscriptions
+
+Note: The application now uses Supabase Auth for authentication and Supabase database for all data storage.
+
+## Environment Variables
+
+### Required Environment Variables
+Create a `.env` file in the project root with the following variables:
+
+```env
+# Supabase Configuration
+VITE_SUPABASE_URL=your_supabase_project_url_here
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+
+# Site URL
+VITE_SITE_URL=https://idcashier.my.id
+SITE_URL=https://idcashier.my.id
+
+# Email Configuration (for SMTP)
+EMAIL_HOST=mail.idcashier.my.id
+EMAIL_PORT=465
+EMAIL_USER=support@idcashier.my.id
+EMAIL_PASSWORD=@Se06070786
+```
+
+### Production Environment Variables
+For production deployment, set these in Supabase Dashboard > Settings > Secrets:
+- `EMAIL_PASSWORD` - SMTP password for email sending
+- `SITE_URL` - Your production site URL
+- All Supabase credentials should also be verified
+
+## Security
+- **Authentication**: Fully managed by Supabase Auth with secure password hashing
+- **Password Storage**: All passwords stored in Supabase Auth (auth.users), not in public.users table
+- **Email Security**: SMTP configured with SSL/TLS (port 465) for secure email delivery
+- **Data Security**: Can be managed by Supabase Row Level Security (RLS)
+- **Session Management**: JWT tokens managed by Supabase Auth
+- **Rate Limiting**: Email sending limited to prevent abuse (2 emails/hour)
+- **Token Expiry**: Password reset tokens expire after 1 hour
+- **Environment Variables**: Never commit .env file to version control
+- **RLS Policies**: Can now be enabled since auth.uid() works with Supabase Auth integration
+
+### Recommended Security Practices
+1. Enable RLS on all tables with appropriate policies
+2. Use strong passwords (minimum 6 characters, recommended 12+)
+3. Enable email confirmation for production (set enable_confirmations=true)
+4. Regularly rotate SMTP credentials
+5. Monitor Supabase logs for suspicious activity
+6. Use HTTPS for all production deployments
+
+## Pushing Schema to Supabase
+
+To push the database schema to your Supabase project:
+
+1. **Using Supabase Dashboard (Easiest)**:
+   - Log in to your Supabase dashboard
+   - Navigate to your project
+   - Go to SQL Editor
+   - Copy and paste the contents of `supabase-schema.sql`
+   - Click "Run" to create all tables
+
+2. **Refer to [HOW_TO_PUSH_SCHEMA.md](HOW_TO_PUSH_SCHEMA.md) for detailed instructions**
+
+## MCP Server Integration
+
+This project integrates with Supabase via the MCP (Model Context Protocol) server, enabling seamless IDE integration with your Supabase backend.
+
+### What is MCP?
+MCP is a protocol that allows your IDE (Cursor, VS Code, etc.) to communicate directly with Supabase services, providing:
+- Direct database access for development and debugging
+- Edge Functions deployment and testing
+- Real-time log monitoring
+- Schema management and migrations
+
+### MCP Features Used in This Project
+- **Database Operations**: Execute SQL queries and migrations directly from IDE
+- **Edge Functions**: Deploy and test authentication functions (auth-register, auth-login, etc.)
+- **Log Monitoring**: View real-time logs for debugging email sending and auth issues
+- **Advisory Checks**: Get security and performance recommendations
+
+### Getting Started with MCP
+1. Verify MCP connection is configured in your IDE
+2. Check that Supabase credentials are set correctly
+3. Test connection using MCP tools in your IDE
+4. See [MCP_INTEGRATION_GUIDE.md](MCP_INTEGRATION_GUIDE.md) for detailed setup instructions
+
+### Common MCP Operations
+- List database tables: Use MCP to view current schema
+- Deploy Edge Functions: Push updated auth functions to Supabase
+- View logs: Monitor email sending and authentication in real-time
+- Run migrations: Apply schema changes from `supabase-schema.sql`
+
+For more information about MCP integration, see [MCP_INTEGRATION_GUIDE.md](MCP_INTEGRATION_GUIDE.md).
+
+## Features
+
+### Authentication & Security
+- **Supabase Auth Integration**: Secure user authentication and authorization
+- **Password Reset Flow**: Full password reset functionality with email verification
+  - Request password reset via email
+  - Secure token-based password reset
+  - Email delivery with configurable SMTP providers
+  - Token expiration (1 hour by default)
+  - Rate limiting to prevent abuse (2 emails per hour)
+- **Row Level Security (RLS)**: Database-level security policies
+- **Role-based Access Control**: Different permissions for owners, cashiers, and developers
+
+### Core Features
+- **Point of Sale (POS)**: Fast and intuitive sales interface
+- **Product Management**: Complete product catalog with categories and suppliers
+- **Inventory Tracking**: Real-time stock management
+- **Customer Management**: Track customer information and purchase history
+- **Sales Reporting**: Comprehensive sales and profit/loss reports
+- **Multi-language Support**: English, Indonesian, and Chinese
+- **Dark/Light Mode**: Customizable theme preferences
+- **Receipt Printing**: Professional receipt generation
+- **Subscription Management**: Built-in subscription tracking
+
+## Tech Stack
+- Frontend: React, Vite, Tailwind CSS
+- Backend: Supabase (PostgreSQL, Auth, Storage)
+- Authentication: Supabase Auth with Email/Password
+- Email: Configurable SMTP (Gmail, SendGrid, Mailgun, AWS SES)
+- Deployment: Static hosting (Netlify, Vercel, etc.)
+
+Note: The application is now a static site that uses Supabase for all backend functionality.
+
+## Deployment
+1. Build the frontend:
+```bash
+npm run build
+```
+
+2. Deploy the contents of the `dist/` directory to any static hosting provider
+
+3. Configure your production environment variables in your hosting provider
+
+For detailed deployment instructions, see [STATIC_DEPLOYMENT_GUIDE.md](STATIC_DEPLOYMENT_GUIDE.md)
+
+## License
+This project is licensed under the MIT License.
+
+## Fix for "The Case of the Invisible Cashiers"
+
+This project had an issue where admin users could not see cashiers they had created. This was fixed in the following files:
+
+- `server/routes/users.js` - Fixed tenant ID assignment for cashiers created by admins
+- `src/pages/SettingsPage.jsx` - Updated frontend to properly display cashiers for admin users
+
+The fix ensures that:
+1. Admin users can see all cashiers in the system
+2. Admin users can create cashiers and assign them to specific owners
+3. Owner users can see only cashiers in their own tenant
+4. Proper validation is performed when creating cashiers
+
+For more details, see [FIX_INVISIBLE_CASHIERS.md](FIX_INVISIBLE_CASHIERS.md)
+
+## GitHub Synchronization
+
+This project includes automated scripts to synchronize your local changes with the GitHub repository at https://github.com/projectmandiri10-lang/idcashier.git.
+
+### Available Synchronization Scripts
+
+1. **Manual Sync**:
+   - `sync-to-github.bat` - Simple synchronization script
+   - Adds all changes, commits with timestamp, and pushes to GitHub
+
+2. **Automated Sync**:
+   - `auto-sync-scheduler.bat` - Advanced synchronization with logging
+   - Pulls latest changes before pushing (reduces conflicts)
+   - Creates detailed logs in the `logs` directory
+   - Commits with timestamp and pushes to GitHub
+
+### How to Use
+
+1. **Manual Synchronization**:
+   - Double-click `sync-to-github.bat` to run a simple sync
+   - Or run in terminal: `sync-to-github.bat`
+
+2. **Scheduled Synchronization**:
+   - Double-click `auto-sync-scheduler.bat` to run advanced sync
+   - Or run in terminal: `auto-sync-scheduler.bat`
+
+### Setting Up Automatic Scheduling
+
+To automatically sync your changes at regular intervals:
+
+1. Open Task Scheduler (taskschd.msc)
+2. Create a new task
+3. Set the trigger to your preferred interval (e.g., every 30 minutes)
+4. Set the action to run `auto-sync-scheduler.bat`
+5. Save the task
+
+### VS Code Integration
+
+This project includes VS Code configuration files for easier development and Git management:
+
+1. **Recommended Extensions**:
+   - GitLens - Supercharge Git capabilities
+   - GitHub Pull Requests - Manage PRs directly from VS Code
+   - Git History - View and search Git history
+   - GitHub Theme - Consistent GitHub styling
+
+2. **Pre-configured Tasks**:
+   - `Git Sync - Simple` - Run simple synchronization
+   - `Git Sync - Advanced` - Run advanced synchronization with logging
+   - `Git Status` - Check current Git status
+   - `Git Pull` - Pull latest changes from remote
+
+3. **Launch Configurations**:
+   - Launch Frontend - Start frontend development server
+   - Launch Backend - Start backend server
+   - Launch Full App - Start both servers concurrently
+
+To use these features:
+1. Open the project in VS Code
+2. Press `Ctrl+Shift+P` to open the command palette
+3. Type "Tasks: Run Task" to access synchronization tasks
+4. Or press `F5` to launch the application with debugging
+
+### Script Features
+
+- **Conflict Reduction**: The advanced script pulls before pushing to minimize conflicts
+- **Detailed Logging**: All sync operations are logged with timestamps
+- **Error Handling**: Scripts handle common Git errors gracefully
+- **No Changes Skip**: If no changes are detected, the scripts will skip committing
+
+### Git Hooks
+
+This project includes a pre-commit hook that automatically syncs your changes to GitHub before each commit:
+
+- The hook checks for changes and runs the synchronization script automatically
+- This ensures your remote repository is always up-to-date with your local changes
+- To enable the hook, you may need to make it executable or configure Git to use it
+
+To manually trigger the pre-commit hook:
+```bash
+cd c:\xampp\htdocs\idcashier
+.git\hooks\pre-commit.bat
+```

@@ -4,14 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Printer } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import Barcode from 'react-barcode';
 
-const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAmount, taxPercent, taxAmount, total, paymentAmount, change, customer, paperSize, settings, useTwoDecimals = true, t }, ref) => {
+const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAmount, taxPercent, taxAmount, total, paymentAmount, change, customer, paperSize, settings, useTwoDecimals = true, showBarcode = false, t }, ref) => {
   const isA4 = paperSize === 'A4';
   const styles = {
     '58mm': { width: '58mm', fontSize: '10px', padding: `${settings.margin}px` },
     '80mm': { width: '80mm', fontSize: '12px', padding: `${settings.margin}px` },
     'A4': { width: '210mm', fontSize: '12px', padding: `${settings.margin}px` },
   };
+
+  // Debug: Log showBarcode and filtered cart
+  console.log('ReceiptContent - showBarcode:', showBarcode, 'paperSize:', paperSize);
+  console.log('ReceiptContent - cart items with barcode:', cart.filter(item => item.barcode && item.barcode.toString().trim().length > 0));
 
   // Debug settings
   console.log('PrintReceipt settings received:', settings);
@@ -100,8 +105,7 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
       <div className="space-y-1">
         <div className="flex justify-between"><p>{t('subtotalLabel')}:</p><p>{safeToLocaleString(subtotal)}</p></div>
         {discountAmount > 0 && <div className="flex justify-between"><p>{t('discountLabel')} ({discountPercent}%):</p><p>-{safeToLocaleString(discountAmount)}</p></div>}
-        {taxAmount > 0 && <div className="flex justify-between"><p>{t('taxLabel')} ({taxPercent}%):</p><p>{safeToLocaleString(taxAmount)}</p></div>
-}
+        {taxAmount > 0 && <div className="flex justify-between"><p>{t('taxLabel')} ({taxPercent}%):</p><p>{safeToLocaleString(taxAmount)}</p></div>}
         <hr className="border-dashed border-black my-1" />
         <div className="flex justify-between font-bold"><p>{t('totalLabel')}:</p><p>{safeToLocaleString(total)}</p></div>
         {paymentAmount > 0 && <div className="flex justify-between"><p>{t('payLabel')}:</p><p>{safeToLocaleString(paymentAmount)}</p></div>}
@@ -111,6 +115,44 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
       <div className="text-center">
         {settings.showFooter !== false && settings.footerText && <p>{settings.footerText}</p>}
       </div>
+      
+      {/* Barcode Section - Only for thermal receipts */}
+      {showBarcode && paperSize !== 'A4' && (() => {
+        const itemsWithBarcode = cart.filter(item => item.barcode && item.barcode.toString().trim().length > 0);
+        
+        if (itemsWithBarcode.length === 0) {
+          return null; // No items with barcode, don't show section
+        }
+        
+        return (
+          <>
+            <hr className="border-dashed border-black my-2" />
+            <div className="text-center space-y-2">
+              {itemsWithBarcode.map((item, index) => {
+                // Prepare barcode value - use as-is for CODE128
+                const barcodeValue = item.barcode.toString().trim();
+                
+                return (
+                  <div key={`${item.id}-${index}`} className="mb-3">
+                    <div style={{ display: 'inline-block' }}>
+                      <Barcode 
+                        value={barcodeValue}
+                        format="CODE128"
+                        width={paperSize === '58mm' ? 1.2 : 1.5}
+                        height={paperSize === '58mm' ? 35 : 45}
+                        displayValue={true}
+                        fontSize={10}
+                        margin={5}
+                        background="#ffffff"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 });

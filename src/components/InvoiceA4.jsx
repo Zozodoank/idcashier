@@ -1,8 +1,12 @@
 import React, { forwardRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { formatCurrency as formatCurrencyUtil, getCurrencyFromStorage } from '@/lib/utils';
 
-const InvoiceA4 = forwardRef(({ sale, companyInfo, useTwoDecimals = true }, ref) => {
+const InvoiceA4 = forwardRef(({ sale, companyInfo, useTwoDecimals = true, context, userId }, ref) => {
   const { t } = useLanguage();
+  
+  // Get currency from storage
+  const currencyCode = getCurrencyFromStorage(userId);
 
   // Ensure we have proper defaults
   const safeCompanyInfo = {
@@ -21,14 +25,9 @@ const InvoiceA4 = forwardRef(({ sale, companyInfo, useTwoDecimals = true }, ref)
     });
   };
 
-  // Format currency in Indonesian Rupiah
+  // Format currency using dynamic currency code
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: useTwoDecimals ? 2 : 0,
-      maximumFractionDigits: useTwoDecimals ? 2 : 0
-    }).format(amount);
+    return formatCurrencyUtil(amount, currencyCode, useTwoDecimals);
   };
 
   // Ensure logo is always displayed with a fallback
@@ -45,9 +44,40 @@ const InvoiceA4 = forwardRef(({ sale, companyInfo, useTwoDecimals = true }, ref)
   const companyAddress = safeCompanyInfo.address;
   const companyPhone = safeCompanyInfo.phone;
 
+  const discountPercent = Number(sale.discount_percent || 0);
+  const taxPercent = Number(sale.tax_percent || 0);
+  const subtotal = Number(sale.subtotal || 0);
+  const discountAmount = sale.discount_amount !== undefined
+    ? Number(sale.discount_amount)
+    : subtotal * (discountPercent / 100);
+  const taxableAmount = subtotal - discountAmount;
+  const taxAmount = sale.tax_amount !== undefined
+    ? Number(sale.tax_amount)
+    : taxableAmount * (taxPercent / 100);
+
+  const discountLabel = discountPercent ? `${t('discountLabel')} ${discountPercent}%` : t('discountLabel');
+  const taxLabel = taxPercent ? `${t('taxLabel')} ${taxPercent}%` : t('taxLabel');
+  const totalAmount = Number(sale.total_amount || subtotal - discountAmount + taxAmount);
+
+  // Dynamic horizontal padding adjustments per page context
+  const baseLeftCh = 8;
+  const baseRightCh = 2;
+  const leftCh = context === 'sales' ? Math.max(0, baseLeftCh - 3) : context === 'reports' ? Math.max(0, baseLeftCh - 2) : baseLeftCh;
+  const rightCh = context === 'reports' ? Math.max(0, baseRightCh - 2) : baseRightCh;
+
   return (
     <div ref={ref} className="printable-invoice-area">
-      <div className="invoice-container bg-white p-8 rounded-lg shadow-lg w-full mx-auto font-sans">
+      <div
+        className="invoice-container bg-white mx-auto font-sans"
+        style={{
+          width: '21cm',
+          minHeight: '29.7cm',
+          paddingTop: '25mm',
+          paddingBottom: '25mm',
+          paddingLeft: `${leftCh}ch`,
+          paddingRight: `${rightCh}ch`
+        }}
+      >
         {/* Header Section */}
         <header className="mb-8">
           {/* Baris Atas: Logo & Info Perusahaan di Kiri, Tanggal di Kanan */}
@@ -123,42 +153,38 @@ const InvoiceA4 = forwardRef(({ sale, companyInfo, useTwoDecimals = true }, ref)
           </table>
         </main>
 
-        {/* Totals Section */}
-        <section className="flex justify-end mb-2">
-          <div className="w-1/3 text-base">
+        {/* Totals & Signature Section */}
+        <section className="flex justify-between items-end mb-12">
+          <div className="flex flex-col justify-end">
+            <div className="border-t border-gray-400 w-48"></div>
+            <p className="text-sm font-semibold text-gray-700 mt-2">{t('signatureLabel') || 'Tanda Tangan'}</p>
+          </div>
+
+          <div className="w-72 text-base space-y-2">
             {sale.subtotal > 0 && (
               <div className="flex justify-between py-2 border-b border-gray-300">
                 <span className="text-gray-600">{t('subtotalLabel')}</span>
                 <span className="font-bold text-gray-800">{formatCurrency(sale.subtotal)}</span>
               </div>
             )}
-            {sale.discount_amount > 0 && (
+            {discountAmount > 0 && (
               <div className="flex justify-between py-2 border-b border-gray-300">
-                <span className="text-gray-600">{t('discountLabel')}</span>
-                <span className="font-bold text-gray-800">
-                  {formatCurrency(sale.discount_amount)} {sale.discount_percent ? `(${sale.discount_percent}%)` : ''}
-                </span>
+                <span className="text-gray-600">{discountLabel}</span>
+                <span className="font-bold text-gray-800">{formatCurrency(discountAmount)}</span>
               </div>
             )}
-            {sale.tax_amount > 0 && (
+            {taxAmount > 0 && (
               <div className="flex justify-between py-2 border-b border-gray-300">
-                <span className="text-gray-600">{t('taxLabel')}</span>
-                <span className="font-bold text-gray-800">
-                  {formatCurrency(sale.tax_amount)} {sale.tax_percent ? `(${sale.tax_percent}%)` : ''}
-                </span>
+                <span className="text-gray-600">{taxLabel}</span>
+                <span className="font-bold text-gray-800">{formatCurrency(taxAmount)}</span>
               </div>
             )}
             <div className="flex justify-between py-2 border-b border-gray-300">
               <span className="text-gray-600">{t('totalLabel')}</span>
-              <span className="font-bold text-gray-800">{formatCurrency(sale.total_amount)}</span>
+              <span className="font-bold text-gray-800">{formatCurrency(totalAmount)}</span>
             </div>
           </div>
         </section>
-
-        {/* Footer Section - No signature, clean finish */}
-        <footer className="mt-8 pt-4">
-          <p className="text-center text-sm text-gray-500">{t('thankYouMessage') || 'Terima kasih atas pembelian Anda'}</p>
-        </footer>
       </div>
     </div>
   );

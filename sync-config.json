@@ -1,0 +1,16 @@
+{
+  "repository": {
+    "url": "https://github.com/projectmandiri10-lang/idcashier.git",
+    "branch": "master",
+    "localPath": "c:\\xampp\\htdocs\\idcashier"
+  },
+  "sync": {
+    "autoPull": true,
+    "commitPrefix": "Auto-sync:",
+    "logEnabled": true,
+    "logDirectory": "logs"
+  },
+  "schedule": {
+    "defaultIntervalMinutes": 30
+  }
+}

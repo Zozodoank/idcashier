@@ -1,0 +1,205 @@
+event_message,event_type,function_id,id,level,timestamp
+"ERROR parsing body: Empty request body
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,a40c061c-07b2-4530-9cdc-5139db47c35f,info,1761400622555000
+"Parsing request body...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,10a83608-b8f7-4afb-9999-bdfcba2f4f4c,info,1761400622555000
+"Raw body received (length): 0
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,77dcb721-da6a-439f-a9ed-5c07067225c5,info,1761400622555000
+"Raw body content: 
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,0ea1aeb7-880f-4664-a8a6-b1424c88b51e,info,1761400622555000
+"Token verified. User: jho.j80@gmail.com
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,3e22b0e6-a1d4-430f-9419-db9434a126b1,info,1761400622555000
+"Verifying token...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,c9c955de-1669-4ce5-ba4f-8ce34adb665d,info,1761400622352000
+"Supabase client created
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,e2a76aee-ed38-40ab-92a8-eaf9907af803,info,1761400622352000
+"Token received, length: 771
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,ffd7e14f-6b6f-4d53-97b0-d7aabfc2afa5,info,1761400622348000
+"=== subscriptions-update-user START ===
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,a8d3173c-ae4a-4150-9716-539f2b2cf358,info,1761400622347000
+booted (time: 40ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,e375d3a7-15c5-4f35-804b-45d34d363659,log,1761400622338000
+"Raw body content: 
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,e20ea926-9637-46be-bf0a-ab47dec58753,info,1761400617443000
+"Raw body received (length): 0
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,00a6fabc-5135-4762-838d-1716269bed1f,info,1761400617443000
+"ERROR parsing body: Empty request body
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,122f2715-5f0d-419e-bf18-dbede58b7fe7,info,1761400617443000
+"Token verified. User: jho.j80@gmail.com
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,544a24a8-e5b5-41b1-a3ae-d28dd3ff22a2,info,1761400617443000
+"Parsing request body...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,0f4f1abb-daae-4800-a5b5-206e257440b1,info,1761400617443000
+"Verifying token...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,92bed8aa-0c6b-4e25-ad53-ea6c80ca94b0,info,1761400617346000
+"Supabase client created
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,c927e893-e845-44f6-9663-69a67f477f93,info,1761400617346000
+"Token received, length: 771
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,ad48da50-f964-4178-9a02-7a8afdc99d39,info,1761400617343000
+"=== subscriptions-update-user START ===
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,d4835571-1569-4f3d-9b4e-0e100b371397,info,1761400617342000
+booted (time: 29ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,f7c76de6-ce51-4d5e-abca-15a554ef607d,log,1761400617336000
+"Raw body received (length): 0
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,8243a4f4-ddf5-40fa-bccb-79dad4aabce5,info,1761400610852000
+"Token verified. User: jho.j80@gmail.com
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,2acbac3f-956e-4133-8207-442f7b3ff7b5,info,1761400610852000
+"ERROR parsing body: Empty request body
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,bfa723b0-8a73-49d8-93c9-1cc63fe3d960,info,1761400610852000
+"Parsing request body...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,9f36ca43-63d1-4eb0-8001-78ab814400d0,info,1761400610852000
+"Raw body content: 
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,680a3f51-4b0d-4107-961a-0712ec2b8bf2,info,1761400610852000
+"Supabase client created
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,b27ee124-1de9-4fb0-a71b-500fc4c5f8da,info,1761400610688000
+"Verifying token...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,88868b5a-a104-4d85-a93e-1ad987378a4b,info,1761400610688000
+"Token received, length: 771
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,945c2f5c-c4a4-46d1-a427-2be03c147503,info,1761400610684000
+"=== subscriptions-update-user START ===
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,b819357d-2ef1-4390-8471-35077b690e7c,info,1761400610683000
+booted (time: 30ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,58f353c2-2b1b-4fc0-a340-0e98df6e0827,log,1761400610678000
+shutdown,Shutdown,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,bb245421-7cd6-4f83-99e1-58946e4de546,log,1761400592001000
+"Token verified. User: jho.j80@gmail.com
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,fbcaa660-997e-4034-a5fe-25cfc4b31806,info,1761400588103000
+"Raw body received (length): 0
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,edfc435e-4c26-478a-8676-c1630df04caf,info,1761400588103000
+"ERROR parsing body: Empty request body
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,c48ab26c-6449-47ae-a606-3a414fd63a69,info,1761400588103000
+"Raw body content: 
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,39d65f17-78c9-413d-88e3-10f4dd38f068,info,1761400588103000
+"Parsing request body...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,18972c91-50a6-4095-a421-6756c98d4a2b,info,1761400588103000
+"Supabase client created
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,6b613b3c-4bbb-4372-9c08-ae12e21cba32,info,1761400587987000
+"Verifying token...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,ab5fae25-9b6a-4ffd-bf73-c5e652c3b071,info,1761400587987000
+"=== subscriptions-update-user START ===
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,ca76c44e-00eb-4f04-9612-4e4d0facbb7a,info,1761400587984000
+"Token received, length: 771
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,2c0b86ce-514a-4e6f-bbec-709504002cf5,info,1761400587984000
+booted (time: 29ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,89ccb292-57e2-427f-8fbc-b0bd35ed958a,log,1761400587978000
+booted (time: 30ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,e9a898fb-2432-4554-a62b-52275033c6d5,log,1761400587786000
+shutdown,Shutdown,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,f5e3c76b-d6fc-4318-86e2-7ce2e221bde5,log,1761400170860000
+"Error stack: SyntaxError: Unexpected end of JSON input
+    at parse (<anonymous>)
+    at packageData (ext:deno_fetch/22_body.js:408:14)
+    at consumeBody (ext:deno_fetch/22_body.js:261:12)
+    at eventLoopTick (ext:core/01_core.js:175:7)
+    at async Object.handler (file:///tmp/user_fn_eypfeiqtvfxxiimhtycc_a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c_14/source/supabase/functions/subscriptions-update-user/index.ts:53:18)
+    at async mapped (ext:runtime/http.js:231:18)
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,f82577d8-7a65-429d-9360-77d597bcb1c1,error,1761399970962000
+"Error stack: SyntaxError: Unexpected end of JSON input
+    at parse (<anonymous>)
+    at packageData (ext:deno_fetch/22_body.js:408:14)
+    at consumeBody (ext:deno_fetch/22_body.js:261:12)
+    at eventLoopTick (ext:core/01_core.js:175:7)
+    at async Object.handler (file:///tmp/user_fn_eypfeiqtvfxxiimhtycc_a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c_14/source/supabase/functions/subscriptions-update-user/index.ts:53:18)
+    at async mapped (ext:runtime/http.js:231:18)
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,da85894c-1056-490e-943f-87d9af0bfa41,error,1761399970962000
+"Error message: Unexpected end of JSON input
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,2240fadf-a5aa-438e-8c8d-63dda95571f5,error,1761399970961000
+"Parsing request body...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,73914d06-e6a7-4f56-b368-9d3992f312b5,info,1761399970961000
+"Token verified. User: jho.j80@gmail.com
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,833b9b74-cbed-4326-818b-47bd667b0bb6,info,1761399970961000
+"=== subscriptions-update-user ERROR ===
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,7f1d89ea-101e-4466-9c8e-59b78c7140c9,error,1761399970961000
+"Error type: SyntaxError
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,3050e034-7146-4514-94f2-b5a9ea501ca4,error,1761399970961000
+"Error message: Unexpected end of JSON input
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,cb6f139e-6e07-4bd3-b14b-d9fed7dc6713,error,1761399970961000
+"Error type: SyntaxError
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,c46c035a-001a-47c8-840d-2587501f6045,error,1761399970961000
+"Token verified. User: jho.j80@gmail.com
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,9b49149c-e6fc-4ddd-89ef-62e29eb29fe8,info,1761399970961000
+"Parsing request body...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,9ecb2d6f-c2e8-428c-96a6-fbb04aba8f41,info,1761399970961000
+"=== subscriptions-update-user ERROR ===
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,6f6584d5-1913-4325-9993-085d94d58ea1,error,1761399970961000
+"Supabase client created
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,896168fe-579e-46d5-8a3b-0396c5a6030d,info,1761399970852000
+"Supabase client created
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,6f3bfde0-6685-4fea-83e4-a00585ea7acb,info,1761399970852000
+"Verifying token...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,1fbff041-b319-4c66-bc78-19ba1bf43714,info,1761399970852000
+"Verifying token...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,494771f4-1a66-462f-bd43-28035b0b0c77,info,1761399970852000
+"Token received, length: 771
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,2f2e4f5e-c30b-46e6-a971-fe044a574d19,info,1761399970849000
+"Token received, length: 771
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,9384e7d6-d7ad-41d8-a4ef-5046464c5471,info,1761399970849000
+"=== subscriptions-update-user START ===
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,167107d5-14a0-420b-b144-889653044b1f,info,1761399970848000
+"=== subscriptions-update-user START ===
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,5fd4f36f-e530-4c2a-a1ff-32d0a6a07188,info,1761399970848000
+booted (time: 30ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,51dd45f5-def5-47a2-902a-0e4b13d401dc,log,1761399970842000
+booted (time: 30ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,0156dca1-2404-424f-8342-478efddf5f25,log,1761399970842000
+shutdown,Shutdown,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,9163a6c7-8877-4ed0-b720-eb5601703431,log,1761399865797000
+"Error stack: SyntaxError: Unexpected end of JSON input
+    at parse (<anonymous>)
+    at packageData (ext:deno_fetch/22_body.js:408:14)
+    at consumeBody (ext:deno_fetch/22_body.js:261:12)
+    at eventLoopTick (ext:core/01_core.js:175:7)
+    at async Object.handler (file:///tmp/user_fn_eypfeiqtvfxxiimhtycc_a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c_14/source/supabase/functions/subscriptions-update-user/index.ts:53:18)
+    at async mapped (ext:runtime/http.js:231:18)
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,6dcf5043-8a8c-475a-b69b-9226a9587b70,error,1761399757932000
+"=== subscriptions-update-user ERROR ===
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,aa60c94e-8d05-4b99-a9ce-f2a3ef1ef7e7,error,1761399757931000
+"Parsing request body...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,e94c3e41-f449-48d1-8bec-a7ccba0da9e1,info,1761399757931000
+"Error type: SyntaxError
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,26132b81-777b-49c6-8d48-84acdaae0eba,error,1761399757931000
+"Token verified. User: jho.j80@gmail.com
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,94677f91-d560-494a-8d33-f268f928a078,info,1761399757931000
+"Error message: Unexpected end of JSON input
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,dd133904-8032-4b30-9af3-11f0a7a04ede,error,1761399757931000
+"Supabase client created
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,bafa5a10-971d-4631-8936-d53fea7ef0b0,info,1761399757826000
+"Verifying token...
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,62ea02b7-40b1-497a-9944-b19b437827ab,info,1761399757826000
+"Token received, length: 771
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,050fc5d2-e4dd-449f-a596-5f7ed7a1fc46,info,1761399757823000
+"=== subscriptions-update-user START ===
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,591391b0-2f5a-4a2a-af8e-2ba80806777e,info,1761399757821000
+booted (time: 33ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,9e94eae3-fd70-48cc-ae19-87ad0c4f1632,log,1761399757816000
+shutdown,Shutdown,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,fa85ef89-1241-41d9-a70b-053602bfe91d,log,1761399167969000
+"Update user subscription error: SyntaxError: Unexpected end of JSON input
+    at parse (<anonymous>)
+    at packageData (ext:deno_fetch/22_body.js:408:14)
+    at consumeBody (ext:deno_fetch/22_body.js:261:12)
+    at eventLoopTick (ext:core/01_core.js:175:7)
+    at async Object.handler (file:///tmp/user_fn_eypfeiqtvfxxiimhtycc_a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c_13/source/supabase/functions/subscriptions-update-user/index.ts:46:18)
+    at async mapped (ext:runtime/http.js:231:18)
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,b05262db-3ccf-42d7-9d12-e19b9c460d29,error,1761398968819000
+"Update user subscription error: SyntaxError: Unexpected end of JSON input
+    at parse (<anonymous>)
+    at packageData (ext:deno_fetch/22_body.js:408:14)
+    at consumeBody (ext:deno_fetch/22_body.js:261:12)
+    at eventLoopTick (ext:core/01_core.js:175:7)
+    at async Object.handler (file:///tmp/user_fn_eypfeiqtvfxxiimhtycc_a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c_13/source/supabase/functions/subscriptions-update-user/index.ts:46:18)
+    at async mapped (ext:runtime/http.js:231:18)
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,57b3d3a1-6c87-4cc7-927c-7cc23e6e070b,error,1761398968819000
+booted (time: 30ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,43d2e779-831e-4317-84b2-eeffa37139a2,log,1761398967951000
+booted (time: 30ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,69cf01b7-799e-419a-88f6-28f9b1f47486,log,1761398967951000
+shutdown,Shutdown,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,c0742f24-7177-403b-81bd-0a216e73512a,log,1761398955070000
+shutdown,Shutdown,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,a7ee0e4d-7e67-41ed-ae58-122b4b5948fc,log,1761398912875000
+shutdown,Shutdown,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,f547042c-42b1-4974-94cf-72c16292889e,log,1761398900189000
+shutdown,Shutdown,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,ad2eb1b8-24f9-4111-bba8-6393bd26f5af,log,1761398900030000
+"Update user subscription error: SyntaxError: Unexpected end of JSON input
+    at parse (<anonymous>)
+    at packageData (ext:deno_fetch/22_body.js:408:14)
+    at consumeBody (ext:deno_fetch/22_body.js:261:12)
+    at eventLoopTick (ext:core/01_core.js:175:7)
+    at async Object.handler (file:///tmp/user_fn_eypfeiqtvfxxiimhtycc_a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c_13/source/supabase/functions/subscriptions-update-user/index.ts:46:18)
+    at async mapped (ext:runtime/http.js:231:18)
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,7a43c077-da59-4072-b834-bcd57287cd48,error,1761398755202000
+booted (time: 30ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,8be25636-6c14-42fd-b879-5836cc4fec8d,log,1761398755054000
+"Update user subscription error: SyntaxError: Unexpected end of JSON input
+    at parse (<anonymous>)
+    at packageData (ext:deno_fetch/22_body.js:408:14)
+    at consumeBody (ext:deno_fetch/22_body.js:261:12)
+    at eventLoopTick (ext:core/01_core.js:175:7)
+    at async Object.handler (file:///tmp/user_fn_eypfeiqtvfxxiimhtycc_a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c_13/source/supabase/functions/subscriptions-update-user/index.ts:46:18)
+    at async mapped (ext:runtime/http.js:231:18)
+",Log,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,91fed2ff-3d83-4d31-a685-9b2bed61a28f,error,1761398713014000
+booted (time: 48ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,bc373e38-3ddf-4afa-bf63-b6a6806b5ac2,log,1761398712848000
+booted (time: 29ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,d6b827a9-1fb5-4153-8895-951d2d608700,log,1761398700172000
+booted (time: 29ms),Boot,a38d4b8d-4f13-4bf1-968f-9b9919b6ed5c,32747100-e5ce-44a3-836f-96035d22d843,log,1761398699995000
