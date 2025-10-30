@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
+import { createPayment } from '@/api/payments';
 
 const HPP_FEE = 50000;
 
@@ -44,29 +46,16 @@ export default function RegisterPage() {
         merchantOrderId
       }));
 
-      // Buat permintaan pembayaran tanpa autentikasi (karena user belum terdaftar)
-      const payRes = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/duitku-payment-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          paymentAmount: total,
-          productDetails,
-          merchantOrderId,
-          customerVaName: form.name || form.email,
-          customerEmail: form.email,
-          paymentMethod: 'ALL',
-          callbackUrl: `${window.location.origin}/payment-callback?register=1` // Tambahkan parameter untuk menandai ini adalah registrasi
-        })
+      // Create payment using the new API
+      const paymentData = await createPayment({
+        amount: total,
+        paymentMethod: 'ALL',
+        orderId: merchantOrderId
       });
-      
-      const payJson = await payRes.json();
-      if (!payRes.ok) throw new Error(payJson.error || payJson.message || 'Failed to create payment request');
 
-      if (payJson.paymentUrl) {
+      if (paymentData.paymentUrl) {
         // Redirect ke halaman pembayaran Duitku
-        window.location.href = payJson.paymentUrl;
+        window.location.href = paymentData.paymentUrl;
         return;
       }
 

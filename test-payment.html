@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Payment Function</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+        <h1 class="text-2xl font-bold text-center mb-6">Test Payment Function</h1>
+        
+        <div id="auth-section" class="mb-6">
+            <h2 class="text-lg font-semibold mb-4">Login</h2>
+            <input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded mb-2">
+            <input type="password" id="password" placeholder="Password" class="w-full p-2 border rounded mb-4">
+            <button id="login-btn" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">
+                Login
+            </button>
+            <button id="signup-btn" class="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600 mt-2">
+                Sign Up
+            </button>
+        </div>
+        
+        <div id="payment-section" class="hidden">
+            <h2 class="text-lg font-semibold mb-4">Create Payment</h2>
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">Amount (Rp)</label>
+                <input type="number" id="amount" value="10000" class="w-full p-2 border rounded">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">Payment Method</label>
+                <select id="payment-method" class="w-full p-2 border rounded">
+                    <option value="VC">Virtual Account</option>
+                    <option value="EW">E-Wallet</option>
+                    <option value="BT">Bank Transfer</option>
+                </select>
+            </div>
+            <button id="pay-btn" class="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600">
+                Create Payment
+            </button>
+            <button id="logout-btn" class="w-full bg-red-500 text-white p-2 rounded hover:bg-red-600 mt-2">
+                Logout
+            </button>
+        </div>
+        
+        <div id="result" class="mt-4 p-4 rounded hidden"></div>
+        
+        <script type="module">
+            import { supabase } from './src/lib/supabaseClient.js';
+            
+            // DOM Elements
+            const authSection = document.getElementById('auth-section');
+            const paymentSection = document.getElementById('payment-section');
+            const resultDiv = document.getElementById('result');
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            
+            // Check if user is already logged in
+            supabase.auth.onAuthStateChange((event, session) => {
+                if (event === 'SIGNED_IN') {
+                    authSection.classList.add('hidden');
+                    paymentSection.classList.remove('hidden');
+                    showResult('Successfully logged in!', 'success');
+                } else if (event === 'SIGNED_OUT') {
+                    authSection.classList.remove('hidden');
+                    paymentSection.classList.add('hidden');
+                    resultDiv.classList.add('hidden');
+                }
+            });
+            
+            // Login function
+            document.getElementById('login-btn').addEventListener('click', async () => {
+                const email = emailInput.value;
+                const password = passwordInput.value;
+                
+                if (!email || !password) {
+                    showResult('Please enter email and password', 'error');
+                    return;
+                }
+                
+                const { error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+                
+                if (error) {
+                    showResult(`Login error: ${error.message}`, 'error');
+                }
+            });
+            
+            // Signup function
+            document.getElementById('signup-btn').addEventListener('click', async () => {
+                const email = emailInput.value;
+                const password = passwordInput.value;
+                
+                if (!email || !password) {
+                    showResult('Please enter email and password', 'error');
+                    return;
+                }
+                
+                const { error } = await supabase.auth.signUp({
+                    email,
+                    password
+                });
+                
+                if (error) {
+                    showResult(`Signup error: ${error.message}`, 'error');
+                } else {
+                    showResult('Signup successful! Please check your email for confirmation.', 'success');
+                }
+            });
+            
+            // Payment function
+            document.getElementById('pay-btn').addEventListener('click', async () => {
+                const amount = document.getElementById('amount').value;
+                const paymentMethod = document.getElementById('payment-method').value;
+                
+                if (!amount || amount < 1000) {
+                    showResult('Amount must be at least Rp 1,000', 'error');
+                    return;
+                }
+                
+                try {
+                    showResult('Creating payment...', 'info');
+                    
+                    const { data, error } = await supabase.functions.invoke('duitku-payment-request', {
+                        body: {
+                            amount: parseInt(amount),
+                            paymentMethod,
+                            productDetails: 'Test Payment',
+                            orderId: `TEST-${Date.now()}`
+                        }
+                    });
+                    
+                    if (error) {
+                        showResult(`Payment error: ${error.message}`, 'error');
+                        return;
+                    }
+                    
+                    if (data?.paymentUrl) {
+                        showResult(`Payment created successfully! Redirecting to payment page...`, 'success');
+                        // In a real app, you would redirect to the payment URL
+                        // window.location.href = data.paymentUrl;
+                        console.log('Payment URL:', data.paymentUrl);
+                    } else {
+                        showResult('Payment created but no payment URL received', 'error');
+                    }
+                } catch (err) {
+                    showResult(`Payment error: ${err.message}`, 'error');
+                }
+            });
+            
+            // Logout function
+            document.getElementById('logout-btn').addEventListener('click', async () => {
+                await supabase.auth.signOut();
+            });
+            
+            // Helper function to show results
+            function showResult(message, type) {
+                resultDiv.classList.remove('hidden', 'bg-green-100', 'bg-red-100', 'bg-blue-100');
+                
+                if (type === 'success') {
+                    resultDiv.classList.add('bg-green-100');
+                } else if (type === 'error') {
+                    resultDiv.classList.add('bg-red-100');
+                } else {
+                    resultDiv.classList.add('bg-blue-100');
+                }
+                
+                resultDiv.innerHTML = message;
+            }
+        </script>
+    </div>
+</body>
+</html>

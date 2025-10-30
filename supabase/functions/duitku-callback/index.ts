@@ -108,17 +108,30 @@ Deno.serve(async (req) => {
     const resultMessage = (callbackData.resultMessage || callbackData['resultmessage']) as string | undefined;
     const signature = (callbackData.signature || callbackData['x-signature'] || callbackData['Signature']) as string | undefined;
 
-    // Load API key from env according to environment
+    // Load Duitku configuration from environment
     // @ts-ignore: Deno is available at runtime
-    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'sandbox').toLowerCase();
+    const DUITKU_MERCHANT_CODE = Deno.env.get('DUITKU_MERCHANT_CODE') || '';
     // @ts-ignore: Deno is available at runtime
-    const SANDBOX_API_KEY = Deno.env.get('DUITKU_SANDBOX_API_KEY') || '';
+    const DUITKU_MERCHANT_KEY = Deno.env.get('DUITKU_MERCHANT_KEY') || '';
     // @ts-ignore: Deno is available at runtime
-    const PROD_API_KEY = Deno.env.get('DUITKU_PRODUCTION_API_KEY') || '';
-    const ACTIVE_API_KEY = ENV === 'production' ? PROD_API_KEY : SANDBOX_API_KEY;
+    const DUITKU_SIGNATURE_ALGO = (Deno.env.get('DUITKU_SIGNATURE_ALGO') || 'md5').toLowerCase();
 
-    // Compute expected signature (SHA-256 hex of merchantCode + merchantOrderId + amount + apiKey)
-    const toHex = (buf: ArrayBuffer) => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    // MD5 implementation for callback verification
+    async function md5hex(s: string): Promise<string> {
+      try {
+        const { md5 } = await import('https://deno.land/std@0.177.0/crypto/md5.ts');
+        return md5(s);
+      } catch (e) {
+        console.log('MD5 import failed, using fallback');
+        const encoder = new TextEncoder();
+        const data = encoder.encode(s);
+        const hashBuffer = await crypto.subtle.digest('MD5', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+    }
+
+    // Helper for timing-safe comparison
     const timingSafeEqual = (a: string, b: string) => {
       const aBytes = new TextEncoder().encode(a);
       const bBytes = new TextEncoder().encode(b);
@@ -144,23 +157,51 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!ACTIVE_API_KEY) {
-      console.warn('Duitku API key not set in environment, skipping signature verification');
+    if (!DUITKU_MERCHANT_KEY) {
+      console.warn('Duitku merchant key not set in environment, skipping signature verification');
     } else {
       try {
-        const rawString = `${merchantCode}${merchantOrderId}${amount}${ACTIVE_API_KEY}`;
-        const enc = new TextEncoder();
-        const digest = await crypto.subtle.digest('SHA-256', enc.encode(rawString));
-        const expected = toHex(digest);
-        if (!signature || !timingSafeEqual(expected, String(signature).toLowerCase())) {
-          console.error('Invalid or missing signature', { expected, provided: signature });
+        // FIXED: Use MD5 signature verification according to Duitku PHP library
+        // For callback: MD5(merchantCode + amount + merchantOrderId + merchantKey)
+        const rawString = `${merchantCode}${amount}${merchantOrderId}${DUITKU_MERCHANT_KEY}`;
+        
+        console.log('🔍 Callback Signature Debug:', {
+          merchantCode,
+          amount,
+          merchantOrderId,
+          merchantKey: DUITKU_MERCHANT_KEY.substring(0, 10) + '...',
+          signatureString: rawString,
+          algorithm: DUITKU_SIGNATURE_ALGO
+        });
+
+        let expected: string;
+        if (DUITKU_SIGNATURE_ALGO === 'md5') {
+          expected = await md5hex(rawString);
+        } else {
+          // Fallback to SHA-256 if specified
+          const toHex = (buf: ArrayBuffer) => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+          const enc = new TextEncoder();
+          const digest = await crypto.subtle.digest('SHA-256', enc.encode(rawString));
+          expected = toHex(digest);
+        }
+
+        console.log('🔐 Signature Verification:', {
+          expected,
+          provided: signature,
+          valid: signature && timingSafeEqual(expected.toLowerCase(), String(signature).toLowerCase())
+        });
+
+        if (!signature || !timingSafeEqual(expected.toLowerCase(), String(signature).toLowerCase())) {
+          console.error('❌ Invalid or missing signature', { expected, provided: signature });
           return new Response(
             JSON.stringify({ success: false, message: 'Invalid signature' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
           );
         }
+
+        console.log('✅ Signature verification successful');
       } catch (sigErr) {
-        console.error('Signature verification error:', sigErr);
+        console.error('❌ Signature verification error:', sigErr);
         return new Response(
           JSON.stringify({ success: false, message: 'Signature verification error' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

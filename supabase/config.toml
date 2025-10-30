@@ -823,7 +823,7 @@ entrypoint = "./functions/duitku-callback/index.ts"
 
 [functions.duitku-payment-request]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/duitku-payment-request/deno.json"
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/duitku-payment-request/index.ts"
