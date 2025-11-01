@@ -1,9 +1,14 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from '@supabase/supabase-js'
-import { corsHeaders } from '../_shared/cors.ts'
+import { getCorsHeaders } from '../_shared/cors.ts'
+import { createSupabaseClient, getUserIdFromToken } from '../_shared/auth.ts'
 
 Deno.serve(async (req) => {
+  // Get origin from request headers for dynamic CORS
+  const origin = req.headers.get('origin') || '';
+  const corsHeaders = getCorsHeaders(origin);
+  
   // Handle preflight request
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -18,7 +23,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Email and password are required' }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: corsHeaders,
           status: 400
         }
       )
@@ -40,21 +45,26 @@ Deno.serve(async (req) => {
     })
 
     if (authError) {
-      console.error('Supabase Auth login failed for ${normalizedEmail}:', authError.message)
+      console.error(`Supabase Auth login failed for ${normalizedEmail}:`, authError.message)
       
       // Provide specific error messages based on the error
-      let errorMessage = 'Invalid credentials'
+      let errorMessage = 'Invalid email or password'
       
-      if (authError.message.includes('Email not confirmed')) {
+      if (authError.message.includes('Email not confirmed') || authError.message.includes('email_not_confirmed')) {
         errorMessage = 'Please confirm your email before logging in. Check your inbox for the confirmation link.'
-      } else if (authError.message.includes('Invalid login credentials')) {
-        errorMessage = 'Invalid email or password'
+      } else if (authError.message.includes('Invalid login credentials') || authError.message.includes('invalid_credentials')) {
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.'
+      } else if (authError.message.includes('User not found')) {
+        errorMessage = 'No account found with this email address.'
       }
       
       return new Response(
-        JSON.stringify({ error: errorMessage }),
+        JSON.stringify({ 
+          error: errorMessage,
+          details: authError.message // Include original error for debugging
+        }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: corsHeaders,
           status: 401
         }
       )
@@ -64,7 +74,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Invalid credentials' }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: corsHeaders,
           status: 401
         }
       )
@@ -104,10 +114,45 @@ Deno.serve(async (req) => {
           return new Response(
             JSON.stringify({ error: 'Failed to create user profile' }),
             { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              headers: corsHeaders,
               status: 500
             }
           )
+        }
+
+        // Subscription check for new user (though unlikely to have subscription)
+        if (normalizedEmail !== 'demo@gmail.com' && normalizedEmail !== 'jho.j80@gmail.com') {
+          let effectiveUserId = newUserData.id;
+          if (newUserData.role === 'cashier') {
+            effectiveUserId = newUserData.tenant_id;
+          }
+          const { data: subscription, error: subError } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', effectiveUserId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          if (subscription) {
+            // Normalize dates to start of day (date-only) to avoid timezone boundary issues
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const endDate = new Date(subscription.end_date);
+            endDate.setHours(0, 0, 0, 0);
+            // Treat end_date as inclusive - subscription expires at end of day
+            // Add one day to end_date before comparing to treat it as inclusive
+            const endDateInclusive = new Date(endDate);
+            endDateInclusive.setDate(endDateInclusive.getDate() + 1);
+            if (today >= endDateInclusive) {
+              return new Response(
+                JSON.stringify({ error: 'Subscription expired', message: 'Langganan Anda telah berakhir. Silakan perpanjang untuk melanjutkan.', subscriptionExpired: true }),
+                {
+                  headers: corsHeaders,
+                  status: 403
+                }
+              );
+            }
+          }
         }
 
         const userResponse = {
@@ -115,14 +160,21 @@ Deno.serve(async (req) => {
           tenantId: newUserData.tenant_id
         }
 
+        // Return user, token, and session info for proper client-side session management
         return new Response(
           JSON.stringify({
             user: userResponse,
             token: authData.session.access_token,
+            session: {
+              access_token: authData.session.access_token,
+              refresh_token: authData.session.refresh_token,
+              expires_at: authData.session.expires_at,
+              expires_in: authData.session.expires_in
+            },
             message: 'Login successful'
           }),
           { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: corsHeaders,
             status: 200
           }
         )
@@ -131,10 +183,46 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Failed to fetch user profile' }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: corsHeaders,
           status: 500
         }
       )
+    }
+
+    // Subscription check
+    if (normalizedEmail !== 'demo@gmail.com' && normalizedEmail !== 'jho.j80@gmail.com') {
+      let effectiveUserId = userData.id;
+      if (userData.role === 'cashier') {
+        effectiveUserId = userData.tenant_id;
+      }
+      const { data: subscription, error: subError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', effectiveUserId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (subscription) {
+        // Normalize dates to start of day (date-only) to avoid timezone boundary issues
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endDate = new Date(subscription.end_date);
+        endDate.setHours(0, 0, 0, 0);
+        // Treat end_date as inclusive - subscription expires at end of day
+        // Add one day to end_date before comparing to treat it as inclusive
+        const endDateInclusive = new Date(endDate);
+        endDateInclusive.setDate(endDateInclusive.getDate() + 1);
+        if (today >= endDateInclusive) {
+          return new Response(
+            JSON.stringify({ error: 'Subscription expired', message: 'Langganan Anda telah berakhir. Silakan perpanjang untuk melanjutkan.', subscriptionExpired: true }),
+            {
+              headers: corsHeaders,
+              status: 403
+            }
+          );
+        }
+      }
     }
 
     const userResponse = {
@@ -142,23 +230,31 @@ Deno.serve(async (req) => {
       tenantId: userData.tenant_id
     }
 
+    // Return user, token, and session info for proper client-side session management
     return new Response(
       JSON.stringify({
         user: userResponse,
         token: authData.session.access_token,
+        session: {
+          access_token: authData.session.access_token,
+          refresh_token: authData.session.refresh_token,
+          expires_at: authData.session.expires_at,
+          expires_in: authData.session.expires_in
+        },
         message: 'Login successful'
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: corsHeaders,
         status: 200
       }
     )
+
   } catch (error) {
-    console.error('Login error:', error)
+    console.error('Unexpected error in auth-login function:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: corsHeaders,
         status: 500
       }
     )

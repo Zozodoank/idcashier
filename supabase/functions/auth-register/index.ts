@@ -12,40 +12,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Parse the request body first to check if this is a payment callback registration
-    const requestData = await req.json()
-    const isPaymentCallback = requestData.paymentCompleted === true
-    
-    // Skip authorization check for payment callback registrations
-    if (!isPaymentCallback) {
-      // Get authorization token FIRST for normal admin registrations
-      const authHeader = req.headers.get('Authorization')
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return new Response(
-          JSON.stringify({ error: 'Authorization token required' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-        )
-      }
-
-      const token = authHeader.substring(7)
-      
-      // Verify token and get user email
-      const userEmail = await getUserEmailFromToken(token)
-      
-      // Only jho.j80@gmail.com can register new users through admin flow
-      if (userEmail !== 'jho.j80@gmail.com') {
-        return new Response(
-          JSON.stringify({ error: 'Access denied. Admin privileges required.' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
-        )
-      }
-    }
-
     // Create Supabase client using service role
     const supabase = createSupabaseClient()
 
-    // Parse the request body (safe now, auth already verified)
-    const { name, email, password, role = 'owner', tenant_id, permissions } = await req.json()
+    // Parse the request body
+    const { name, email, password, role = 'owner', tenant_id, permissions, trialDays } = await req.json()
     
     // Validate input
     if (!name || !email || !password) {
@@ -69,26 +40,26 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Check if user already exists
-    const { data: existingUsers, error: existingError } = await supabase
+    // Soft-check existing user (both Auth and public)
+    const { data: existingPublic, error: existingPublicErr } = await supabase
       .from('users')
       .select('id')
       .eq('email', email)
-
-    if (existingError) {
-      console.error(`Database error checking existing user ${email}:`, existingError)
-      throw existingError
+    if (existingPublicErr) {
+      console.error(`Database error checking existing public user ${email}:`, existingPublicErr)
+      throw existingPublicErr
     }
 
-    if (existingUsers.length > 0) {
-      return new Response(
-        JSON.stringify({ error: 'User already exists' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 409
-        }
-      )
-    }
+    // Try find existing auth user by email
+    const { data: existingAuth, error: existingAuthErr } = await supabase
+      .schema('auth')
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .limit(1)
+      .single()
+    // Note: if not found, existingAuthErr may be set; we'll ignore 'no rows' error safely below
+    const existingAuthId = existingAuth?.id as string | undefined;
 
     // Validate permissions for cashier role
     let userPermissions = null
@@ -110,61 +81,107 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Create Supabase Auth user first
-    const { data: authData, error: createAuthError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Auto-confirm email, or set to false if email verification is required
-      user_metadata: {
-        name,
-        role
+    // Ensure Supabase Auth user
+    let userId: string
+    if (existingAuthId) {
+      // Update password to ensure login works
+      const { error: updPwdErr } = await supabase.auth.admin.updateUserById(existingAuthId, {
+        password,
+      })
+      if (updPwdErr) {
+        console.error(`Supabase Auth error updating password ${email}:`, updPwdErr)
+        return new Response(
+          JSON.stringify({ error: 'Failed to update user password: ' + updPwdErr.message }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        )
       }
-    })
-
-    if (createAuthError) {
-      console.error(`Supabase Auth error creating user ${email}:`, createAuthError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to create user account: ' + createAuthError.message }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
-        }
-      )
+      userId = existingAuthId
+    } else {
+      const { data: authData, error: createAuthError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { name, role }
+      })
+      if (createAuthError || !authData?.user?.id) {
+        console.error(`Supabase Auth error creating user ${email}:`, createAuthError)
+        return new Response(
+          JSON.stringify({ error: 'Failed to create user account: ' + (createAuthError?.message || 'Unknown error') }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        )
+      }
+      userId = authData.user.id
     }
-
-    // Use the Auth user ID for consistency between auth.users and public.users
-    const userId = authData.user.id
     
     // For owner, tenant_id will be set to userId (self-reference)
     // For cashier, tenant_id should be provided in request (reference to owner)
     // FK constraint has been removed to allow owner self-reference
     const userTenantId = role === 'owner' ? userId : tenant_id
 
-    // Create user in public.users (without password field)
-    const { data: newUser, error: insertError } = await supabase
+    // Upsert user in public.users (id is the conflict target)
+    const { data: newUser, error: upsertError } = await supabase
       .from('users')
-      .insert([
-        {
-          id: userId,
-          name,
-          email,
-          role,
-          tenant_id: userTenantId,
-          permissions: userPermissions
-        }
-      ])
+      .upsert({
+        id: userId,
+        name,
+        email,
+        role,
+        tenant_id: userTenantId,
+        permissions: userPermissions
+      }, { onConflict: 'id' })
       .select('id, name, email, role, tenant_id, permissions, created_at')
       .single()
 
-    if (insertError) {
-      console.error(`Database error creating user ${email}:`, insertError)
-      // Rollback: delete the auth user if database insert fails
+    if (upsertError) {
+      console.error(`Database error upserting user ${email}:`, upsertError)
+      // Jangan hapus auth user; cukup kembalikan error jelas
+      return new Response(
+        JSON.stringify({ error: 'Failed to create user account: Database error creating/updating user' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+
+    // Create trial subscription if trialDays is provided (supports negative for expired trials)
+    if (typeof trialDays === 'number' && trialDays !== 0) {
       try {
-        await supabase.auth.admin.deleteUser(userId)
-      } catch (deleteError) {
-        console.error('Failed to rollback auth user:', deleteError)
+        const today = new Date()
+        if (trialDays > 0) {
+          const endDate = new Date(today)
+          endDate.setDate(endDate.getDate() + trialDays)
+          const { error: subscriptionError } = await supabase
+            .from('subscriptions')
+            .insert([
+              {
+                id: crypto.randomUUID(),
+                user_id: userId,
+                start_date: today.toISOString().split('T')[0],
+                end_date: endDate.toISOString().split('T')[0]
+              }
+            ])
+          if (subscriptionError) console.error('Error creating trial subscription:', subscriptionError)
+        } else {
+          // expired: start |trialDays| days ago, end yesterday
+          const start = new Date(today)
+          start.setDate(start.getDate() + trialDays) // trialDays negative
+          const end = new Date(today)
+          end.setDate(end.getDate() - 1)
+          // cleanup existing
+          await supabase.from('subscriptions').delete().eq('user_id', userId)
+          const { error: subscriptionError } = await supabase
+            .from('subscriptions')
+            .insert([
+              {
+                id: crypto.randomUUID(),
+                user_id: userId,
+                start_date: start.toISOString().split('T')[0],
+                end_date: end.toISOString().split('T')[0]
+              }
+            ])
+          if (subscriptionError) console.error('Error creating expired trial:', subscriptionError)
+        }
+      } catch (subscriptionError) {
+        console.error('Error creating trial subscription:', subscriptionError)
       }
-      throw insertError
     }
 
     // Prepare user response with tenantId
@@ -173,10 +190,14 @@ Deno.serve(async (req) => {
       tenantId: newUser.tenant_id
     }
 
+    const message = trialDays 
+      ? `User registered successfully with ${trialDays} days trial. You can now log in with your credentials.`
+      : 'User registered successfully. You can now log in with your credentials.'
+
     return new Response(
       JSON.stringify({
         user: userResponse,
-        message: 'User registered successfully. You can now log in with your credentials.',
+        message,
         emailVerificationSent: false // Set to true if enable_confirmations is true in config
       }),
       { 

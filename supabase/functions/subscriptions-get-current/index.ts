@@ -37,10 +37,9 @@ Deno.serve(async (req) => {
       .from('subscriptions')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .maybeSingle()
     
-    // Handle case where no subscription exists (PGRST116 means no rows returned)
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error('Database error fetching subscription for user ${userId}:', error)
       throw error
     }

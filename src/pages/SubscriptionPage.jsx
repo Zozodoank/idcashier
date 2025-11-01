@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -10,6 +11,7 @@ import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 
 const SubscriptionPage = () => {
+  const navigate = useNavigate();
   const { t } = useLanguage();
   const { user, token } = useAuth();
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -42,9 +44,16 @@ const SubscriptionPage = () => {
         setSubscriptionData(subscription);
         
         if (subscription) {
+          // Normalize dates to start of day (date-only) to avoid timezone boundary issues
           const today = new Date();
+          today.setHours(0, 0, 0, 0);
           const endDate = new Date(subscription.end_date);
-          const isActive = endDate >= today;
+          endDate.setHours(0, 0, 0, 0);
+          // Treat end_date as inclusive - subscription expires at end of day
+          // Add one day to end_date before comparing to treat it as inclusive
+          const endDateInclusive = new Date(endDate);
+          endDateInclusive.setDate(endDateInclusive.getDate() + 1);
+          const isActive = today < endDateInclusive;
           
           setIsSubscribed(isActive);
           setSubscriptionEndDate(subscription.end_date);
@@ -168,9 +177,9 @@ const SubscriptionPage = () => {
         <div className="mt-6">
           <button
             className="px-4 py-2 rounded bg-white text-primary font-semibold"
-            onClick={() => window.location.href = '/register?renew=1&plan=1&price=50000'}
+            onClick={() => navigate('/renewal')}
           >
-            Perpanjang Langganan
+            Perpanjang Sekarang
           </button>
         </div>
         </motion.div>

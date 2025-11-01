@@ -111,16 +111,16 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = await authAPI.login(email, password);
       
-      // Check if result.token is null and handle session retrieval
-      if (result.token === null) {
-        const { data: session } = await supabase.auth.getSession();
-        if (session && session.access_token) {
-          result.token = session.access_token;
-        } else {
-          throw new Error('Authentication failed: No session exists');
-        }
+      // Check for subscription expired error
+      if (result.error && result.subscriptionExpired) {
+        return {
+          success: false,
+          error: result.error,
+          subscriptionExpired: true
+        };
       }
       
+      // The edge function now returns token directly, no need for session fallback
       if (result.token && result.user) {
         setToken(result.token);
         // Ensure tenantId is properly set

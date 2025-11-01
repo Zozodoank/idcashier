@@ -50,109 +50,82 @@ export const authAPI = {
       // Log login attempt
       console.log(`Attempting login for: ${normalizedEmail}`);
       
-      // First, try to sign in with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password: password
+      // Call auth-login edge function using fetch to access HTTP status
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
+      
+      // Use the Supabase URL to call the edge function
+      const functionsUrl = `${supabaseUrl}/functions/v1/auth-login`;
+      const response = await fetch(functionsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`
+        },
+        body: JSON.stringify({ email: normalizedEmail, password })
       });
-      
-      if (authError) {
-        // Map Supabase errors to the expected format
-        let errorMessage = 'Login failed';
-        if (authError.status === 400) {
-          errorMessage = 'Email atau password salah';
-        } else if (authError.status === 401) {
-          errorMessage = 'Email atau password salah';
-        } else if (authError.status === 500) {
-          errorMessage = 'Server error, silakan coba lagi';
-        } else {
-          errorMessage = authError.message || 'Login failed';
-        }
-        throw new Error(errorMessage);
+
+      const data = await response.json();
+
+      // Check for HTTP 403 with subscription expired
+      if (response.status === 403 && data.subscriptionExpired === true) {
+        return {
+          success: false,
+          error: data.message || data.error || 'Langganan Anda telah berakhir. Silakan perpanjang untuk melanjutkan.',
+          subscriptionExpired: true
+        };
       }
-      
-      if (!authData.session) {
-        throw new Error('Login failed: session not created');
+
+      // Check for other errors
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `Login failed with status ${response.status}`);
       }
-      
-      // Ensure the session is properly set
-      if (authData.session) {
-        await supabase.auth.setSession(authData.session);
+
+      if (!data || !data.user || !data.token) {
+        throw new Error('Invalid response from server');
       }
-      
-      // Add a small delay to ensure the session is properly propagated
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Get user profile from users table by EMAIL instead of ID
-      // This solves the ID mismatch issue between Supabase Auth and database
-      // Fallback strategy implemented to handle RLS configuration issues that cause error 406
-      // If .single() fails with PGRST116 (406), try query without .single() and handle array result
-      // This is defensive programming for RLS misconfiguration; for permanent fix, see SUPABASE_RLS_FIX.sql
-      let userData;
-      try {
-        const result = await supabase
-          .from('users')
-          .select('id, name, email, role, tenant_id, permissions, created_at')
-          .eq('email', normalizedEmail)  // Use email instead of ID
-          .single();
-        userData = result.data;
-        if (result.error) {
-          throw result.error;
-        }
-      } catch (singleError) {
-        // Handle error 406 (PGRST116) with fallback strategy
-        if (singleError.code === 'PGRST116') {
-          console.error('Error 406 detected in login - likely RLS configuration issue:', {
-            code: singleError.code,
-            message: singleError.message,
-            details: singleError.details,
-            hint: singleError.hint
+
+      // Set session token using supabase.auth.setSession() if session data is available
+      if (data.session && data.session.access_token && data.session.refresh_token) {
+        try {
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token
           });
-          console.log('Attempting fallback query without .single() to bypass potential RLS block');
-          
-          // Fallback: query without .single() to get array
-          const { data: userArray, error: arrayError } = await supabase
-            .from('users')
-            .select('id, name, email, role, tenant_id, permissions, created_at')
-            .eq('email', normalizedEmail);
-          
-          if (arrayError) {
-            console.error('Fallback query also failed:', arrayError);
-            throw new Error('Failed to get user profile: ' + arrayError.message);
-          }
-          
-          if (userArray.length === 0) {
-            console.log('Fallback query returned empty array - user not found');
-            throw new Error('User not found');
-          } else if (userArray.length === 1) {
-            console.log('Fallback query succeeded with single user');
-            userData = userArray[0];
-          } else {
-            console.log('Fallback query returned multiple users - data inconsistency');
-            throw new Error('Multiple users found');
-          }
-          
-          console.log('RLS issue confirmed - fallback succeeded. For permanent fix, apply policies from SUPABASE_RLS_FIX.sql');
-        } else {
-          // Re-throw non-406 errors
-          throw singleError;
+        } catch (sessionError) {
+          // If setSession fails, log but continue - token will be used directly
+          console.log('Could not set session, will use token directly:', sessionError);
         }
       }
-      
+
       // Include tenant_id as tenantId in response
       const userResponse = {
-        ...userData,
-        tenantId: userData.tenant_id
+        ...data.user,
+        tenantId: data.user.tenant_id || data.user.tenantId
       };
       
       return {
         user: userResponse,
-        token: authData.session.access_token,
-        message: 'Login successful'
+        token: data.token,
+        message: data.message || 'Login successful'
       };
     } catch (error) {
       // Log error detail for debugging
       console.log(`Login error: ${error.message}`);
+      
+      // Check if error is from edge function with subscription expired
+      if (error.message && (error.message.includes('subscriptionExpired') || error.message.includes('Subscription expired'))) {
+        return {
+          success: false,
+          error: 'Langganan Anda telah berakhir. Silakan perpanjang untuk melanjutkan.',
+          subscriptionExpired: true
+        };
+      }
+      
       // Re-throw other errors
       throw error;
     }
@@ -2135,12 +2108,12 @@ export const subscriptionAPI = {
         .from('subscriptions')
         .select('*')
         .eq('user_id', userData.id) // Use database user ID instead of Supabase Auth user ID
-        .single();
-      
+        .maybeSingle();
+
       // Log response for debugging
       console.log('Subscription API response status:');
-      
-      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows returned
+
+      if (error) {
         throw new Error(error.message || 'Failed to get subscription');
       }
       

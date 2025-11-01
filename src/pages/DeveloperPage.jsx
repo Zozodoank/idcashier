@@ -8,14 +8,13 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Trash2, Edit, CheckCircle, XCircle } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 
 const DeveloperPage = () => {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [users, setUsers] = useState([]);
-  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', activePeriod: '12' });
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -60,87 +59,6 @@ const DeveloperPage = () => {
   useEffect(() => {
     fetchUsers();
   }, []);
-
-  const saveUser = async (userData) => {
-    try {
-      // For now, we'll just refetch all users
-      await fetchUsers();
-    } catch (error) {
-      console.error('Error saving user:', error);
-      toast({ title: t('error'), description: t('failedToSaveUser'), variant: 'destructive' });
-    }
-  };
-
-  const handleAddUser = async () => {
-    if (!newUser.name || !newUser.email || !newUser.password) {
-      toast({ title: t('error'), description: t('fillAllFields'), variant: 'destructive' });
-      return;
-    }
-
-    try {
-      // Get auth token
-      const token = localStorage.getItem('idcashier_token');
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-      
-      // Register new user through the auth Edge Function
-      const { data: authData, error: authError } = await supabase.functions.invoke('auth-register', {
-        body: JSON.stringify({
-          name: newUser.name,
-          email: newUser.email,
-          password: newUser.password,
-          role: 'owner'
-        })
-      });
-
-      if (authError) {
-        throw new Error(authError.message || 'Failed to register user');
-      }
-      
-      if (authData?.error) {
-        throw new Error(authData.error);
-      }
-      
-      // Get the newly created user ID from the response
-      const newUserId = authData?.user?.id || authData?.id;
-      
-      if (!newUserId) {
-        throw new Error('Failed to get new user ID from registration response');
-      }
-      
-      // Convert activePeriod to number (months)
-      const months = parseInt(newUser.activePeriod, 10);
-      
-      // Create subscription for the new user using subscriptions-update-user
-      const { data: subscriptionData, error: subscriptionError } = await supabase.functions.invoke('subscriptions-update-user', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        body: {
-          userId: newUserId,
-          months: months
-        }
-      });
-
-      if (subscriptionError) {
-        console.error('Error creating subscription:', subscriptionError);
-        toast({ title: t('warning'), description: 'User created but subscription creation failed. Please extend subscription manually.' });
-      }
-      
-      if (subscriptionData?.error) {
-        console.error('Error in subscription data:', subscriptionData.error);
-        toast({ title: t('warning'), description: 'User created but subscription creation failed. Please extend subscription manually.' });
-      }
-
-      setNewUser({ name: '', email: '', password: '', activePeriod: '12' });
-      await fetchUsers();
-      toast({ title: t('success'), description: t('userAddedWithSubscription') || 'User added successfully with subscription' });
-    } catch (error) {
-      console.error('Error adding user:', error);
-      toast({ title: t('error'), description: error.message || t('failedToAddUser'), variant: 'destructive' });
-    }
-  };
 
   const handleEditUser = (user) => {
     setCurrentUser(user);
@@ -207,9 +125,13 @@ const DeveloperPage = () => {
         throw new Error('Not authenticated');
       }
       
-      // Delete user through the users Edge Function (ID in URL params)
-      const { data, error } = await supabase.functions.invoke(`users-delete?id=${currentUser.id}`, {
-        method: 'DELETE',
+      const payload = {
+        userId: currentUser.id,
+        operation: 'delete' // Add operation parameter
+      };
+      
+      const { data, error } = await supabase.functions.invoke('subscriptions-update-user', {
+        body: JSON.stringify(payload),
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -260,29 +182,8 @@ const DeveloperPage = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold mb-2">{t('customerManagement')}</h1>
-          <p className="text-muted-foreground">{t('developerSubtitle')}</p>
+          <p className="text-muted-foreground">Kelola subscription customer yang sudah terdaftar</p>
         </div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-card border rounded-xl p-6 shadow-lg">
-          <h2 className="text-xl font-semibold mb-4">{t('addCustomer')}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            <div><Label htmlFor="name">{t('name')}</Label><Input id="name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} placeholder={t('customerNamePlaceholder')} /></div>
-            <div><Label htmlFor="email">{t('email')}</Label><Input id="email" type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder={t('emailPlaceholder')} /></div>
-            <div><Label htmlFor="password">Password</Label><Input id="password" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="••••••••" /></div>
-            <div>
-              <Label htmlFor="activePeriod">Masa Aktif</Label>
-              <Select value={newUser.activePeriod} onValueChange={(value) => setNewUser({ ...newUser, activePeriod: value })}>
-                <SelectTrigger id="activePeriod"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="3">{t('threeMonths')}</SelectItem>
-                  <SelectItem value="6">{t('sixMonths')}</SelectItem>
-                  <SelectItem value="12">{t('oneYear')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <Button onClick={handleAddUser} className="w-full md:w-auto"><Plus className="w-4 h-4 mr-2" />{t('addCustomer')}</Button>
-        </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-card border rounded-xl p-6 shadow-lg">
           <h2 className="text-xl font-semibold mb-4">{t('customers')}</h2>

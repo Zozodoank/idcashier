@@ -81,7 +81,8 @@ const DashboardLayout = () => {
   const { user, updateUser, logout } = useAuth();
   const { hppEnabled } = useHPP();
   const [subscriptionInactive, setSubscriptionInactive] = useState(false);
-  
+  const [subscriptionData, setSubscriptionData] = useState(null);
+
   // Simplified state initialization without localStorage access
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuItems, setMenuItems] = useState([]);
@@ -134,9 +135,11 @@ const DashboardLayout = () => {
           const today = new Date();
           const endDate = new Date(sub.end_date);
           setSubscriptionInactive(endDate < today);
+          setSubscriptionData(sub);
         } else {
           // Jika tidak ada data subscription, anggap tidak aktif
           setSubscriptionInactive(true);
+          setSubscriptionData(null);
         }
       } catch (e) {
         // Pada error, jangan blokir total supaya pengguna tetap bisa mengakses
@@ -191,7 +194,7 @@ const DashboardLayout = () => {
 
     setMenuItems(filtered);
   }, [t, user, language, hppEnabled]);
-  
+
   // Handle navigation redirect if HPP disabled
   useEffect(() => {
     if (!hppEnabled && (currentPage === 'employees' || currentPage === 'expenses')) {
@@ -241,7 +244,7 @@ const DashboardLayout = () => {
       {item.label}
     </Button>
   );
-  
+
   // Show skeleton/placeholder when user is not available
   if (!user) {
     return (
@@ -290,7 +293,37 @@ const DashboardLayout = () => {
           </div>
         </div>
       </header>
-      
+
+      {/* Trial Expired Warning Banner */}
+      {(() => {
+        const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@gmail.com,jho.j80@gmail.com')
+          .split(',')
+          .map(e => String(e || '').trim().toLowerCase())
+          .filter(Boolean);
+        const isWhitelisted = whitelist.includes(String(user?.email || '').toLowerCase());
+
+        if (!isWhitelisted && subscriptionInactive) {
+          return (
+            <div className="bg-red-500 text-white px-4 py-3 text-center relative z-40">
+              <div className="flex items-center justify-center gap-2">
+                <span className="font-medium">
+                  ⚠️ Trial Anda telah berakhir. Lakukan pembayaran agar dapat menggunakan aplikasi kembali.
+                </span>
+                <Button 
+                  size="sm" 
+                  variant="secondary" 
+                  className="ml-4 bg-white text-red-500 hover:bg-gray-100"
+                  onClick={() => handleMenuClick('subscription')}
+                >
+                  Perpanjang Sekarang
+                </Button>
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })()}
+
       <div className="flex">
          <aside
           className={`fixed md:sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 border-r bg-card transform transition-transform ${

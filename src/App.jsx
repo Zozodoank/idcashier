@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from '@/pages/LandingPage';
 import RegisterPage from '@/pages/RegisterPage';
-import HPPInfoPage from '@/pages/HPPInfoPage';
+import RenewalPage from '@/pages/RenewalPage';
 import LoginPage from '@/pages/LoginPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import PaymentCallbackPage from '@/pages/PaymentCallbackPage';
@@ -57,7 +57,7 @@ function App() {
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/register" element={<RegisterPage />} />
-                  <Route path="/hpp-info" element={<HPPInfoPage />} />
+                  <Route path="/renewal" element={<RenewalPage />} />
                   <Route path="/payment-callback" element={<PaymentCallbackPage />} />
                   <Route path="/dashboard/*" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>} />
                   <Route path="*" element={<Navigate to="/" />} />

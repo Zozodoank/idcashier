@@ -79,8 +79,8 @@ Deno.serve(async (req) => {
       )
     }
     
-    const { userId: targetUserId, months } = body
-    console.log('Extracted - targetUserId:', targetUserId, 'months:', months)
+    const { userId: targetUserId, months, operation, reason } = body
+    console.log('Extracted - targetUserId:', targetUserId, 'months:', months, 'operation:', operation)
 
     if (!targetUserId) {
       console.log('ERROR: No targetUserId provided')
@@ -91,6 +91,112 @@ Deno.serve(async (req) => {
           status: 400
         }
       )
+    }
+
+    // Handle different operations
+    if (operation) {
+      console.log('Processing operation:', operation)
+      
+      switch (operation) {
+        case 'delete':
+          // Check if target user is protected
+          const { data: targetUserData, error: targetUserError } = await supabase
+            .from('users')
+            .select('email')
+            .eq('id', targetUserId)
+            .single()
+          
+          if (targetUserError) {
+            throw new Error('User not found')
+          }
+          
+          // Prevent deleting protected users
+          if (targetUserData.email === 'demo@gmail.com' || targetUserData.email === 'jho.j80@gmail.com') {
+            return new Response(
+              JSON.stringify({ error: 'Cannot delete protected user' }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+            )
+          }
+          
+          // Delete user from auth.users
+          const { error: deleteError } = await supabase.auth.admin.deleteUser(targetUserId)
+          if (deleteError) {
+            throw new Error(`Failed to delete user: ${deleteError.message}`)
+          }
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              operation: 'delete', 
+              result: { userId: targetUserId }, 
+              message: 'User deleted successfully' 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          )
+
+        case 'ban':
+          // Disable user by setting end_date to yesterday
+          const yesterday = new Date()
+          yesterday.setDate(yesterday.getDate() - 1)
+
+          // Get current subscription
+          const { data: banSub } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', targetUserId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+
+          if (banSub) {
+            // Update existing subscription to expire yesterday
+            const { error: banError } = await supabase
+              .from('subscriptions')
+              .update({
+                end_date: yesterday.toISOString().split('T')[0],
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', banSub.id)
+
+            if (banError) {
+              throw new Error(`Failed to ban user: ${banError.message}`)
+            }
+          } else {
+            // Create expired subscription
+            const { error: createBanError } = await supabase
+              .from('subscriptions')
+              .insert({
+                id: crypto.randomUUID(),
+                user_id: targetUserId,
+                start_date: yesterday.toISOString().split('T')[0],
+                end_date: yesterday.toISOString().split('T')[0]
+              })
+
+            if (createBanError) {
+              throw new Error(`Failed to ban user: ${createBanError.message}`)
+            }
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              operation: 'ban',
+              result: { userId: targetUserId, bannedDate: yesterday.toISOString().split('T')[0], reason },
+              message: `User banned successfully${reason ? `: ${reason}` : ''}`
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          )
+
+        case 'extend':
+          // Continue with existing extend logic below
+          break
+
+        default:
+          return new Response(
+            JSON.stringify({ error: 'Invalid operation. Supported: delete, extend, ban' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          )
+      }
     }
 
     // Validate and convert months parameter
@@ -234,8 +340,16 @@ Deno.serve(async (req) => {
     
     console.log('=== subscriptions-update-user SUCCESS ===')
 
+    // Return response based on operation type
+    const response = operation === 'extend' ? {
+      success: true,
+      operation: 'extend',
+      result: { ...result, months: monthsNum },
+      message: `Subscription extended by ${monthsNum} months`
+    } : result
+
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify(response),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200

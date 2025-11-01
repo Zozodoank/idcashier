@@ -2,10 +2,14 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from '@supabase/supabase-js';
-import { corsHeaders } from '../_shared/cors.ts';
+import { getCorsHeaders } from '../_shared/cors.ts';
 
 // Duitku callback handler
 Deno.serve(async (req) => {
+  // Get origin from request headers for dynamic CORS
+  const origin = req.headers.get('origin') || '';
+  const corsHeaders = getCorsHeaders(origin);
+  
   // Handle preflight request
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -113,8 +117,8 @@ Deno.serve(async (req) => {
     const DUITKU_MERCHANT_CODE = Deno.env.get('DUITKU_MERCHANT_CODE') || '';
     // @ts-ignore: Deno is available at runtime
     const DUITKU_MERCHANT_KEY = Deno.env.get('DUITKU_MERCHANT_KEY') || '';
-    // @ts-ignore: Deno is available at runtime
-    const DUITKU_SIGNATURE_ALGO = (Deno.env.get('DUITKU_SIGNATURE_ALGO') || 'md5').toLowerCase();
+    // Duitku callbacks always use MD5 according to spec
+    const DUITKU_SIGNATURE_ALGO = 'md5';
 
     // MD5 implementation for callback verification
     async function md5hex(s: string): Promise<string> {
@@ -151,7 +155,7 @@ Deno.serve(async (req) => {
           receivedData: callbackData
         }),
         {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: corsHeaders,
           status: 400
         }
       );
@@ -195,140 +199,181 @@ Deno.serve(async (req) => {
           console.error('❌ Invalid or missing signature', { expected, provided: signature });
           return new Response(
             JSON.stringify({ success: false, message: 'Invalid signature' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+            { headers: corsHeaders, status: 401 }
           );
         }
-
-        console.log('✅ Signature verification successful');
-      } catch (sigErr) {
-        console.error('❌ Signature verification error:', sigErr);
+      } catch (signatureError) {
+        console.error('Signature verification error:', signatureError);
         return new Response(
-          JSON.stringify({ success: false, message: 'Signature verification error' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+          JSON.stringify({ success: false, message: 'Signature verification failed' }),
+          { headers: corsHeaders, status: 500 }
         );
       }
     }
-    
-    // Validate required fields
-    if (!merchantOrderId || !resultCode) {
-      console.error('Missing required fields in callback data');
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Missing required fields: merchantOrderId and resultCode are required',
-          receivedData: callbackData,
-          extractedValues: { merchantOrderId, resultCode, paymentMethod }
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
-        }
-      );
-    }
-    
+
     // Create Supabase client with service role key for full access
     const supabase = createClient(
       // @ts-ignore: Deno is available at runtime
-      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_URL') || '',
       // @ts-ignore: Deno is available at runtime
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
       {
-        global: {
-          // @ts-ignore: Deno is available at runtime
-          headers: { Authorization: 'Bearer ' + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') },
-        },
         auth: {
           autoRefreshToken: false,
           persistSession: false
         }
       }
     );
-    
-    // Update transaction status based on resultCode
-    // Result codes typically:
-    // 00: Success
-    // 01: Expired
-    // 02: Failed
-    
-    let status = 'pending';
-    if (resultCode === '00') {
-      status = 'completed';
-    } else if (resultCode === '01') {
-      status = 'expired';
-    } else if (resultCode === '02') {
-      status = 'failed';
-    }
-    
-    // Update the payment record in database
-    const { data, error } = await supabase
-      .from('payments')
-      .update({ 
-        status: status,
-        payment_method: paymentMethod,
-        reference: merchantOrderId,
-        updated_at: new Date().toISOString()
-      })
-      .eq('merchant_order_id', merchantOrderId)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Error updating payment record:', error);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Failed to update payment record',
-          error: error.message
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500
-        }
-      );
-    }
-    
-    // If payment is successful, we might want to update user subscription
-    if (status === 'completed' && data.user_id) {
-      // Here you could update user subscription status
-      // This is just an example - adjust based on your needs
-      const { error: subscriptionError } = await supabase
-        .from('subscriptions')
-        .update({ 
-          status: 'active',
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', data.user_id)
-        .select()
+
+    // Extract payment ID from merchantOrderId (format: "RENEWAL-{userId}-{timestamp}" or "PAYMENT-{userId}-{timestamp}")
+    let paymentId: string | null = null;
+    const merchantOrderIdParts = merchantOrderId?.split('-');
+    if (merchantOrderIdParts && merchantOrderIdParts.length >= 3) {
+      // Try to find payment by merchant_order_id
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('payments')
+        .select('id')
+        .eq('merchant_order_id', merchantOrderId)
         .single();
-      
-      if (subscriptionError) {
-        console.error('Error updating subscription:', subscriptionError);
+
+      if (paymentData) {
+        paymentId = paymentData.id;
+      } else {
+        console.error('Payment not found for merchantOrderId:', merchantOrderId);
       }
     }
-    
-    console.log('Payment record updated successfully:', data);
-    
-    // Return success response to Duitku
+
+    // Update payment status based on resultCode
+    const isSuccess = resultCode === '00';
+    const paymentStatus = isSuccess ? 'completed' : 'failed';
+    const paymentMessage = resultMessage || (isSuccess ? 'Payment successful' : 'Payment failed');
+
+    if (paymentId) {
+      const updateData: any = {
+        status: paymentStatus,
+        result_code: resultCode,
+        result_message: paymentMessage,
+        updated_at: new Date().toISOString()
+      };
+
+      // Add payment URL for successful payments if available
+      if (isSuccess && callbackData.paymentUrl) {
+        updateData.payment_url = callbackData.paymentUrl;
+      }
+
+      const { error: updateError } = await supabase
+        .from('payments')
+        .update(updateData)
+        .eq('id', paymentId);
+
+      if (updateError) {
+        console.error('Error updating payment status:', updateError);
+      } else {
+        console.log(`Payment ${paymentId} status updated to ${paymentStatus}`);
+      }
+    }
+
+    // If this is a successful renewal payment, update subscription
+    if (isSuccess && merchantOrderId?.startsWith('RENEWAL-')) {
+      // Extract user ID from merchantOrderId
+      const userId = merchantOrderIdParts?.[1];
+      
+      if (userId) {
+        // Get the payment amount to determine extension period
+        let extensionMonths = 1; // Default fallback
+        const amountNum = typeof amount === 'string' ? parseInt(amount) : amount;
+        
+        // Determine extension period based on amount (using the same logic as in renew-subscription-payment)
+        if (amountNum === 150000) {
+          extensionMonths = 3;
+        } else if (amountNum === 270000) {
+          extensionMonths = 6;
+        } else if (amountNum === 500000) {
+          extensionMonths = 12;
+        }
+        
+        // Find existing subscription or create new one
+        const { data: existingSubscription, error: subError } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        const newEndDate = new Date();
+        
+        if (existingSubscription) {
+          // Extend existing subscription
+          const currentEndDate = new Date(existingSubscription.end_date);
+          // If current end date is in the past, start from today
+          if (currentEndDate < new Date()) {
+            newEndDate.setDate(newEndDate.getDate() + (extensionMonths * 30));
+          } else {
+            // Extend from current end date
+            newEndDate.setTime(currentEndDate.getTime() + (extensionMonths * 30 * 24 * 60 * 60 * 1000));
+          }
+          
+          const { error: updateError } = await supabase
+            .from('subscriptions')
+            .update({
+              end_date: newEndDate.toISOString().split('T')[0],
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingSubscription.id);
+
+          if (updateError) {
+            console.error('Error updating subscription:', updateError);
+          } else {
+            console.log(`Subscription ${existingSubscription.id} extended by ${extensionMonths} months`);
+          }
+        } else {
+          // Create new subscription
+          newEndDate.setDate(newEndDate.getDate() + (extensionMonths * 30));
+          
+          const { error: insertError } = await supabase
+            .from('subscriptions')
+            .insert({
+              user_id: userId,
+              start_date: new Date().toISOString().split('T')[0],
+              end_date: newEndDate.toISOString().split('T')[0],
+              status: 'active'
+            });
+
+          if (insertError) {
+            console.error('Error creating subscription:', insertError);
+          } else {
+            console.log(`New subscription created for user ${userId}, valid until ${newEndDate.toISOString().split('T')[0]}`);
+          }
+        }
+      }
+    }
+
+    // Return success response
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Callback processed successfully' 
+        message: 'Callback processed successfully',
+        paymentId,
+        status: paymentStatus
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: corsHeaders,
         status: 200
       }
     );
+
   } catch (error) {
-    console.error('Duitku callback processing error:', error);
+    console.error('Error processing Duitku callback:', error);
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: 'Internal server error',
+        message: 'Internal server error processing callback',
         error: error.message
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: corsHeaders,
         status: 500
       }
     );

@@ -551,6 +551,28 @@ const LandingPage = () => {
                 </>
               )}
             </Button>
+            
+            {/* Free Trial button - shows for all languages */}
+            <Button 
+              size="lg" 
+              variant="outline"
+              className="border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+              onClick={() => navigate('/register')}
+            >
+              🆓 {language === 'zh' ? '免费试用' : 'Free Trial'}
+            </Button>
+            
+            {/* Register button */}
+            {!user && (
+              <Button 
+                size="lg" 
+                variant="outline"
+                className="border-purple-600 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950"
+                onClick={() => navigate('/register')}
+              >
+                📝 {t('landingRegister')}
+              </Button>
+            )}
           </div>
         </div>
       </section>
@@ -630,13 +652,13 @@ const LandingPage = () => {
                     variant={plan.popular ? "default" : "outline"}
                     onClick={() => {
                       if (!user) {
-                        navigate(`/register?plan=${plan.duration}&price=${plan.price}`);
+                        navigate('/register');
                       } else {
                         navigate('/dashboard');
                       }
                     }}
                   >
-                    {t('landingChoosePlan')}
+                    {user ? t('landingGoToDashboard') : t('landingStartTrial')}
                   </Button>
                 </CardFooter>
               </Card>

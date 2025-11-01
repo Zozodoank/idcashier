@@ -2,6 +2,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from '@supabase/supabase-js'
 import { corsHeaders } from '../_shared/cors.ts'
+import { getUserIdFromToken } from '../_shared/auth.ts'
 
 Deno.serve(async (req) => {
   // Handle preflight request
@@ -22,12 +23,20 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Extract token (in a real implementation, you would verify the JWT)
-    const token = authHeader.substring(7)
-    
-    // For demo purposes, we'll assume the token contains the user ID
-    // In a real implementation, you would decode and verify the JWT
-    const userId = token // Simplified for demo
+    // Extract token and verify
+    let userId: string
+    try {
+      const token = authHeader.substring(7)
+      userId = await getUserIdFromToken(token)
+    } catch (error) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401
+        }
+      )
+    }
 
     // Create Supabase client
     const supabase = createClient(
@@ -42,7 +51,7 @@ Deno.serve(async (req) => {
       .eq('id', userId)
     
     if (error) {
-      console.error('Database error for user ${userId}:', error)
+      console.error(`Database error for user ${userId}:`, error)
       throw error
     }
 

@@ -14,25 +14,35 @@ export default function PaymentCallbackPage() {
   const [status, setStatus] = useState('processing');
   const [message, setMessage] = useState('Memproses pembayaran...');
   const isRegistration = params.get('register') === '1';
+  const isRenewal = params.get('renewal') === '1';
 
   useEffect(() => {
     const processPaymentCallback = async () => {
       try {
         // Cek status pembayaran dari parameter URL
         const paymentStatus = params.get('status') || '';
+        const resultCode = params.get('resultCode') || params.get('resultcode') || '';
+        const result = params.get('result') || '';
         
-        if (paymentStatus.toLowerCase() === 'success' || paymentStatus.toLowerCase() === 'paid') {
+        // Determine success from multiple indicators: status, resultCode, and result
+        const isSuccess = 
+          paymentStatus.toLowerCase() === 'success' || 
+          paymentStatus.toLowerCase() === 'paid' ||
+          resultCode === '00' ||
+          result.toLowerCase() === 'success';
+        
+        if (isSuccess) {
           setStatus('success');
           setMessage('Pembayaran berhasil!');
-          
+
           // Jika ini adalah proses registrasi, lakukan pendaftaran di Supabase
           if (isRegistration) {
             const pendingRegistration = JSON.parse(localStorage.getItem('pendingRegistration'));
-            
+
             if (!pendingRegistration) {
               throw new Error('Data registrasi tidak ditemukan');
             }
-            
+
             // Daftarkan pengguna di Supabase
             const registerRes = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/auth-register', {
               method: 'POST',
@@ -47,22 +57,33 @@ export default function PaymentCallbackPage() {
                 paymentCompleted: true
               })
             });
-            
+
             const regJson = await registerRes.json();
             if (!registerRes.ok) throw new Error(regJson.error || regJson.message || 'Register failed');
-            
+
             // Login otomatis setelah registrasi berhasil
             const loginRes = await login(pendingRegistration.email, pendingRegistration.password);
             if (!loginRes.success || !loginRes.token) {
               throw new Error(loginRes.error || 'Login failed after register');
             }
-            
+
             // Hapus data pendaftaran dari localStorage
             localStorage.removeItem('pendingRegistration');
-            
+
             // Redirect ke dashboard setelah 3 detik
             setTimeout(() => {
               navigate('/dashboard');
+            }, 3000);
+          } else if (isRenewal) {
+            // New renewal logic
+            toast({
+              title: 'Pembayaran Berhasil!',
+              description: 'Langganan Anda telah diperpanjang.',
+            });
+
+            // Redirect to subscription page after 3 seconds
+            setTimeout(() => {
+              navigate('/subscription');
             }, 3000);
           } else {
             // Jika bukan registrasi, redirect ke halaman subscription
@@ -132,9 +153,12 @@ export default function PaymentCallbackPage() {
               </div>
               <p>{message}</p>
               <p className="text-sm text-muted-foreground">
-                {isRegistration 
-                  ? 'Akun Anda telah berhasil dibuat. Anda akan diarahkan ke dashboard dalam beberapa detik.' 
-                  : 'Pembayaran Anda telah berhasil diproses. Anda akan diarahkan ke halaman langganan dalam beberapa detik.'}
+                {isRegistration
+                  ? "Akun Anda telah berhasil dibuat. Anda akan diarahkan ke dashboard dalam beberapa detik."
+                  : isRenewal
+                  ? "Langganan Anda telah berhasil diperpanjang. Anda akan diarahkan ke halaman langganan dalam beberapa detik."
+                  : "Pembayaran Anda telah berhasil diproses. Anda akan diarahkan ke halaman langganan dalam beberapa detik."
+                }
               </p>
             </div>
           )}

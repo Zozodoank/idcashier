@@ -34,6 +34,22 @@ const LoginPage = () => {
       
       const result = await login(normalizedEmail, password);
       
+      // Check for subscription expired
+      if (!result.success && result.subscriptionExpired) {
+        toast({
+          title: 'Langganan Berakhir',
+          description: result.error || 'Langganan Anda telah berakhir. Silakan perpanjang untuk melanjutkan.',
+          variant: 'destructive',
+        });
+        
+        // Redirect to renewal page after 2 seconds
+        setTimeout(() => {
+          navigate('/renewal');
+        }, 2000);
+        
+        return;
+      }
+      
       if (result.success) {
         toast({
           title: `${t('welcome')} ${result.user.name || result.user.email}!`,

@@ -728,6 +728,10 @@ export const translations = {
     landingModernPOS: 'Modern POS System',
     landingDemo: 'Demo',
     landingLoading: 'Loading...',
+    landingStartTrial: 'Choose Plan',
+    landingGoToDashboard: 'Go to Dashboard',
+    landingRegister: 'Register',
+    landingFreeTrial: 'Free Trial',
     // New keys for ReportsPage
     productName: 'Nama Produk',
     barcode: 'Barcode',
@@ -1482,6 +1486,10 @@ export const translations = {
     landingModernPOS: 'Sistem POS Modern',
     landingDemo: 'Demo',
     landingLoading: 'Memuat...',
+    landingStartTrial: 'Pilih Paket',
+    landingGoToDashboard: 'Ke Dashboard',
+    landingRegister: 'Daftar',
+    landingFreeTrial: 'Free Trial',
     // New keys for ReportsPage
     productName: 'Nama Produk',
     barcode: 'Barcode',
@@ -2239,5 +2247,9 @@ export const translations = {
     landingModernPOS: '现代销售点系统',
     landingDemo: '演示',
     landingLoading: '加载中...',
+    landingStartTrial: '选择方案',
+    landingGoToDashboard: '前往仪表板',
+    landingRegister: '注册',
+    landingFreeTrial: '免费试用',
   }
 };
