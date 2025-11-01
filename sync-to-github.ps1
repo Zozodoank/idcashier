@@ -1,5 +1,5 @@
 # Script to automatically sync changes to GitHub repository
-# Repository: https://github.com/projectmandiri10-lang/idcashier.git
+# Repository: https://github.com/Zozodoank/idcashier.git
 # Location: c:\xampp\htdocs\idcashier
 
 Write-Host "Starting synchronization with GitHub repository..." -ForegroundColor Green

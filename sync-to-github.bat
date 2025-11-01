@@ -1,6 +1,6 @@
 @echo off
 REM Batch script to run the PowerShell sync script
-REM Repository: https://github.com/projectmandiri10-lang/idcashier.git
+REM Repository: https://github.com/Zozodoank/idcashier.git
 REM Location: c:\xampp\htdocs\idcashier
 
 echo Starting synchronization with GitHub repository...
