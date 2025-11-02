@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabaseClient';
+import { invokeFn } from '../lib/invokeFn';
+import { useToast } from '@/components/ui/use-toast';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Loader, Calendar, CreditCard } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/components/ui/use-toast';
-import { Calendar, CheckCircle, CreditCard, Loader } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/lib/supabaseClient';
 
 const RenewalPage = () => {
   const navigate = useNavigate();
@@ -23,6 +21,14 @@ const RenewalPage = () => {
   const [emailInputMode, setEmailInputMode] = useState(false);
 
   const plans = [
+    {
+      id: '1_month',
+      name: '1 Bulan',
+      duration: 1,
+      price: 50000,
+      pricePerMonth: 50000,
+      popular: false
+    },
     {
       id: '3_months',
       name: '3 Bulan',
@@ -70,20 +76,28 @@ const RenewalPage = () => {
       }
       
       try {
-        const { data, error } = await supabase.functions.invoke('subscriptions-get-current-user', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const data = await invokeFn('subscriptions-get-current-user');
         
-        if (error) throw error;
-        
-        setCurrentSubscription(data);
+        // Check if user has a subscription
+        if (data && data.has_subscription === false) {
+          // User has no subscription, set to null to show appropriate UI
+          setCurrentSubscription(null);
+        } else if (data && data.error) {
+          // Error occurred in the function
+          throw new Error(data.error);
+        } else {
+          // Valid subscription data
+          setCurrentSubscription(data);
+        }
       } catch (error) {
         console.error('Error fetching current subscription:', error);
         toast({
           title: 'Error',
-          description: 'Gagal memuat data langganan saat ini.',
+          description: error.message || 'Gagal memuat data langganan saat ini.',
           variant: 'destructive'
         });
+        // Set subscription to null on error to avoid showing invalid data
+        setCurrentSubscription(null);
       } finally {
         setLoading(false);
       }
@@ -94,7 +108,7 @@ const RenewalPage = () => {
 
   const handleRenewal = async (planId) => {
     // Validate planId before proceeding
-    if (!planId || !['3_months', '6_months', '12_months'].includes(planId)) {
+    if (!planId || !['1_month', '3_months', '6_months', '12_months'].includes(planId)) {
       console.error('Invalid planId:', planId);
       toast({
         title: 'Error',
@@ -121,29 +135,10 @@ const RenewalPage = () => {
     try {
       // If no token, use email-based renewal
       const requestBody = token
-        ? { plan: planId }
-        : { plan: planId, email: userEmail || new URLSearchParams(window.location.search).get('email') };
+        ? { plan_id: planId }  // Use plan_id for consistency
+        : { plan_id: planId, email: userEmail || new URLSearchParams(window.location.search).get('email') };
 
-      const headers = token
-        ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-        : { 'Content-Type': 'application/json' };
-
-      console.log('Sending renewal request:', { requestBody, headers });
-      // Log supabase functions configuration for debugging
-      console.log('Supabase functions config:', { supabaseUrl: supabase.supabaseUrl, functions: supabase.functions });
-
-      const { data, error } = await supabase.functions.invoke(
-        'renew-subscription-payment',
-        {
-          body: JSON.stringify(requestBody),  // Stringify body for consistency with DeveloperPage.jsx
-          headers: headers
-        }
-      );
-
-      // Log response for debugging
-      console.log('Renewal API response:', { data, error });
-
-      if (error) throw error;
+      const data = await invokeFn('renew-subscription-payment', requestBody);
 
       window.location.href = data.paymentUrl;
     } catch (error) {
@@ -153,11 +148,11 @@ const RenewalPage = () => {
       let errorDescription = error.message || errorMessage;
 
       // Check for specific error statuses or parse details like in payments.js
-      if (error.status === 400 || error.message?.includes('400')) {
+      if (error.message?.includes('400') || (error.message && error.message.includes('"code":400'))) {
         errorMessage = 'Parameter tidak valid. Pastikan paket langganan dipilih dengan benar.';
-      } else if (error.status === 401 || error.message?.includes('401')) {
+      } else if (error.message?.includes('401') || (error.message && error.message.includes('"code":401'))) {
         errorMessage = 'Sesi login telah berakhir. Silakan login ulang.';
-      } else if (error.status === 404 || error.message?.includes('404')) {
+      } else if (error.message?.includes('404') || (error.message && error.message.includes('"code":404'))) {
         errorMessage = 'Pengguna tidak ditemukan. Periksa email Anda.';
       } else {
         // Try to parse structured error from response, similar to payments.js
@@ -278,7 +273,21 @@ const RenewalPage = () => {
         <p className="text-muted-foreground">Pilih paket yang sesuai dengan kebutuhan Anda</p>
       </div>
 
-      {currentSubscription && (
+      {currentSubscription === null && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Status Langganan
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">Anda belum memiliki langganan aktif. Silakan pilih paket di bawah untuk memulai.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {currentSubscription && currentSubscription.has_subscription !== false && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

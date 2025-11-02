@@ -90,6 +90,14 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Calculate duration and amount based on dates
+    const startDateObj = new Date(finalStartDate);
+    const endDateObj = new Date(finalEndDate);
+    const timeDiff = endDateObj.getTime() - startDateObj.getTime();
+    const duration = Math.ceil(timeDiff / (1000 * 3600 * 24 * 30)); // Approximate months
+    const amount = 0; // Default amount for admin operations
+    const planName = `${duration}_months`;
+
     // Check if subscription already exists for this user
     const { data: existingSubscriptions, error: existingError } = await supabase
       .from('subscriptions')
@@ -103,9 +111,13 @@ Deno.serve(async (req) => {
       const { data, error } = await supabase
         .from('subscriptions')
         .update({
+          plan_name: planName,
+          duration: duration,
+          amount: amount,
           start_date: finalStartDate,
           end_date: finalEndDate,
-          updated_at: new Date()
+          updated_at: new Date(),
+          status: 'active'
         })
         .eq('id', subscriptionId)
         .select('*')
@@ -124,8 +136,12 @@ Deno.serve(async (req) => {
           {
             id: crypto.randomUUID(), // Generate UUID for the subscription
             user_id: userId,
+            plan_name: planName,
+            duration: duration,
+            amount: amount,
             start_date: finalStartDate,
-            end_date: finalEndDate
+            end_date: finalEndDate,
+            status: 'active'
           }
         ])
         .select('*')

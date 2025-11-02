@@ -89,6 +89,7 @@ function maskSensitiveString(str: string): string {
 
 // Plan mapping
 const PLAN_MAPPING: Record<string, PlanData> = {
+  '1_month': { duration: 1, amount: 50000, productDetails: 'Perpanjangan Langganan 1 Bulan' },
   '3_months': { duration: 3, amount: 150000, productDetails: 'Perpanjangan Langganan 3 Bulan' },
   '6_months': { duration: 6, amount: 270000, productDetails: 'Perpanjangan Langganan 6 Bulan' },
   '12_months': { duration: 12, amount: 500000, productDetails: 'Perpanjangan Langganan 12 Bulan' }
@@ -197,6 +198,17 @@ const createDuitkuPayment = async (
   }
 };
 
+// Helper function to create JSON responses with CORS headers
+function json(payload: any, status = 200) {
+  // Get origin from request headers for dynamic CORS
+  const origin = payload.origin || '*';
+  const corsHeaders = getCorsHeaders(origin);
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+  });
+}
+
 // Main handler
 Deno.serve(async (req) => {
   // Get origin from request headers for dynamic CORS
@@ -208,125 +220,70 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Add debug endpoint for development (protect with secret key)
-  const url = new URL(req.url);
-  const isDebug = url.searchParams.get('debug') === 'true';
-  const debugSecret = url.searchParams.get('secret');
-  const expectedSecret = Deno.env.get('DEBUG_SECRET');
-  
-  // Require DEBUG_SECRET to be set in production
-  if (isDebug) {
-    // In production, require DEBUG_SECRET to be set and match
-    const isProduction = (Deno.env.get('DENO_ENV') || '').toLowerCase() === 'production';
-    if (isProduction && !expectedSecret) {
-      return new Response(
-        JSON.stringify({ error: 'Debug endpoint not available in production without DEBUG_SECRET' }),
-        { headers: corsHeaders, status: 403 }
-      );
-    }
-    
-    if (!expectedSecret) {
-      return new Response(
-        JSON.stringify({ error: 'DEBUG_SECRET not configured' }),
-        { headers: corsHeaders, status: 403 }
-      );
-    }
-    
-    if (debugSecret !== expectedSecret) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid debug secret' }),
-        { headers: corsHeaders, status: 403 }
-      );
-    }
-    
-    try {
-      const rawBody = await req.clone().text();
-      const parsedBody = rawBody ? JSON.parse(rawBody) : {};
-      // Even in debug mode, don't return sensitive fields
-      const sanitizedHeaders = sanitizeLogData(Object.fromEntries(req.headers.entries()));
-      return new Response(
-        JSON.stringify({
-          method: req.method,
-          url: req.url,
-          headers: sanitizedHeaders,
-          contentType: req.headers.get('content-type'),
-          // Don't log rawBody or parsedBody in debug mode to avoid leaking sensitive data
-          planExists: 'plan' in parsedBody,
-          emailExists: 'email' in parsedBody
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } catch (debugError) {
-      return new Response(
-        JSON.stringify({ error: 'Debug parsing failed', details: debugError.message }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
-    }
-  }
-
-  // Log initial request details (redacted)
-  logger.info('Request received', {
-    method: req.method,
-    url: req.url,
-    headers: sanitizeLogData(Object.fromEntries(req.headers.entries()))
-  });
-
   try {
-    // Enhanced body parsing with logging
-    logger.info('Starting body parsing', { contentType: req.headers.get('content-type') });
-    let requestBody: any = {};
-    let rawBodyText = '';
+    // Get the authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return json({ 
+        success: false, 
+        error: 'Missing authorization header',
+        code: 401,
+        origin
+      }, 401);
+    }
+
+    // Parse JSON body robustly
+    let body: any;
     try {
-      rawBodyText = await req.clone().text();
-      logger.info('Raw body text retrieved', { length: rawBodyText.length }); // Log only length
-      if (!rawBodyText.trim()) {
-        logger.warn('Request body is empty');
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Request body is empty or undefined'
-          }),
-          { headers: corsHeaders, status: 400 }
-        );
+      body = await req.json();
+    } catch {
+      try { 
+        const text = await req.text();
+        body = JSON.parse(text); 
+      } catch {
+        return json({ 
+          success: false, 
+          error: 'Invalid or missing JSON body',
+          code: 400,
+          origin
+        }, 400);
       }
-      requestBody = JSON.parse(rawBodyText);
-      logger.info('Body parsed successfully', { typeofPlan: typeof requestBody.plan, typeofEmail: typeof requestBody.email });
-    } catch (parseError) {
-      logger.error('Failed to parse request body', { error: parseError.message, bodyLength: rawBodyText.length });
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Invalid JSON in request body: ${parseError.message}`
-        }),
-        { headers: corsHeaders, status: 400 }
-      );
     }
-
-    // Validate request structure
-    if (!requestBody || typeof requestBody !== 'object') {
-      logger.warn('Request body is not a valid object');
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Request body must be a valid JSON object'
-        }),
-        { headers: corsHeaders, status: 400 }
-      );
+    
+    // Support both plan_id and plan for backward compatibility
+    const plan_id = body?.plan_id ?? body?.plan;
+    if (!plan_id) {
+      return json({ 
+        success: false, 
+        error: 'Missing plan_id',
+        code: 400,
+        origin
+      }, 400);
     }
-
-    const { plan, email } = requestBody;
-    logger.info('Extracted fields', { plan, hasPlan: 'plan' in requestBody, hasEmail: 'email' in requestBody });
 
     // Validate plan parameter with enhanced logging
-    logger.info('Validating plan parameter', { receivedPlan: plan });
-    if (!plan || !PLAN_MAPPING[plan]) {
-      const receivedPlanStr = plan ? `'${plan}'` : 'undefined/null';
+    logger.info('Validating plan parameter', { receivedPlan: plan_id });
+    if (!plan_id) {
+      logger.warn('Plan parameter is missing', { requestBody });
       return new Response(
         JSON.stringify({
           success: false,
-          error: `Invalid plan ${receivedPlanStr}. Must be one of: 3_months, 6_months, 12_months`
+          error: 'Plan parameter is required',
+          code: 400,
+          received_body: requestBody
         }),
-        { headers: corsHeaders, status: 400 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+    
+    if (!PLAN_MAPPING[plan_id]) {
+      const receivedPlanStr = plan_id ? `'${plan_id}'` : 'undefined/null';
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Invalid plan ${receivedPlanStr}. Must be one of: 1_month, 3_months, 6_months, 12_months`
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
@@ -335,7 +292,6 @@ Deno.serve(async (req) => {
     let userData: any;
 
     // Support both token-based and email-based authentication
-    const authHeader = req.headers.get('Authorization');
     logger.info('Authentication check', { hasAuthHeader: !!authHeader, hasEmail: !!email });
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -350,13 +306,14 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'Invalid token'
+            error: 'Invalid token',
+            code: 401
           }),
           { headers: corsHeaders, status: 401 }
         );
       }
 
-      // Fetch user data by ID
+      // Fetch user data by ID using service role to bypass RLS
       const { data, error: userError } = await supabase
         .from('users')
         .select('name, email, phone')
@@ -368,7 +325,8 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'User not found'
+            error: 'User not found',
+            code: 404
           }),
           { headers: corsHeaders, status: 404 }
         );
@@ -379,6 +337,7 @@ Deno.serve(async (req) => {
       logger.info('Using email-based authentication', { email: maskSensitiveString(email) });
       // Email-based authentication (for expired users accessing renewal page)
       const normalizedEmail = email.trim().toLowerCase();
+      // Use service role to bypass RLS when fetching user by email
       const { data, error: userError } = await supabase
         .from('users')
         .select('id, name, email, phone')
@@ -386,11 +345,12 @@ Deno.serve(async (req) => {
         .single();
 
       if (userError || !data) {
-        logger.error('User fetch by email failed', { email: maskSensitiveString(normalizedEmail), error: userError?.message });
+        logger.error('User fetch by email failed', { email: maskSensitiveString(email), error: userError?.message });
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'User not found with provided email'
+            error: 'User not found',
+            code: 404
           }),
           { headers: corsHeaders, status: 404 }
         );
@@ -399,22 +359,23 @@ Deno.serve(async (req) => {
       userData = data;
       logger.info('User data fetched via email', { email: maskSensitiveString(userData.email) });
     } else {
-      logger.warn('No valid authentication provided');
+      logger.warn('No authentication provided');
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Authorization header with Bearer token or email in request body is required'
+          error: 'Authentication required - please login or provide email',
+          code: 401
         }),
         { headers: corsHeaders, status: 401 }
       );
     }
 
     // Log plan selection and proceed
-    logger.info('Plan selected and user authenticated', { plan, userId: '[REDACTED]' });
+    logger.info('Plan selected and user authenticated', { plan_id, userId: '[REDACTED]' });
 
     // Get plan data
-    const planData = PLAN_MAPPING[plan];
-    logger.info('Plan data retrieved', { plan, amount: planData.amount });
+    const planData = PLAN_MAPPING[plan_id];
+    logger.info('Plan data retrieved', { plan_id, amount: planData.amount });
 
     // Generate merchant order ID
     const timestamp = Date.now();

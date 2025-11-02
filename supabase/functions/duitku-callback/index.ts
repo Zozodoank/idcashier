@@ -279,17 +279,38 @@ Deno.serve(async (req) => {
       const userId = merchantOrderIdParts?.[1];
       
       if (userId) {
+        // Get payment record to access product details
+        let paymentRecord: any = null;
+        if (paymentId) {
+          const { data, error: paymentError } = await supabase
+            .from('payments')
+            .select('amount, product_details')
+            .eq('id', paymentId)
+            .single();
+          
+          if (!paymentError && data) {
+            paymentRecord = data;
+          }
+        }
+        
         // Get the payment amount to determine extension period
         let extensionMonths = 1; // Default fallback
         const amountNum = typeof amount === 'string' ? parseInt(amount) : amount;
         
-        // Determine extension period based on amount (using the same logic as in renew-subscription-payment)
-        if (amountNum === 150000) {
+        // Determine extension period and plan name based on amount and product details
+        let planName = '1_month';
+        if (amountNum === 50000) {
+          extensionMonths = 1;
+          planName = paymentRecord?.product_details?.includes('1 Bulan') ? '1_month' : '1_month';
+        } else if (amountNum === 150000) {
           extensionMonths = 3;
+          planName = '3_months';
         } else if (amountNum === 270000) {
           extensionMonths = 6;
+          planName = '6_months';
         } else if (amountNum === 500000) {
           extensionMonths = 12;
+          planName = '12_months';
         }
         
         // Find existing subscription or create new one
@@ -317,8 +338,12 @@ Deno.serve(async (req) => {
           const { error: updateError } = await supabase
             .from('subscriptions')
             .update({
+              plan_name: planName,
+              duration: extensionMonths,
+              amount: amountNum,
               end_date: newEndDate.toISOString().split('T')[0],
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              status: 'active'
             })
             .eq('id', existingSubscription.id);
 
@@ -335,6 +360,9 @@ Deno.serve(async (req) => {
             .from('subscriptions')
             .insert({
               user_id: userId,
+              plan_name: planName,
+              duration: extensionMonths,
+              amount: amountNum,
               start_date: new Date().toISOString().split('T')[0],
               end_date: newEndDate.toISOString().split('T')[0],
               status: 'active'

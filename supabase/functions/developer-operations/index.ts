@@ -149,8 +149,12 @@ Deno.serve(async (req) => {
             .insert({
               id: crypto.randomUUID(),
               user_id: userId,
+              plan_name: `${months}_months`,
+              duration: months,
+              amount: 0, // This is an admin operation, no payment involved
               start_date: today.toISOString().split('T')[0],
-              end_date: newEndDate.toISOString().split('T')[0]
+              end_date: newEndDate.toISOString().split('T')[0],
+              status: 'active'
             });
 
           if (createError) {
@@ -182,7 +186,8 @@ Deno.serve(async (req) => {
             .from('subscriptions')
             .update({
               end_date: yesterday.toISOString().split('T')[0],
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              status: 'inactive'
             })
             .eq('id', banSub.id);
 
@@ -196,8 +201,12 @@ Deno.serve(async (req) => {
             .insert({
               id: crypto.randomUUID(),
               user_id: userId,
+              plan_name: 'expired',
+              duration: 0,
+              amount: 0,
               start_date: yesterday.toISOString().split('T')[0],
-              end_date: yesterday.toISOString().split('T')[0]
+              end_date: yesterday.toISOString().split('T')[0],
+              status: 'inactive'
             });
           if (createBanError) {
             throw new Error(`Failed to create expired subscription: ${createBanError.message}`);
