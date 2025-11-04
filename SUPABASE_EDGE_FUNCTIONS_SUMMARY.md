@@ -8,26 +8,31 @@ This document summarizes all the Supabase Edge Functions that have been created 
 - **Endpoint:** POST /auth-login
 - **Purpose:** Authenticate users and return user data
 - **Location:** `supabase/functions/auth-login/index.ts`
+- **JWT Verification:** Disabled (--no-verify-jwt)
 
 ### 2. auth-me
 - **Endpoint:** GET /auth-me
 - **Purpose:** Get current user profile
 - **Location:** `supabase/functions/auth-me/index.ts`
+- **JWT Verification:** Enabled (requires authentication)
 
 ### 3. auth-register
 - **Endpoint:** POST /auth-register
 - **Purpose:** Register new users (admin only)
 - **Location:** `supabase/functions/auth-register/index.ts`
+- **JWT Verification:** Disabled (--no-verify-jwt)
 
 ### 4. auth-request-password-reset
 - **Endpoint:** POST /auth-request-password-reset
 - **Purpose:** Request password reset token
 - **Location:** `supabase/functions/auth-request-password-reset/index.ts`
+- **JWT Verification:** Disabled (--no-verify-jwt)
 
 ### 5. auth-reset-password
 - **Endpoint:** POST /auth-reset-password
 - **Purpose:** Reset user password with token
 - **Location:** `supabase/functions/auth-reset-password/index.ts`
+- **JWT Verification:** Disabled (--no-verify-jwt)
 
 ## Products Functions
 
@@ -64,9 +69,9 @@ To deploy all Edge Functions:
 # Deploy auth functions
 npx supabase functions deploy auth-login --no-verify-jwt
 npx supabase functions deploy auth-me
-npx supabase functions deploy auth-register
-npx supabase functions deploy auth-request-password-reset
-npx supabase functions deploy auth-reset-password
+npx supabase functions deploy auth-register --no-verify-jwt
+npx supabase functions deploy auth-request-password-reset --no-verify-jwt
+npx supabase functions deploy auth-reset-password --no-verify-jwt
 
 # Deploy products functions
 npx supabase functions deploy products-get-all

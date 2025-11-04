@@ -1,38 +1,70 @@
 // CORS headers for Supabase Edge Functions
-export function getCorsHeaders(origin: string) {
-  // Read allowed origins from environment variables with sensible defaults
-  const allowedOriginsEnv = Deno.env.get('ALLOWED_ORIGINS');
-  let allowedOrigins: string[];
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': 'https://idcashier.my.id',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
+  'Access-Control-Max-Age': '86400', // Cache preflight for 24 hours
+  'Vary': 'Origin'
+};
+
+// Handle preflight OPTIONS requests
+export function handleOptions(req: Request) {
+  const origin = req.headers.get('origin') || '';
   
-  if (allowedOriginsEnv) {
-    allowedOrigins = allowedOriginsEnv.split(',').map(o => o.trim());
-  } else {
-    // Default allowed origins
-    allowedOrigins = [
-      'https://idcashier.my.id',
-      'http://localhost:3000',
-      'http://127.0.0.1:3000'
-    ];
+  // For development, allow localhost
+  if (origin === 'http://localhost:5173' || origin === 'http://localhost:3000' || origin === 'http://127.0.0.1:3000') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Allow-Origin': origin
+      }
+    });
   }
-
-  // Add Vary: Origin header for proper caching
-  const baseHeaders = {
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Max-Age': '86400', // Cache preflight for 24 hours
-    'Vary': 'Origin'
-  };
-
-  if (!allowedOrigins.includes(origin)) {
-    return baseHeaders;
-  }
-
-  return {
-    ...baseHeaders,
-    'Access-Control-Allow-Origin': origin
-  };
+  
+  // For production, check against allowed origins
+  return new Response(null, {
+    status: 204,
+    headers: {
+      ...corsHeaders,
+      'Access-Control-Allow-Origin': 'https://idcashier.my.id'
+    }
+  });
 }
 
-// Backward-compatible export for existing functions
-// This will be removed after all functions migrate to getCorsHeaders(origin)
-export const corsHeaders = getCorsHeaders(Deno.env.get('FRONTEND_URL') || '*');
+// Dynamic CORS headers function
+export function getCorsHeaders(origin: string) {
+  // For development, allow localhost
+  if (origin === 'http://localhost:5173' || origin === 'http://localhost:3000' || origin === 'http://127.0.0.1:3000') {
+    return {
+      ...corsHeaders,
+      'Access-Control-Allow-Origin': origin
+    };
+  }
+  
+  // For production, return standard headers
+  return corsHeaders;
+}
+
+// Helper function to create JSON responses with CORS headers
+export function createResponse(payload: any, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 
+      'Content-Type': 'application/json',
+      ...corsHeaders
+    },
+  });
+}
+
+// Helper function to create error responses with CORS headers
+export function createErrorResponse(message: string, status = 500) {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { 
+      'Content-Type': 'application/json',
+      ...corsHeaders
+    },
+  });
+}

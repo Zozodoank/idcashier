@@ -4,12 +4,35 @@ import { Helmet } from 'react-helmet';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShoppingCart, Package, TrendingUp, DollarSign, FolderTree, Truck, Users } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { useEdgeFunction } from '@/hooks/useEdgeFunction';
+import { toast } from 'react-hot-toast';
 
 const DashboardPage = () => {
   const { t } = useLanguage();
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   
+  // Use our custom hook for each dashboard function
+  const { 
+    data: statsData, 
+    loading: statsLoading, 
+    error: statsError,
+    invoke: invokeStats
+  } = useEdgeFunction('dashboard-stats');
+  
+  const { 
+    data: transactionsData, 
+    loading: transactionsLoading, 
+    error: transactionsError,
+    invoke: invokeTransactions
+  } = useEdgeFunction('dashboard-recent-transactions');
+  
+  const { 
+    data: productsData, 
+    loading: productsLoading, 
+    error: productsError,
+    invoke: invokeProducts
+  } = useEdgeFunction('dashboard-top-products');
+
   const [stats, setStats] = useState([
     {
       title: t('sales'),
@@ -61,94 +84,92 @@ const DashboardPage = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user || !token) return;
+      if (!user) return;
       
       try {
         setLoading(true);
         
-        
-        // Fetch all dashboard data in parallel using Edge Functions
-        const [statsResponse, transactionsResponse, productsResponse] = await Promise.all([
-          supabase.functions.invoke('dashboard-stats', { headers: { Authorization: `Bearer ${token}` } }),
-          supabase.functions.invoke('dashboard-recent-transactions', { headers: { Authorization: `Bearer ${token}` } }),
-          supabase.functions.invoke('dashboard-top-products', { headers: { Authorization: `Bearer ${token}` } })
+        // Fetch all dashboard data in parallel using our custom hook
+        await Promise.all([
+          invokeStats(),
+          invokeTransactions(),
+          invokeProducts()
         ]);
-        
-        // Check for errors
-        if (statsResponse.error || transactionsResponse.error || productsResponse.error) {
-          const errors = [statsResponse.error, transactionsResponse.error, productsResponse.error].filter(Boolean);
-          console.error('Dashboard data fetch errors:', errors);
-          throw new Error('Failed to fetch dashboard data');
-        }
-        
-        // Get the data
-        const statsData = statsResponse.data;
-        const transactionsData = transactionsResponse.data;
-        const productsData = productsResponse.data;
-        
-        // Update stats
-        setStats([
-          {
-            title: t('sales'),
-            value: `Rp ${statsData.totalSales.toLocaleString()}`,
-            icon: DollarSign,
-            color: 'from-green-500 to-emerald-600',
-          },
-          {
-            title: t('products'),
-            value: statsData.totalProducts.toString(),
-            icon: Package,
-            color: 'from-blue-500 to-cyan-600',
-          },
-          {
-            title: t('categories'),
-            value: statsData.totalCategories.toString(),
-            icon: FolderTree,
-            color: 'from-indigo-500 to-purple-600',
-          },
-          {
-            title: t('suppliers'),
-            value: statsData.totalSuppliers.toString(),
-            icon: Truck,
-            color: 'from-amber-500 to-orange-600',
-          },
-          {
-            title: t('customers'),
-            value: statsData.totalCustomers.toString(),
-            icon: Users,
-            color: 'from-rose-500 to-pink-600',
-          },
-          {
-            title: t('transactions'),
-            value: statsData.totalTransactions.toString(),
-            icon: ShoppingCart,
-            color: 'from-purple-500 to-pink-600',
-          },
-          {
-            title: t('growth'),
-            value: statsData.growth,
-            icon: TrendingUp,
-            color: 'from-orange-500 to-red-600',
-          },
-        ]);
-        
-        // Set recent transactions
-        setRecentTransactions(transactionsData);
-        
-        // Set top products
-        setTopProducts(productsData);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        toast.error('Gagal memuat data dashboard');
       } finally {
         setLoading(false);
       }
     };
     
     fetchData();
-  }, [t, user, token]);
+  }, [t, user, invokeStats, invokeTransactions, invokeProducts]);
+
+  // Update UI when data changes
+  useEffect(() => {
+    if (statsData) {
+      setStats([
+        {
+          title: t('sales'),
+          value: `Rp ${statsData.totalSales.toLocaleString()}`,
+          icon: DollarSign,
+          color: 'from-green-500 to-emerald-600',
+        },
+        {
+          title: t('products'),
+          value: statsData.totalProducts.toString(),
+          icon: Package,
+          color: 'from-blue-500 to-cyan-600',
+        },
+        {
+          title: t('categories'),
+          value: statsData.totalCategories.toString(),
+          icon: FolderTree,
+          color: 'from-indigo-500 to-purple-600',
+        },
+        {
+          title: t('suppliers'),
+          value: statsData.totalSuppliers.toString(),
+          icon: Truck,
+          color: 'from-amber-500 to-orange-600',
+        },
+        {
+          title: t('customers'),
+          value: statsData.totalCustomers.toString(),
+          icon: Users,
+          color: 'from-rose-500 to-pink-600',
+        },
+        {
+          title: t('transactions'),
+          value: statsData.totalTransactions.toString(),
+          icon: ShoppingCart,
+          color: 'from-purple-500 to-pink-600',
+        },
+        {
+          title: t('growth'),
+          value: statsData.growth,
+          icon: TrendingUp,
+          color: 'from-orange-500 to-red-600',
+        },
+      ]);
+    }
+  }, [statsData, t]);
+
+  useEffect(() => {
+    if (transactionsData) {
+      setRecentTransactions(transactionsData);
+    }
+  }, [transactionsData]);
+
+  useEffect(() => {
+    if (productsData) {
+      setTopProducts(productsData);
+    }
+  }, [productsData]);
 
   // Show loading state
-  if (loading) {
+  if (loading || statsLoading || transactionsLoading || productsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

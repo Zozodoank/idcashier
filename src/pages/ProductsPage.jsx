@@ -14,6 +14,7 @@ import { Plus, Upload, Download, Edit, Trash2 } from 'lucide-react';
 import { exportToExcel } from '@/lib/utils';
 import { productsAPI, categoriesAPI, suppliersAPI, settingsAPI, productHPPBreakdownAPI, rawMaterialsAPI, productRecipesAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHPP } from '@/contexts/HPPContext'; // Add HPP context
 import * as XLSX from 'xlsx';
 import HPPBreakdownInput from '@/components/HPPBreakdownInput';
 import RawMaterialsManagement from '@/components/RawMaterialsManagement';
@@ -23,6 +24,7 @@ const ProductsPage = ({ user }) => {
   const { t } = useLanguage();
   const { toast } = useToast();
   const { user: authUser, token } = useAuth();
+  const { hppEnabled } = useHPP(); // Use HPP context instead of local state
   
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]); // Will store full category objects
@@ -36,10 +38,9 @@ const ProductsPage = ({ user }) => {
   const [currentCategory, setCurrentCategory] = useState(null);
   const [currentSupplier, setCurrentSupplier] = useState(null);
 
-  const isDemoAccount = user.email === 'demo@gmail.com';
+  const isDemoAccount = user.email === 'demo@idcashier.my.id';
   
-  // HPP feature state
-  const [hppEnabled, setHppEnabled] = useState(false);
+  // HPP feature state - removed local state, using context instead
   const canViewHPP = user?.permissions?.canViewHPP || false;
   const [hppBreakdown, setHppBreakdown] = useState([]);
   
@@ -594,7 +595,9 @@ const ProductsPage = ({ user }) => {
               <TabsTrigger value="products">{t('products')}</TabsTrigger>
               <TabsTrigger value="categories">{t('category')}</TabsTrigger>
               <TabsTrigger value="suppliers">{t('supplier')}</TabsTrigger>
-              <TabsTrigger value="raw-materials">{t('rawMaterials') || 'bahan baku'}</TabsTrigger>
+              {hppEnabled && (
+                <TabsTrigger value="raw-materials">{t('rawMaterials') || 'bahan baku'}</TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -701,9 +704,11 @@ const ProductsPage = ({ user }) => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="raw-materials">
-            <RawMaterialsManagement />
-          </TabsContent>
+          {hppEnabled && (
+            <TabsContent value="raw-materials">
+              <RawMaterialsManagement />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 

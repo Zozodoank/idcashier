@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     }
 
     // Prevent deleting demo user
-    if (targetUserData.email === 'demo@gmail.com') {
+    if (targetUserData.email === 'demo@idcashier.my.id') {
       return new Response(
         JSON.stringify({ error: 'Cannot delete demo user' }),
         { 

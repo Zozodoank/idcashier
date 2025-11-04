@@ -2090,7 +2090,12 @@ export const subscriptionAPI = {
       const { invokeFn } = await import('./invokeFn');
       
       // Call Edge Function to get subscription data using invokeFn
-      const data = await invokeFn('subscriptions-get-current-user');
+      // Pass the token in the headers
+      const data = await invokeFn('subscriptions-get-current-user', null, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       
       return data || null;
     } catch (error) {

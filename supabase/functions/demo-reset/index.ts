@@ -44,7 +44,8 @@ Deno.serve(async (req) => {
 		console.log('[demo-reset] starting reset', { dryRun })
 
 		// Demo owner email (can be overridden via secret)
-		const demoEmail = Deno.env.get('DEMO_EMAIL') || 'demo@idcashier.my.id'
+		// Force using the correct email address
+		const demoEmail = 'demo@idcashier.my.id' // Deno.env.get('DEMO_EMAIL') || 'demo@idcashier.my.id'
 
 		// Find demo owner user
 		const { data: demoOwner, error: ownerError } = await supabase
@@ -73,6 +74,7 @@ Deno.serve(async (req) => {
 			return jsonResponse({ success: true, message: 'No tenant users found for demo account' })
 		}
 
+	// Preserve demo user data - only reset non-user data
 	// 1) Delete employees and related data first (to avoid FK issues)
 	// Get all employee IDs for the tenant - use count to verify we got all records
 	const { data: employees, error: empQueryErr, count: empCount } = await supabase
@@ -149,20 +151,21 @@ Deno.serve(async (req) => {
 		console.log('[demo-reset] Deleted attendance_logs by employee_id')
 	}
 	
-	// Delete employees (with error checking)
+	// Delete employees (with error checking) - but preserve the demo owner
 	if (!dryRun) {
-		const { error: empErr } = await supabase.from('employees').delete().eq('tenant_id', demoOwner.id)
+		const { error: empErr } = await supabase.from('employees').delete().eq('tenant_id', demoOwner.id).neq('user_id', demoOwner.id)
 		if (empErr) {
 			console.error('[demo-reset] Error deleting employees:', empErr)
 			throw empErr
 		}
-		console.log('[demo-reset] Deleted employees')
+		console.log('[demo-reset] Deleted employees (excluding demo owner)')
 		
 		// Verification: Check if any employees still exist
 		const { data: remainingEmployees, error: verifyErr } = await supabase
 			.from('employees')
 			.select('id', { count: 'exact' })
 			.eq('tenant_id', demoOwner.id)
+			.neq('user_id', demoOwner.id)
 		if (verifyErr) {
 			console.warn('[demo-reset] Verification query failed:', verifyErr)
 		} else {
@@ -227,11 +230,15 @@ Deno.serve(async (req) => {
 		}
 	}
 	
-	// Delete cashier/manager users from auth.users (Supabase Auth)
+	// Delete cashier/manager users from auth.users (Supabase Auth) - but preserve the demo owner
 	// These are employees who have user_id (app access)
 	if (!dryRun && employeeUserIds.length > 0) {
 		console.log(`Deleting ${employeeUserIds.length} cashier/manager accounts from Supabase Auth...`)
 		for (const userId of employeeUserIds) {
+			// Skip the demo owner
+			if (userId === demoOwner.id) {
+				continue;
+			}
 			try {
 				const { error } = await supabase.auth.admin.deleteUser(userId)
 				if (error) {
@@ -243,11 +250,11 @@ Deno.serve(async (req) => {
 			}
 		}
 		
-		// Also delete from public.users table (in case there's data inconsistency)
-		await supabase.from('users').delete().in('id', employeeUserIds)
+		// Also delete from public.users table (in case there's data inconsistency) - but preserve the demo owner
+		await supabase.from('users').delete().in('id', employeeUserIds.filter(id => id !== demoOwner.id))
 	}
 	
-	// Delete all cashier users in demo tenant (backup cleanup)
+	// Delete all cashier users in demo tenant (backup cleanup) - but preserve the demo owner
 	// This catches any cashiers not linked to employees
 	const { data: cashierUsers } = await supabase
 		.from('users')
@@ -260,41 +267,45 @@ Deno.serve(async (req) => {
 	
 	if (!dryRun && cashierUserIds.length > 0) {
 		console.log(`Deleting ${cashierUserIds.length} additional cashier accounts...`)
-		// Delete from Supabase Auth
+		// Delete from Supabase Auth - but preserve the demo owner
 		for (const userId of cashierUserIds) {
+			// Skip the demo owner
+			if (userId === demoOwner.id) {
+				continue;
+			}
 			try {
 				await supabase.auth.admin.deleteUser(userId)
 			} catch (err) {
 				console.error(`Error deleting cashier ${userId}:`, err)
 			}
 		}
-		// Delete from users table
-		await supabase.from('users').delete().in('id', cashierUserIds)
+		// Delete from users table - but preserve the demo owner
+		await supabase.from('users').delete().in('id', cashierUserIds.filter(id => id !== demoOwner.id))
 	}
 
-	// 2) Delete transactional data (sales cascades sale_items)
+	// 2) Delete transactional data (sales cascades sale_items) - but preserve demo owner's data
 	const { error: delSalesErr } = dryRun ? { error: null } as any : await supabase
 		.from('sales')
 		.delete()
-		.in('user_id', userIds)
+		.in('user_id', userIds.filter(id => id !== demoOwner.id))
 	if (delSalesErr) throw delSalesErr
 
-	// 3) Delete returns and return_items
-	if (!dryRun) await supabase.from('returns').delete().in('user_id', userIds)
+	// 3) Delete returns and return_items - but preserve demo owner's data
+	if (!dryRun) await supabase.from('returns').delete().in('user_id', userIds.filter(id => id !== demoOwner.id))
 
-	// 4) Delete expenses and expense categories
+	// 4) Delete expenses and expense categories - but preserve demo owner's data
 	if (!dryRun) await supabase.from('expenses').delete().eq('tenant_id', demoOwner.id)
 	if (!dryRun) await supabase.from('expense_categories').delete().eq('tenant_id', demoOwner.id)
 
-	// 5) Delete HPP-related data
-	if (!dryRun) await supabase.from('global_hpp').delete().in('user_id', userIds)
-	if (!dryRun) await supabase.from('raw_materials').delete().in('user_id', userIds)
+	// 5) Delete HPP-related data - but preserve demo owner's data
+	if (!dryRun) await supabase.from('global_hpp').delete().in('user_id', userIds.filter(id => id !== demoOwner.id))
+	if (!dryRun) await supabase.from('raw_materials').delete().in('user_id', userIds.filter(id => id !== demoOwner.id))
 	
 	// Get all product IDs for the demo tenant before deleting related data
 	const { data: products } = await supabase
 		.from('products')
 		.select('id')
-		.in('user_id', userIds)
+		.in('user_id', userIds.filter(id => id !== demoOwner.id))
 	
 	const productIds = (products || []).map((p: { id: string }) => p.id)
 	console.log('[demo-reset] products found', { products: productIds.length })
@@ -305,10 +316,10 @@ Deno.serve(async (req) => {
 		await supabase.from('product_hpp_breakdown').delete().in('product_id', productIds)
 	}
 
-	// 6) Delete app settings
-	if (!dryRun) await supabase.from('app_settings').delete().in('user_id', userIds)
+	// 6) Delete app settings - but preserve demo owner's data
+	if (!dryRun) await supabase.from('app_settings').delete().in('user_id', userIds.filter(id => id !== demoOwner.id))
 
-	// 7) Delete attendance-related data (backup cleanup by tenant_id)
+	// 7) Delete attendance-related data (backup cleanup by tenant_id) - but preserve demo owner's data
 	// Delete device employee mappings by tenant (backup cleanup if any missed)
 	if (!dryRun) {
 		const { error: deviceTenantErr } = await supabase.from('device_employee_mappings').delete().eq('tenant_id', demoOwner.id)
@@ -340,6 +351,7 @@ Deno.serve(async (req) => {
 			.from('employees')
 			.select('id')
 			.eq('tenant_id', demoOwner.id)
+			.neq('user_id', demoOwner.id) // Exclude demo owner
 		const finalEmployeeIds = (finalEmployees || []).map((e: { id: string }) => e.id)
 		
 		// Try to delete any remaining attendance records using employee IDs from employees table
@@ -359,10 +371,10 @@ Deno.serve(async (req) => {
 		// For now, we'll rely on the tenant-level backup below
 	}
 	
-	// Delete devices
+	// Delete devices - but preserve demo owner's data
 	if (!dryRun) await supabase.from('devices').delete().eq('tenant_id', demoOwner.id)
 
-	// 8) Delete masters owned by tenant
+	// 8) Delete masters owned by tenant - but preserve demo owner's data
 	const deletions = [
 		{ table: 'products', column: 'user_id' },
 		{ table: 'categories', column: 'user_id' },
@@ -370,46 +382,54 @@ Deno.serve(async (req) => {
 		{ table: 'customers', column: 'user_id' },
 	]
 	for (const d of deletions) {
-		const { error } = dryRun ? { error: null } as any : await supabase.from(d.table).delete().in(d.column, userIds)
+		const { error } = dryRun ? { error: null } as any : await supabase.from(d.table).delete().in(d.column, userIds.filter(id => id !== demoOwner.id))
 		if (error) throw error
 	}
 
 		// Seed minimal dataset for demo tenant (employees/attendance are gated and disabled by default)
-		const supplierId = crypto.randomUUID()
-		const categoryId = crypto.randomUUID()
-		const productId = crypto.randomUUID()
-		const customerId = crypto.randomUUID()
+		// Only seed if there are no existing products for the demo owner
+		const { data: existingProducts } = await supabase
+			.from('products')
+			.select('id')
+			.eq('user_id', demoOwner.id)
+		
+		if (!existingProducts || existingProducts.length === 0) {
+			const supplierId = crypto.randomUUID()
+			const categoryId = crypto.randomUUID()
+			const productId = crypto.randomUUID()
+			const customerId = crypto.randomUUID()
 
-		// Insert supplier
-		{
-			const { error } = dryRun ? { error: null } as any : await supabase
-				.from('suppliers')
-				.insert([{ id: supplierId, user_id: demoOwner.id, name: 'PT. BAROKAH', address: 'Jakarta', phone: '021-000000' }])
-			if (error) throw error
-		}
+			// Insert supplier
+			{
+				const { error } = dryRun ? { error: null } as any : await supabase
+					.from('suppliers')
+					.insert([{ id: supplierId, user_id: demoOwner.id, name: 'PT. BAROKAH', address: 'Jakarta', phone: '021-000000' }])
+				if (error) throw error
+			}
 
-		// Insert category
-		{
-			const { error } = dryRun ? { error: null } as any : await supabase
-				.from('categories')
-				.insert([{ id: categoryId, user_id: demoOwner.id, name: 'SNACK' }])
-			if (error) throw error
-		}
+			// Insert category
+			{
+				const { error } = dryRun ? { error: null } as any : await supabase
+					.from('categories')
+					.insert([{ id: categoryId, user_id: demoOwner.id, name: 'SNACK' }])
+				if (error) throw error
+			}
 
-		// Insert product
-		{
-			const { error } = dryRun ? { error: null } as any : await supabase
-				.from('products')
-				.insert([{ id: productId, user_id: demoOwner.id, name: 'SOSIS', category_id: categoryId, supplier_id: supplierId, price: 2000, cost: 1500, stock: 100, barcode: '8999999999999' }])
-			if (error) throw error
-		}
+			// Insert product
+			{
+				const { error } = dryRun ? { error: null } as any : await supabase
+					.from('products')
+					.insert([{ id: productId, user_id: demoOwner.id, name: 'SOSIS', category_id: categoryId, supplier_id: supplierId, price: 2000, cost: 1500, stock: 100, barcode: '8999999999999' }])
+				if (error) throw error
+			}
 
-		// Insert default customer (optional)
-		{
-			const { error } = dryRun ? { error: null } as any : await supabase
-				.from('customers')
-				.insert([{ id: customerId, user_id: demoOwner.id, name: 'Pelanggan Umum', email: null, phone: null }])
-			if (error) throw error
+			// Insert default customer (optional)
+			{
+				const { error } = dryRun ? { error: null } as any : await supabase
+					.from('customers')
+					.insert([{ id: customerId, user_id: demoOwner.id, name: 'Pelanggan Umum', email: null, phone: null }])
+				if (error) throw error
+			}
 		}
 
 		// Optional: Seed employees and attendance only if explicitly enabled

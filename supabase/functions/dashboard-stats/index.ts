@@ -1,46 +1,38 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-import { createClient } from '@supabase/supabase-js'
-import { corsHeaders } from '../_shared/cors.ts'
+import { corsHeaders, handleOptions, createResponse, createErrorResponse } from '../_shared/cors.ts'
+import { createSupabaseForFunction, validateAuthHeader } from '../_shared/client.ts'
 import { createSupabaseClient, getUserIdFromToken, getTenantOwnerId } from '../_shared/auth.ts'
 
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return handleOptions(req)
   }
 
   try {
     // Get the authorization header
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Authorization token required' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401
-        }
-      )
+    if (!validateAuthHeader(authHeader)) {
+      // Handle OPTIONS request for CORS
+      if (req.method === 'OPTIONS') {
+        return handleOptions(req);
+      }
+      return createErrorResponse('Authorization token required', 401)
     }
 
     // Extract token
     const token = authHeader.substring(7)
     
     // Create Supabase client
-    const supabase = createSupabaseClient()
+    const supabase = createSupabaseForFunction(authHeader)
 
     // Get user ID from token
     let userId;
     try {
-      userId = await getUserIdFromToken(token, supabase);
+      userId = await getUserIdFromToken(token);
     } catch (authError) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired token' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401
-        }
-      );
+      return createErrorResponse('Invalid or expired token', 401);
     }
 
     // Get tenant owner ID (works for both owner and cashier)
@@ -48,13 +40,7 @@ Deno.serve(async (req) => {
     try {
       ownerId = await getTenantOwnerId(supabase, userId);
     } catch (ownerError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to resolve tenant' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401
-        }
-      );
+      return createErrorResponse('Failed to resolve tenant', 401);
     }
 
     // Get all users in the tenant (owner + all cashiers)
@@ -69,22 +55,16 @@ Deno.serve(async (req) => {
     
     // Check if tenantUsers is empty
     if (!tenantUsers || tenantUsers.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          totalProducts: 0,
-          totalCategories: 0,
-          totalSuppliers: 0,
-          totalCustomers: 0,
-          totalUsers: 0, 
-          totalTransactions: 0, 
-          totalSales: 0, 
-          growth: '0%' 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        }
-      )
+      return createResponse({ 
+        totalProducts: 0,
+        totalCategories: 0,
+        totalSuppliers: 0,
+        totalCustomers: 0,
+        totalUsers: 0, 
+        totalTransactions: 0, 
+        totalSales: 0, 
+        growth: '0%' 
+      })
     }
 
     // Extract user IDs
@@ -92,22 +72,16 @@ Deno.serve(async (req) => {
     
     // Check if userIds is empty
     if (!userIds || userIds.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          totalProducts: 0,
-          totalCategories: 0,
-          totalSuppliers: 0,
-          totalCustomers: 0,
-          totalUsers: 0, 
-          totalTransactions: 0, 
-          totalSales: 0, 
-          growth: '0%' 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        }
-      )
+      return createResponse({ 
+        totalProducts: 0,
+        totalCategories: 0,
+        totalSuppliers: 0,
+        totalCustomers: 0,
+        totalUsers: 0, 
+        totalTransactions: 0, 
+        totalSales: 0, 
+        growth: '0%' 
+      })
     }
 
     // Build queries with tenant-based filtering
@@ -149,30 +123,18 @@ Deno.serve(async (req) => {
     // Calculate growth (simplified - in a real app, you'd compare to previous period)
     const growth = totalTransactions > 0 ? Math.min(100, Math.round((totalTransactions / 10) * 12)) : 0
     
-    return new Response(
-      JSON.stringify({
-        totalProducts: productCount || 0,
-        totalCategories: categoryCount || 0,
-        totalSuppliers: supplierCount || 0,
-        totalCustomers: customerCount || 0,
-        totalUsers: userCount || 0,
-        totalTransactions: totalTransactions,
-        totalSales: totalSales,
-        growth: `${growth}%`
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      }
-    )
+    return createResponse({
+      totalProducts: productCount || 0,
+      totalCategories: categoryCount || 0,
+      totalSuppliers: supplierCount || 0,
+      totalCustomers: customerCount || 0,
+      totalUsers: userCount || 0,
+      totalTransactions: totalTransactions,
+      totalSales: totalSales,
+      growth: `${growth}%`
+    })
   } catch (error) {
     console.error('Dashboard stats error:', error)
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
-      }
-    )
+    return createErrorResponse('Internal server error', 500)
   }
 })

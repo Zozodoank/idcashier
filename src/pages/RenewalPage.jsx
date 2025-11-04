@@ -5,9 +5,12 @@ import { invokeFn } from '../lib/invokeFn';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Loader, Calendar, CreditCard } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader, Calendar, CreditCard, CheckCircle } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const RenewalPage = () => {
   const navigate = useNavigate();
@@ -76,7 +79,12 @@ const RenewalPage = () => {
       }
       
       try {
-        const data = await invokeFn('subscriptions-get-current-user');
+        // Pass token in headers for authenticated requests
+        const data = await invokeFn('subscriptions-get-current-user', null, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
         
         // Check if user has a subscription
         if (data && data.has_subscription === false) {
@@ -150,10 +158,16 @@ const RenewalPage = () => {
       // Check for specific error statuses or parse details like in payments.js
       if (error.message?.includes('400') || (error.message && error.message.includes('"code":400'))) {
         errorMessage = 'Parameter tidak valid. Pastikan paket langganan dipilih dengan benar.';
+        errorDescription = 'Periksa kembali data yang Anda masukkan dan coba lagi.';
       } else if (error.message?.includes('401') || (error.message && error.message.includes('"code":401'))) {
         errorMessage = 'Sesi login telah berakhir. Silakan login ulang.';
+        errorDescription = 'Anda perlu login kembali untuk melanjutkan pembayaran.';
       } else if (error.message?.includes('404') || (error.message && error.message.includes('"code":404'))) {
         errorMessage = 'Pengguna tidak ditemukan. Periksa email Anda.';
+        errorDescription = 'Pastikan email yang Anda masukkan sudah terdaftar.';
+      } else if (error.message?.includes('NetworkError') || error.message?.includes('Failed to fetch')) {
+        errorMessage = 'Koneksi bermasalah.';
+        errorDescription = 'Periksa koneksi internet Anda dan coba lagi.';
       } else {
         // Try to parse structured error from response, similar to payments.js
         try {
@@ -162,8 +176,9 @@ const RenewalPage = () => {
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
             console.error('Parsed error details:', parsed);
-            if (parsed.details) {
-              errorDescription = `${parsed.message || errorMessage} | ${JSON.stringify(parsed.details)}`;
+            if (parsed.error) {
+              errorMessage = parsed.error;
+              errorDescription = parsed.details ? JSON.stringify(parsed.details) : 'Terjadi kesalahan saat memproses pembayaran.';
             }
           }
         } catch (parseErr) {

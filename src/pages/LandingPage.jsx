@@ -41,7 +41,7 @@ const LandingPage = () => {
     setIsDemoLoading(true);
     try {
       // Normalize demo email on client side
-      const demoEmail = 'demo@gmail.com';
+      const demoEmail = 'demo@idcashier.my.id';
       const normalizedDemoEmail = demoEmail.trim().toLowerCase();
       
       const result = await login(normalizedDemoEmail, 'Demo2025');

@@ -63,22 +63,17 @@ import {
 
 } from "@/components/ui/dialog";
 
-
+import { useHPP } from '@/contexts/HPPContext';
 
 const ReportsPage = () => {
-
   const { t } = useLanguage();
-
   const { toast } = useToast();
-
   const { navigationParams } = useNavigation();
-
   const { user, token } = useAuth();
-
+  const { hppEnabled } = useHPP(); // Use HPP context instead of local state
   const permissions = usePermissions();
   
-  // HPP feature state
-  const [hppEnabled, setHppEnabled] = useState(false);
+  // HPP feature state - removed local state, using context instead
   const canViewHPP = user?.permissions?.canViewHPP || false;
   
   // Note: Global HPP removed - now managed via Expenses system

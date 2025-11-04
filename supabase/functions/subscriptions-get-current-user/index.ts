@@ -1,37 +1,27 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from '@supabase/supabase-js'
-import { getCorsHeaders } from '../_shared/cors.ts'
+import { createResponse, createErrorResponse } from '../_shared/cors.ts'
 import { createSupabaseClient, getUserIdFromToken } from '../_shared/auth.ts'
 
-// Helper function to create JSON responses with CORS headers
-function json(payload: any, status = 200, origin = '*') {
-  const corsHeaders = getCorsHeaders(origin);
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders },
-  });
-}
-
 Deno.serve(async (req) => {
-  // Get origin from request headers for dynamic CORS
-  const origin = req.headers.get('origin') || '';
-  
   // Handle preflight request
   if (req.method === 'OPTIONS') {
-    const corsHeaders = getCorsHeaders(origin);
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: { 
+      'Access-Control-Allow-Origin': 'https://idcashier.my.id',
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin'
+    } });
   }
 
   try {
     // Get the authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return json({ 
-        success: false, 
-        error: 'Missing authorization header',
-        code: 401
-      }, 401, origin);
+      return createErrorResponse('Missing authorization header', 401);
     }
 
     // Extract token
@@ -52,11 +42,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (userError || !userData) {
-      return json({
-        success: false,
-        error: 'User not found',
-        code: 404
-      }, 404, origin);
+      return createErrorResponse('User not found', 404);
     }
 
     // If user is a cashier, use the owner's ID for subscription
@@ -76,24 +62,16 @@ Deno.serve(async (req) => {
     if (error) {
       console.error('Subscription query error:', error);
       // Return proper error instead of default subscription
-      return json({
-        success: false,
-        error: 'Failed to fetch subscription data',
-        details: error.message,
-        code: 500
-      }, 500, origin);
+      return createErrorResponse('Failed to fetch subscription data', 500);
     }
     
     if (subscriptions.length === 0) {
       // If no subscription found, return null to indicate no subscription
-      return json({
-        success: true,
-        data: {
-          user_id: userId,
-          has_subscription: false,
-          message: 'No active subscription found'
-        }
-      }, 200, origin);
+      return createResponse({
+        user_id: userId,
+        has_subscription: false,
+        message: 'No active subscription found'
+      });
     }
     
     const subscription = subscriptions[0];
@@ -101,22 +79,14 @@ Deno.serve(async (req) => {
     const endDate = new Date(subscription.end_date);
     const isActive = endDate >= today;
     
-    return json({
-      success: true,
-      data: {
-        ...subscription,
-        is_active: isActive,
-        has_subscription: true
-      }
-    }, 200, origin);
+    return createResponse({
+      ...subscription,
+      is_active: isActive,
+      has_subscription: true
+    });
   } catch (error) {
     console.error('Get subscription error:', error);
     // Return proper error instead of default subscription
-    return json({
-      success: false,
-      error: 'Internal server error',
-      details: error.message,
-      code: 500
-    }, 500, origin);
+    return createErrorResponse('Internal server error', 500);
   }
 });

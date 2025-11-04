@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHPP } from '@/contexts/HPPContext'; // Add HPP context
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +73,7 @@ const EmployeesPage = ({ user }) => {
   const { t } = useLanguage();
   const { toast } = useToast();
   const { user: authUser, token } = useAuth();
+  const { hppEnabled } = useHPP(); // Use HPP context
   
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1561,7 +1563,7 @@ const EmployeesPage = ({ user }) => {
                 <Label htmlFor="has_app_access">{t('hasAppAccess')}</Label>
                 <p className="text-xs text-muted-foreground mt-1">
                   Karyawan dapat login dan mengakses aplikasi
-                  {user?.email === 'demo@gmail.com' && (
+                  {user?.email === 'demo@idcashier.my.id' && (
                     <span className="text-amber-600 font-medium"> (Data akan dihapus saat reset demo)</span>
                   )}
                 </p>

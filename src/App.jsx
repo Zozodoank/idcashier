@@ -15,6 +15,7 @@ import { NavigationProvider } from '@/contexts/NavigationContext';
 import { HPPProvider } from '@/contexts/HPPContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDisableNumberInputScroll } from '@/hooks/useDisableNumberInputScroll';
+import Toaster from '@/components/Toaster';
 
 // ProtectedRoute component to handle authentication
 const ProtectedRoute = ({ children }) => {
@@ -52,6 +53,7 @@ function App() {
                   <title>idCashier - Point of Sale System</title>
                   <meta name="description" content="Modern multi-tenant Point of Sale system for your business" />
                 </Helmet>
+                <Toaster />
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/login" element={<LoginPage />} />

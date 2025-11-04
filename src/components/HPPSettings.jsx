@@ -67,6 +67,16 @@ const HPPSettings = () => {
 
   const loadSettings = async () => {
     try {
+      // Check if user is demo or developer (whitelisted accounts)
+      const isWhitelistedAccount = user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com';
+      
+      // If user is whitelisted, HPP is automatically enabled
+      if (isWhitelistedAccount) {
+        setHppEnabled(true);
+        setLoading(false);
+        return;
+      }
+      
       const data = await settingsAPI.get('hpp_enabled', token);
       const settingEnabled = data?.setting_value?.enabled || false;
       
@@ -77,7 +87,9 @@ const HPPSettings = () => {
     } catch (error) {
       console.error('Error loading HPP settings:', error);
       // During trial, HPP should be enabled even if no setting exists
-      setHppEnabled(isTrialActive);
+      // For whitelisted accounts, HPP should always be enabled
+      const isWhitelistedAccount = user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com';
+      setHppEnabled(isTrialActive || isWhitelistedAccount);
     } finally {
       setLoading(false);
     }
@@ -110,6 +122,17 @@ const HPPSettings = () => {
   };
 
   const handleActivateHPP = () => {
+    // Check if user is demo or developer (whitelisted accounts)
+    const isWhitelistedAccount = user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com';
+    
+    if (isWhitelistedAccount) {
+      toast({
+        title: 'Info',
+        description: 'Fitur HPP sudah aktif untuk akun demo dan developer'
+      });
+      return;
+    }
+    
     if (hppEnabled) {
       if (isTrialActive) {
         toast({
@@ -255,9 +278,11 @@ const HPPSettings = () => {
               </Label>
               <p className="text-sm text-muted-foreground">
                 {hppEnabled ? (
-                  isTrialActive ? 'Aktif (Trial 7 Hari)' : 'Fitur HPP sudah aktif'
+                  isTrialActive ? 'Aktif (Gratis 7 Hari)' : 
+                  (user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com') ? 
+                  'Aktif' : 'Sudah aktif'
                 ) : (
-                  'Fitur HPP belum aktif'
+                  'Belum aktif'
                 )}
               </p>
             </div>
@@ -270,7 +295,8 @@ const HPPSettings = () => {
             {hppEnabled ? (
               <>
                 <CheckCircle className="w-4 h-4 mr-2" />
-                {isTrialActive ? 'Trial Aktif' : 'Aktif'}
+                {(user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com') ? 'Whitelist' : 
+                 (isTrialActive ? 'Trial Aktif' : 'Aktif')}
               </>
             ) : (
               <>

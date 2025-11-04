@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHPP } from '@/contexts/HPPContext'; // Add HPP context
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,7 @@ import * as XLSX from 'xlsx';
 const ExpensesPage = ({ user }) => {
   const { t } = useLanguage();
   const { token } = useAuth();
+  const { hppEnabled } = useHPP(); // Use HPP context
   const { toast } = useToast();
 
   const [expenses, setExpenses] = useState([]);

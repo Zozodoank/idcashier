@@ -1,46 +1,38 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-import { createClient } from '@supabase/supabase-js'
-import { corsHeaders } from '../_shared/cors.ts'
+import { corsHeaders, handleOptions, createResponse, createErrorResponse } from '../_shared/cors.ts'
+import { createSupabaseForFunction, validateAuthHeader } from '../_shared/client.ts'
 import { createSupabaseClient, getUserIdFromToken, getTenantOwnerId } from '../_shared/auth.ts'
 
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return handleOptions(req)
   }
 
   try {
     // Get the authorization header
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Authorization token required' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401
-        }
-      )
+    if (!validateAuthHeader(authHeader)) {
+      // Handle OPTIONS request for CORS
+      if (req.method === 'OPTIONS') {
+        return handleOptions(req);
+      }
+      return createErrorResponse('Authorization token required', 401)
     }
 
     // Extract token
     const token = authHeader.substring(7)
     
     // Create Supabase client
-    const supabase = createSupabaseClient()
+    const supabase = createSupabaseForFunction(authHeader)
 
     // Get user ID from token
     let userId: string
     try {
-      userId = await getUserIdFromToken(token, supabase)
+      userId = await getUserIdFromToken(token);
     } catch (error) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired token' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401
-        }
-      )
+      return createErrorResponse('Invalid or expired token', 401)
     }
 
     // Get tenant owner ID (works for both owner and cashier)
@@ -48,13 +40,7 @@ Deno.serve(async (req) => {
     try {
       ownerId = await getTenantOwnerId(supabase, userId)
     } catch (error) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to resolve tenant' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401
-        }
-      )
+      return createErrorResponse('Failed to resolve tenant', 401)
     }
 
     // Get all users in the tenant (owner + all cashiers)
@@ -69,13 +55,7 @@ Deno.serve(async (req) => {
     
     // Check if tenantUsers is empty
     if (!tenantUsers || tenantUsers.length === 0) {
-      return new Response(
-        JSON.stringify([]),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        }
-      )
+      return createResponse([])
     }
 
     // Extract user IDs
@@ -83,13 +63,7 @@ Deno.serve(async (req) => {
     
     // Check if userIds is empty
     if (!userIds || userIds.length === 0) {
-      return new Response(
-        JSON.stringify([]),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        }
-      )
+      return createResponse([])
     }
 
     // Get sales data with tenant-based filtering
@@ -126,21 +100,9 @@ Deno.serve(async (req) => {
       .sort((a, b) => b.sold - a.sold)
       .slice(0, 5)
     
-    return new Response(
-      JSON.stringify(topProductsList),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      }
-    )
+    return createResponse(topProductsList)
   } catch (error) {
     console.error('Top products error:', error)
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
-      }
-    )
+    return createErrorResponse('Internal server error', 500)
   }
 })

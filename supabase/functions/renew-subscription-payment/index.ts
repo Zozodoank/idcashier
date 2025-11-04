@@ -1,7 +1,10 @@
 // Setup type definitions for built-in Supabase Runtime APIs
-import "jsr:@supabase/functions-js@2.5.0/edge-runtime.d.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+
+// Import Supabase client
 import { createClient } from '@supabase/supabase-js';
-import { getCorsHeaders } from '../_shared/cors.ts';
+import { corsHeaders, handleOptions, createResponse, createErrorResponse } from '../_shared/cors.ts';
+import { createSupabaseForFunction, validateAuthHeader } from '../_shared/client.ts';
 import { createSupabaseClient, getUserIdFromToken } from '../_shared/auth.ts';
 
 // Type definitions
@@ -198,103 +201,117 @@ const createDuitkuPayment = async (
   }
 };
 
-// Helper function to create JSON responses with CORS headers
-function json(payload: any, status = 200) {
-  // Get origin from request headers for dynamic CORS
-  const origin = payload.origin || '*';
-  const corsHeaders = getCorsHeaders(origin);
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders },
-  });
-}
-
 // Main handler
 Deno.serve(async (req) => {
-  // Get origin from request headers for dynamic CORS
-  const origin = req.headers.get('origin') || '';
-  const corsHeaders = getCorsHeaders(origin);
-  
+  // Log incoming request for debugging
+  logger.info('Incoming request to renew-subscription-payment', { 
+    method: req.method, 
+    url: req.url, 
+    headers: Object.fromEntries(req.headers.entries())
+  });
   // Handle preflight request
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return handleOptions(req);
+  }
+
+  // Enhanced logging for debugging empty body issue
+  logger.info('Request details', {
+    method: req.method,
+    url: req.url,
+    contentType: req.headers.get('content-type'),
+    contentLength: req.headers.get('content-length'),
+    hasBody: req.body !== null,
+    headers: Object.fromEntries(req.headers.entries())
+  });
+
+  // Immediately return error for GET requests since they can't have bodies
+  if (req.method === 'GET') {
+    logger.error('GET request received for payment function which requires a body', {
+      method: req.method,
+      url: req.url,
+      headers: Object.fromEntries(req.headers.entries())
+    });
+    return createErrorResponse('Invalid request method. This endpoint requires a POST request with a body.', 405);
   }
 
   try {
     // Get the authorization header
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return json({ 
-        success: false, 
-        error: 'Missing authorization header',
-        code: 401,
-        origin
-      }, 401);
+    
+    // Log environment variables for debugging (redacted)
+    logger.info('Environment variables check', { 
+      hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+      hasServiceRoleKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      hasDuitkuMerchantCode: !!Deno.env.get('DUITKU_MERCHANT_CODE'),
+      hasDuitkuMerchantKey: !!Deno.env.get('DUITKU_MERCHANT_KEY'),
+      hasFrontendUrl: !!Deno.env.get('FRONTEND_URL'),
+      hasDuitkuEnvironment: !!Deno.env.get('DUITKU_ENVIRONMENT')
+    });
+    
+    // Validate required environment variables
+    if (!Deno.env.get('SUPABASE_URL') || !Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+      logger.error('Missing required Supabase environment variables');
+      return createErrorResponse('Server configuration error', 500);
     }
-
-    // Parse JSON body robustly
+    
+    // Parse JSON body robustly with enhanced logging
     let body: any;
     try {
-      body = await req.json();
-    } catch {
-      try { 
-        const text = await req.text();
-        body = JSON.parse(text); 
-      } catch {
-        return json({ 
-          success: false, 
-          error: 'Invalid or missing JSON body',
-          code: 400,
-          origin
-        }, 400);
+      // Read the text first to avoid consuming the body twice
+      const text = await req.text();
+      logger.info('Raw request text received', { textLength: text.length, textPreview: text.substring(0, 100) });
+      
+      if (!text.trim()) {
+        logger.error('Empty request body received', { 
+          headers: Object.fromEntries(req.headers.entries()),
+          method: req.method,
+          url: req.url
+        });
+        return createErrorResponse('Empty request body', 400);
       }
+      
+      // Try to parse as JSON
+      body = JSON.parse(text);
+      logger.info('Successfully parsed JSON body from request', { bodyKeys: Object.keys(body) });
+    } catch (jsonError) {
+      logger.error('Failed to parse request body as JSON', { 
+        error: jsonError.message,
+        requestBody: text ? text.substring(0, 200) + (text.length > 200 ? '...' : '') : 'Empty',
+        headers: Object.fromEntries(req.headers.entries())
+      });
+      return createErrorResponse('Invalid or missing JSON body', 400);
     }
     
     // Support both plan_id and plan for backward compatibility
     const plan_id = body?.plan_id ?? body?.plan;
     if (!plan_id) {
-      return json({ 
-        success: false, 
-        error: 'Missing plan_id',
-        code: 400,
-        origin
-      }, 400);
-    }
-
-    // Validate plan parameter with enhanced logging
-    logger.info('Validating plan parameter', { receivedPlan: plan_id });
-    if (!plan_id) {
-      logger.warn('Plan parameter is missing', { requestBody });
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Plan parameter is required',
-          code: 400,
-          received_body: requestBody
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
+      logger.warn('Plan parameter is missing', { requestBody: body });
+      return createErrorResponse('Plan parameter is required', 400);
     }
     
     if (!PLAN_MAPPING[plan_id]) {
       const receivedPlanStr = plan_id ? `'${plan_id}'` : 'undefined/null';
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Invalid plan ${receivedPlanStr}. Must be one of: 1_month, 3_months, 6_months, 12_months`
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
+      return createErrorResponse(`Invalid plan ${receivedPlanStr}. Must be one of: 1_month, 3_months, 6_months, 12_months`, 400);
     }
 
-    const supabase = createSupabaseClient();
+    // Create Supabase client
+    let supabase;
+    try {
+      supabase = createSupabaseForFunction(authHeader);
+      logger.info('Supabase client created successfully');
+    } catch (clientError) {
+      logger.error('Failed to create Supabase client', { message: clientError.message });
+      return createErrorResponse('Failed to initialize database connection', 500);
+    }
     let userId: string;
     let userData: any;
 
     // Support both token-based and email-based authentication
+    // Extract email from body for email-based authentication
+    const email = body?.email;
     logger.info('Authentication check', { hasAuthHeader: !!authHeader, hasEmail: !!email });
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    if (authHeader && validateAuthHeader(authHeader)) {
       logger.info('Using token-based authentication');
       // Token-based authentication (authenticated users)
       const token = authHeader.replace('Bearer ', '');
@@ -303,71 +320,77 @@ Deno.serve(async (req) => {
         logger.info('Token validated', { userId: '[REDACTED]' });
       } catch (error) {
         logger.error('Token validation failed', { message: error.message });
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Invalid token',
-            code: 401
-          }),
-          { headers: corsHeaders, status: 401 }
-        );
+        // If token validation fails but email is provided, fall back to email-based auth
+        if (email) {
+          logger.info('Falling back to email-based authentication', { email: maskSensitiveString(email) });
+          const normalizedEmail = email.trim().toLowerCase();
+          const { data, error: userError } = await supabase
+            .from('users')
+            .select('id, name, email, phone')
+            .eq('email', normalizedEmail)
+            .single();
+
+          if (userError || !data) {
+            logger.error('User fetch by email failed', { email: maskSensitiveString(email), error: userError?.message });
+            return createErrorResponse('User not found', 404);
+          }
+          userId = data.id;
+          userData = data;
+          logger.info('User data fetched via email fallback', { email: maskSensitiveString(userData.email) });
+        } else {
+          return createErrorResponse('Invalid token', 401);
+        }
       }
 
-      // Fetch user data by ID using service role to bypass RLS
-      const { data, error: userError } = await supabase
-        .from('users')
-        .select('name, email, phone')
-        .eq('id', userId)
-        .single();
+      // If we have a userId but no userData yet, fetch user data
+      if (!userData) {
+        logger.info('Fetching user data by ID', { userId: '[REDACTED]' });
+        try {
+          // Fetch user data by ID using service role to bypass RLS
+          const { data, error: userError } = await supabase
+            .from('users')
+            .select('id, name, email, phone, role, tenant_id')
+            .eq('id', userId)
+            .single();
 
-      if (userError || !data) {
-        logger.error('User fetch by ID failed', { userId: '[REDACTED]', error: userError?.message });
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'User not found',
-            code: 404
-          }),
-          { headers: corsHeaders, status: 404 }
-        );
+          if (userError || !data) {
+            logger.error('User fetch by ID failed', { userId: '[REDACTED]', error: userError?.message });
+            return createErrorResponse('User not found', 404);
+          }
+          userData = data;
+          logger.info('User data fetched via token', { email: maskSensitiveString(userData.email) });
+        } catch (fetchError) {
+          logger.error('Exception during user fetch by ID', { userId: '[REDACTED]', error: fetchError.message });
+          return createErrorResponse('Failed to fetch user data', 500);
+        }
       }
-      userData = data;
-      logger.info('User data fetched via token', { email: maskSensitiveString(userData.email) });
     } else if (email) {
       logger.info('Using email-based authentication', { email: maskSensitiveString(email) });
       // Email-based authentication (for expired users accessing renewal page)
       const normalizedEmail = email.trim().toLowerCase();
-      // Use service role to bypass RLS when fetching user by email
-      const { data, error: userError } = await supabase
-        .from('users')
-        .select('id, name, email, phone')
-        .eq('email', normalizedEmail)
-        .single();
+      
+      try {
+        // Use service role to bypass RLS when fetching user by email
+        const { data, error: userError } = await supabase
+          .from('users')
+          .select('id, name, email, phone')
+          .eq('email', normalizedEmail)
+          .single();
 
-      if (userError || !data) {
-        logger.error('User fetch by email failed', { email: maskSensitiveString(email), error: userError?.message });
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'User not found',
-            code: 404
-          }),
-          { headers: corsHeaders, status: 404 }
-        );
+        if (userError || !data) {
+          logger.error('User fetch by email failed', { email: maskSensitiveString(email), error: userError?.message });
+          return createErrorResponse('User not found', 404);
+        }
+        userId = data.id;
+        userData = data;
+        logger.info('User data fetched via email', { email: maskSensitiveString(userData.email) });
+      } catch (fetchError) {
+        logger.error('Exception during user fetch by email', { email: maskSensitiveString(email), error: fetchError.message });
+        return createErrorResponse('Failed to fetch user data', 500);
       }
-      userId = data.id;
-      userData = data;
-      logger.info('User data fetched via email', { email: maskSensitiveString(userData.email) });
     } else {
       logger.warn('No authentication provided');
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Authentication required - please login or provide email',
-          code: 401
-        }),
-        { headers: corsHeaders, status: 401 }
-      );
+      return createErrorResponse('Authentication required - please login or provide email', 401);
     }
 
     // Log plan selection and proceed
@@ -377,113 +400,144 @@ Deno.serve(async (req) => {
     const planData = PLAN_MAPPING[plan_id];
     logger.info('Plan data retrieved', { plan_id, amount: planData.amount });
 
+    // For cashiers, use the owner's ID for subscription/payment
+    let effectiveUserId = userId;
+    if (userData.role === 'cashier') {
+      effectiveUserId = userData.tenant_id;
+      logger.info('User is cashier, using tenant_id for payment', { userId, tenantId: userData.tenant_id });
+    }
+    
     // Generate merchant order ID
     const timestamp = Date.now();
-    const merchantOrderId = `RENEWAL-${userId}-${timestamp}`;
+    const merchantOrderId = `RENEWAL-${effectiveUserId}-${timestamp}`;
     logger.info('Merchant order ID generated', { orderIdPrefix: 'RENEWAL-[USER_ID]-[TIMESTAMP]' });
 
     // Create payment record
-    const { data: paymentRecord, error: paymentError } = await supabase
-      .from('payments')
-      .insert({
-        user_id: userId,
-        amount: planData.amount,
-        merchant_order_id: merchantOrderId,
-        product_details: planData.productDetails,
-        customer_va_name: userData.name,
-        customer_email: userData.email,
-        customer_phone: userData.phone || '081234567890',
-        payment_method: 'ALL',
-        status: 'pending'
-      })
-      .select('id')
-      .single();
+    logger.info('Creating payment record', { 
+      userId: '[REDACTED]', 
+      effectiveUserId: '[REDACTED]',
+      amount: planData.amount, 
+      merchantOrderId: merchantOrderId.substring(0, 30) + '...' 
+    });
+    
+    try {
+      const { data: paymentRecord, error: paymentError } = await supabase
+        .from('payments')
+        .insert({
+          user_id: effectiveUserId,
+          amount: planData.amount,
+          merchant_order_id: merchantOrderId,
+          product_details: planData.productDetails,
+          customer_va_name: userData.name,
+          customer_email: userData.email,
+          customer_phone: userData.phone || '081234567890',
+          payment_method: 'ALL',
+          status: 'pending'
+        })
+        .select('id')
+        .single();
 
-    if (paymentError) {
-      logger.error('Error creating payment record', { error: paymentError.message });
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Failed to create payment record: ${paymentError.message}`
-        }),
-        { headers: corsHeaders, status: 500 }
-      );
+      if (paymentError) {
+        logger.error('Error creating payment record', { error: paymentError.message });
+        return createErrorResponse(`Failed to create payment record: ${paymentError.message}`, 500);
+      }
+      logger.info('Payment record created', { paymentId: paymentRecord.id });
+    } catch (paymentRecordError) {
+      logger.error('Exception during payment record creation', { error: paymentRecordError.message });
+      return createErrorResponse('Failed to create payment record', 500);
     }
-    logger.info('Payment record created', { paymentId: paymentRecord.id });
 
     // Call Duitku API
     logger.info('Initiating Duitku payment');
-    const paymentResult = await createDuitkuPayment(
-      merchantOrderId,
-      planData.amount,
-      planData.productDetails,
-      userData.name,
-      userData.email,
-      userData.phone || '081234567890'
-    );
-
-    if (!paymentResult.success) {
-      logger.error('Duitku payment failed', { errorMessage: paymentResult.errorMessage });
-      // Delete payment record if Duitku call fails
-      await supabase.from('payments').delete().eq('id', paymentRecord.id);
-
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: paymentResult.errorMessage
-        }),
-        { headers: corsHeaders, status: 500 }
+    
+    let paymentResult;
+    try {
+      paymentResult = await createDuitkuPayment(
+        merchantOrderId,
+        planData.amount,
+        planData.productDetails,
+        userData.name,
+        userData.email,
+        userData.phone || '081234567890'
       );
+
+      if (!paymentResult.success) {
+        logger.error('Duitku payment failed', { errorMessage: paymentResult.errorMessage });
+        // Delete payment record if Duitku call fails
+        try {
+          await supabase.from('payments').delete().eq('id', paymentRecord.id);
+        } catch (deleteError) {
+          logger.error('Failed to delete payment record after Duitku failure', { error: deleteError.message });
+        }
+
+        return createErrorResponse(paymentResult.errorMessage, 500);
+      }
+      logger.info('Duitku payment successful', { paymentUrl: paymentResult.paymentUrl ? '[URL_PRESENT]' : null });
+    } catch (duitkuError) {
+      logger.error('Exception during Duitku payment creation', { error: duitkuError.message });
+      // Delete payment record if Duitku call fails
+      try {
+        await supabase.from('payments').delete().eq('id', paymentRecord.id);
+      } catch (deleteError) {
+        logger.error('Failed to delete payment record after Duitku exception', { error: deleteError.message });
+      }
+      return createErrorResponse('Failed to create payment with payment provider', 500);
     }
-    logger.info('Duitku payment successful', { paymentUrl: paymentResult.paymentUrl ? '[URL_PRESENT]' : null });
 
     // Update payment record with payment URL and reference
-    const { error: updateError } = await supabase
-      .from('payments')
-      .update({
-        payment_url: paymentResult.paymentUrl,
-        reference: paymentResult.reference,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', paymentRecord.id);
-      
-    // Check for errors in payment update
-    if (updateError) {
-      logger.error('Error updating payment record with Duitku details', { error: updateError.message });
-      // Return 500 error if update fails
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Failed to update payment record: ${updateError.message}`
-        }),
-        { headers: corsHeaders, status: 500 }
-      );
+    logger.info('Updating payment record with Duitku details');
+    
+    try {
+      const { error: updateError } = await supabase
+        .from('payments')
+        .update({
+          payment_url: paymentResult.paymentUrl,
+          reference: paymentResult.reference,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', paymentRecord.id);
+        
+      // Check for errors in payment update
+      if (updateError) {
+        logger.error('Error updating payment record with Duitku details', { error: updateError.message });
+        // Return 500 error if update fails
+        return createErrorResponse(`Failed to update payment record: ${updateError.message}`, 500);
+      }
+      logger.info('Payment record updated with Duitku details');
+    } catch (updateError) {
+      logger.error('Exception during payment record update', { error: updateError.message });
+      return createErrorResponse('Failed to update payment record', 500);
     }
-    logger.info('Payment record updated with Duitku details');
 
     // Return success response
     logger.info('Returning success response');
-    return new Response(
-      JSON.stringify({
-        success: true,
-        paymentUrl: paymentResult.paymentUrl,
-        merchantOrderId,
-        paymentId: paymentRecord.id,
-        message: 'Payment request created successfully'
-      }),
-      { headers: corsHeaders, status: 201 }
-    );
+    return createResponse({
+      success: true,
+      paymentUrl: paymentResult.paymentUrl,
+      merchantOrderId,
+      paymentId: paymentRecord.id,
+      message: 'Payment request created successfully'
+    }, 201);
   } catch (error) {
-    logger.error('Unhandled error in renew-subscription-payment function', { message: error.message });
-    return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: 'Internal server error'
-      }),
-      { 
-        headers: corsHeaders,
-        status: 500
-      }
-    );
+    // Log detailed error information for debugging
+    logger.error('Unhandled error in renew-subscription-payment function', { 
+      message: error.message, 
+      stack: error.stack,
+      name: error.name
+    });
+    
+    // Try to provide more specific error messages based on error type
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      logger.error('Network error when calling external API', { error: error.message });
+      return createErrorResponse('Network error when connecting to payment provider', 500);
+    } else if (error.message && error.message.includes('Supabase')) {
+      logger.error('Supabase client error', { error: error.message });
+      return createErrorResponse('Database connection error', 500);
+    } else if (error.message && error.message.includes('Deno')) {
+      logger.error('Deno runtime error', { error: error.message });
+      return createErrorResponse('Runtime environment error', 500);
+    }
+    
+    return createErrorResponse('Internal server error', 500);
   }
 });

@@ -235,7 +235,7 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
       return;
     }
 
-    if (user.email === 'demo@gmail.com') {
+    if (user.email === 'demo@idcashier.my.id') {
       toast({ title: t('accessDenied'), description: t('passwordChangeFail'), variant: "destructive" });
       return;
     }
@@ -364,12 +364,12 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
       <div className="space-y-6">
         <div><h1 className="text-3xl font-bold">{t('settings')}</h1><p className="text-muted-foreground">{t('settingsSubtitle')}</p></div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full grid-cols-2 ${(hppEnabled || user?.permissions?.canViewHPP) ? 'sm:grid-cols-6' : 'sm:grid-cols-5'}`}>
+          <TabsList className={`grid w-full grid-cols-2 ${(hppEnabled || user?.permissions?.canViewHPP || user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com') ? 'sm:grid-cols-6' : 'sm:grid-cols-5'}`}>
             <TabsTrigger value="toko"><Store className="w-4 h-4 mr-2" />{t('store')}</TabsTrigger>
             <TabsTrigger value="akun"><Users className="w-4 h-4 mr-2" />{t('account')}</TabsTrigger>
             <TabsTrigger value="pelanggan"><Users className="w-4 h-4 mr-2" />{t('customers')}</TabsTrigger>
             <TabsTrigger value="struk"><Printer className="w-4 h-4 mr-2" />{t('receipt')}</TabsTrigger>
-            {(user?.permissions?.canViewHPP || user?.role === 'owner') && (
+            {(user?.permissions?.canViewHPP || user?.role === 'owner' || user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com') && (
               <TabsTrigger value="hpp"><DollarSign className="w-4 h-4 mr-2" />{t('hpp')}</TabsTrigger>
             )}
             <TabsTrigger value="umum"><SettingsIcon className="w-4 h-4 mr-2" />{t('general')}</TabsTrigger>
@@ -405,22 +405,8 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
                 <div className="p-4 border rounded-lg">
                   <h3 className="font-semibold mb-2">{t('yourAccount')}</h3>
                   <div className="space-y-2"><Label htmlFor="owner-email">{t('email')}</Label><Input id="owner-email" value={user.email} disabled /></div>
-                  <div className="space-y-2 mt-4"><Label htmlFor="owner-password">{t('newPassword')}</Label><Input id="owner-password" type="password" placeholder="••••••••" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={user.email === 'demo@gmail.com'} /></div>
-                  <Button className="mt-4" onClick={handleChangePassword} disabled={user.email === 'demo@gmail.com'}><KeyRound className="w-4 h-4 mr-2" /> {t('changePassword')}</Button>
-                </div>
-                <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
-                  <h3 className="font-semibold mb-2">💡 Manajemen Karyawan & Kasir</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Untuk mengelola karyawan dan kasir (termasuk membuat akun login), 
-                    gunakan menu <strong>Karyawan</strong> di sidebar.
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => window.location.href = '/employees'}
-                  >
-                    <Users className="w-4 h-4 mr-2" /> 
-                    Ke Halaman Karyawan
-                  </Button>
+                  <div className="space-y-2 mt-4"><Label htmlFor="owner-password">{t('newPassword')}</Label><Input id="owner-password" type="password" placeholder="••••••••" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={user.email === 'demo@idcashier.my.id'} /></div>
+                  <Button className="mt-4" onClick={handleChangePassword} disabled={user.email === 'demo@idcashier.my.id'}><KeyRound className="w-4 h-4 mr-2" /> {t('changePassword')}</Button>
                 </div>
               </CardContent>
             </Card>
@@ -774,7 +760,7 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
             </Card>
           </TabsContent>
 
-          {(user?.permissions?.canViewHPP || user?.role === 'owner') && (
+          {(user?.permissions?.canViewHPP || user?.role === 'owner' || user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com') && (
             <TabsContent value="hpp">
               <div className="mt-4">
                 <HPPSettings />

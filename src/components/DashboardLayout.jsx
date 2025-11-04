@@ -17,6 +17,7 @@ import SubscriptionPage from '@/pages/SubscriptionPage';
 import DeveloperPage from '@/pages/DeveloperPage';
 import EmployeesPage from '@/pages/EmployeesPage';
 import ExpensesPage from '@/pages/ExpensesPage';
+import AuthGuard from '@/components/AuthGuard';
 import {
   LayoutDashboard,
   CreditCard,
@@ -110,18 +111,30 @@ const DashboardLayout = () => {
   useEffect(() => {
     if (!user) return;
     // Determine whitelist
-    const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@gmail.com,jho.j80@gmail.com')
+    const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.my.id,jho.j80@gmail.com')
       .split(',')
       .map(e => String(e || '').trim().toLowerCase())
       .filter(Boolean);
     const isWhitelisted = whitelist.includes(String(user.email || '').toLowerCase());
-    // Fetch subscription status if not whitelisted
+    
+    // Special case: only testing@idcashier.my.id should be treated as expired
+    const isTestAccount = user.email === 'testing@idcashier.my.id';
+    
+    // Fetch subscription status if not whitelisted and not the test account
     const fetchSub = async () => {
       try {
+        // Whitelisted accounts are never expired
         if (isWhitelisted) {
           setSubscriptionInactive(false);
           return;
         }
+        
+        // Test account should always be treated as expired
+        if (isTestAccount) {
+          setSubscriptionInactive(true);
+          return;
+        }
+        
         const token = user?.token; // token mungkin tidak tersedia di object user
         let sub = null;
         try {
@@ -260,124 +273,126 @@ const DashboardLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <div className="flex h-16 items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:inline-flex"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-            >
-              {sidebarOpen ? <X /> : <Menu />}
-            </Button>
-            <div className="flex items-center gap-2">
-              <img src={logoUrl} alt="idCashier Logo" className="w-8 h-8" />
-              <span className="font-bold text-xl hidden sm:inline">idCashier</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <LanguageSelector />
-            <ThemeToggle />
-            <Button variant="ghost" size="icon" onClick={() => {
-              storage.remove('idcashier_current_page');
-              // Use logout function from AuthContext directly
-              logout();
-              // Redirect to landing page
-              navigate('/');
-            }}>
-              <LogOut className="w-5 h-5" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Trial Expired Warning Banner */}
-      {(() => {
-        const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@gmail.com,jho.j80@gmail.com')
-          .split(',')
-          .map(e => String(e || '').trim().toLowerCase())
-          .filter(Boolean);
-        const isWhitelisted = whitelist.includes(String(user?.email || '').toLowerCase());
-
-        if (!isWhitelisted && subscriptionInactive) {
-          return (
-            <div className="bg-red-500 text-white px-4 py-3 text-center relative z-40">
-              <div className="flex items-center justify-center gap-2">
-                <span className="font-medium">
-                  ⚠️ Trial Anda telah berakhir. Lakukan pembayaran agar dapat menggunakan aplikasi kembali.
-                </span>
-                <Button 
-                  size="sm" 
-                  variant="secondary" 
-                  className="ml-4 bg-white text-red-500 hover:bg-gray-100"
-                  onClick={() => handleMenuClick('subscription')}
-                >
-                  Perpanjang Sekarang
-                </Button>
+    <AuthGuard>
+      <div className="min-h-screen bg-background text-foreground">
+        <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+          <div className="flex h-16 items-center justify-between px-4 md:px-6">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:inline-flex"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+              >
+                {sidebarOpen ? <X /> : <Menu />}
+              </Button>
+              <div className="flex items-center gap-2">
+                <img src={logoUrl} alt="idCashier Logo" className="w-8 h-8" />
+                <span className="font-bold text-xl hidden sm:inline">idCashier</span>
               </div>
             </div>
-          );
-        }
-        return null;
-      })()}
 
-      <div className="flex">
-         <aside
-          className={`fixed md:sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 border-r bg-card transform transition-transform ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } md:translate-x-0`}
-        >
-          <div className="flex flex-col h-full">
-            <nav className="flex-1 space-y-2 p-4">
-              {menuItems.map((item) => (
-                <NavButton
-                  key={item.id}
-                  item={item}
-                  isActive={currentPage === item.id}
-                  onClick={() => handleMenuClick(item.id)}
-                />
-              ))}
-            </nav>
-            <div className="p-4 border-t">
-              <div className="p-4 rounded-lg bg-muted text-center">
-                  <p className="text-sm font-semibold">{user.name || user.email}</p>
-                  <p className="text-xs text-muted-foreground">{user.email}</p>
-              </div>
+            <div className="flex items-center gap-4">
+              <LanguageSelector />
+              <ThemeToggle />
+              <Button variant="ghost" size="icon" onClick={() => {
+                storage.remove('idcashier_current_page');
+                // Use logout function from AuthContext directly
+                logout();
+                // Redirect to landing page
+                navigate('/');
+              }}>
+                <LogOut className="w-5 h-5" />
+              </Button>
             </div>
           </div>
-        </aside>
+        </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/30">
-          <motion.div
-            key={currentPage}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
+        {/* Trial Expired Warning Banner */}
+        {(() => {
+          const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.my.id,jho.j80@gmail.com')
+            .split(',')
+            .map(e => String(e || '').trim().toLowerCase())
+            .filter(Boolean);
+          const isWhitelisted = whitelist.includes(String(user?.email || '').toLowerCase());
+
+          if (!isWhitelisted && subscriptionInactive) {
+            return (
+              <div className="bg-red-500 text-white px-4 py-3 text-center relative z-40">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="font-medium">
+                    ⚠️ Trial Anda telah berakhir. Lakukan pembayaran agar dapat menggunakan aplikasi kembali.
+                  </span>
+                  <Button 
+                    size="sm" 
+                    variant="secondary" 
+                    className="ml-4 bg-white text-red-500 hover:bg-gray-100"
+                    onClick={() => handleMenuClick('subscription')}
+                  >
+                    Perpanjang Sekarang
+                  </Button>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
+
+        <div className="flex">
+          <aside
+            className={`fixed md:sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 border-r bg-card transform transition-transform ${
+              sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            } md:translate-x-0`}
           >
-            {(() => {
-              const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@gmail.com,jho.j80@gmail.com')
-                .split(',')
-                .map(e => String(e || '').trim().toLowerCase())
-                .filter(Boolean);
-              const isWhitelisted = whitelist.includes(String(user?.email || '').toLowerCase());
-              const bypass = isWhitelisted || currentPage === 'subscription' || currentPage === 'developer';
-              if (!bypass && subscriptionInactive) {
-                return (
-                  <div className="p-6 rounded border bg-card">
-                    <p className="mb-4">Langganan Anda tidak aktif. Silakan perpanjang untuk mengakses fitur.</p>
-                    <Button onClick={() => handleMenuClick('subscription')}>Perpanjang</Button>
-                  </div>
-                );
-              }
-              return renderPageContent();
-            })()}
-          </motion.div>
-        </main>
+            <div className="flex flex-col h-full">
+              <nav className="flex-1 space-y-2 p-4">
+                {menuItems.map((item) => (
+                  <NavButton
+                    key={item.id}
+                    item={item}
+                    isActive={currentPage === item.id}
+                    onClick={() => handleMenuClick(item.id)}
+                  />
+                ))}
+              </nav>
+              <div className="p-4 border-t">
+                <div className="p-4 rounded-lg bg-muted text-center">
+                    <p className="text-sm font-semibold">{user.name || user.email}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/30">
+            <motion.div
+              key={currentPage}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+            >
+              {(() => {
+                const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.my.id,jho.j80@gmail.com')
+                  .split(',')
+                  .map(e => String(e || '').trim().toLowerCase())
+                  .filter(Boolean);
+                const isWhitelisted = whitelist.includes(String(user?.email || '').toLowerCase());
+                const bypass = isWhitelisted || currentPage === 'subscription' || currentPage === 'developer';
+                if (!bypass && subscriptionInactive) {
+                  return (
+                    <div className="p-6 rounded border bg-card">
+                      <p className="mb-4">Langganan Anda tidak aktif. Silakan perpanjang untuk mengakses fitur.</p>
+                      <Button onClick={() => handleMenuClick('subscription')}>Perpanjang</Button>
+                    </div>
+                  );
+                }
+                return renderPageContent();
+              })()}
+            </motion.div>
+          </main>
+        </div>
       </div>
-    </div>
+    </AuthGuard>
   );
 };
 

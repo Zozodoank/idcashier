@@ -298,7 +298,7 @@ const DeveloperPage = () => {
             <Button 
               variant="destructive" 
               onClick={handleConfirmDelete}
-              disabled={currentUser?.email === 'demo@gmail.com'}
+              disabled={currentUser?.email === 'demo@idcashier.my.id'}
             >
               <Trash2 className="w-4 h-4 mr-2" />
               {t('delete') || 'Hapus'}

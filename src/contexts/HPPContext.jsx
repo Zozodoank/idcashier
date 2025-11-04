@@ -16,6 +16,18 @@ export const HPPProvider = ({ children }) => {
     }
     
     try {
+      // For demo account, always enable HPP
+      if (user.email === 'demo@idcashier.my.id') {
+        setHppEnabled(true);
+        return;
+      }
+      
+      // For developer account, always enable HPP
+      if (user.email === 'jho.j80@gmail.com') {
+        setHppEnabled(true);
+        return;
+      }
+      
       const data = await settingsAPI.get('hpp_enabled', token);
       setHppEnabled(data?.setting_value?.enabled || false);
     } catch (error) {
@@ -51,4 +63,3 @@ export const useHPP = () => {
   }
   return context;
 };
-

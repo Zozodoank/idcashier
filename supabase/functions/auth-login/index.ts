@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
         }
 
         // Subscription check for new user (though unlikely to have subscription)
-        if (normalizedEmail !== 'demo@gmail.com' && normalizedEmail !== 'jho.j80@gmail.com') {
+        if (normalizedEmail !== 'demo@idcashier.my.id' && normalizedEmail !== 'jho.j80@gmail.com') {
           let effectiveUserId = newUserData.id;
           if (newUserData.role === 'cashier') {
             effectiveUserId = newUserData.tenant_id;
@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
     }
 
     // Subscription check
-    if (normalizedEmail !== 'demo@gmail.com' && normalizedEmail !== 'jho.j80@gmail.com') {
+    if (normalizedEmail !== 'demo@idcashier.my.id' && normalizedEmail !== 'jho.j80@gmail.com') {
       let effectiveUserId = userData.id;
       if (userData.role === 'cashier') {
         effectiveUserId = userData.tenant_id;

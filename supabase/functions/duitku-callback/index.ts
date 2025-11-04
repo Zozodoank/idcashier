@@ -279,6 +279,21 @@ Deno.serve(async (req) => {
       const userId = merchantOrderIdParts?.[1];
       
       if (userId) {
+        // For cashiers, use the owner's ID for subscription
+        let effectiveUserId = userId;
+        
+        // Get user data to check if user is a cashier
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('role, tenant_id')
+          .eq('id', userId)
+          .single();
+          
+        if (!userError && userData && userData.role === 'cashier') {
+          effectiveUserId = userData.tenant_id;
+          console.log(`User ${userId} is a cashier, using tenant_id ${effectiveUserId} for subscription`);
+        }
+        
         // Get payment record to access product details
         let paymentRecord: any = null;
         if (paymentId) {
@@ -317,7 +332,7 @@ Deno.serve(async (req) => {
         const { data: existingSubscription, error: subError } = await supabase
           .from('subscriptions')
           .select('*')
-          .eq('user_id', userId)
+          .eq('user_id', effectiveUserId)
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
@@ -359,7 +374,7 @@ Deno.serve(async (req) => {
           const { error: insertError } = await supabase
             .from('subscriptions')
             .insert({
-              user_id: userId,
+              user_id: effectiveUserId,
               plan_name: planName,
               duration: extensionMonths,
               amount: amountNum,
@@ -371,7 +386,7 @@ Deno.serve(async (req) => {
           if (insertError) {
             console.error('Error creating subscription:', insertError);
           } else {
-            console.log(`New subscription created for user ${userId}, valid until ${newEndDate.toISOString().split('T')[0]}`);
+            console.log(`New subscription created for user ${effectiveUserId}, valid until ${newEndDate.toISOString().split('T')[0]}`);
           }
         }
       }
