@@ -2,6 +2,7 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from '@supabase/supabase-js';
+import { md5 } from '../_shared/md5.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 
 // Duitku callback handler
@@ -120,20 +121,7 @@ Deno.serve(async (req) => {
     // Duitku callbacks always use MD5 according to spec
     const DUITKU_SIGNATURE_ALGO = 'md5';
 
-    // MD5 implementation for callback verification
-    async function md5hex(s: string): Promise<string> {
-      try {
-        const { md5 } = await import('https://deno.land/std@0.177.0/crypto/md5.ts');
-        return md5(s);
-      } catch (e) {
-        console.log('MD5 import failed, using fallback');
-        const encoder = new TextEncoder();
-        const data = encoder.encode(s);
-        const hashBuffer = await crypto.subtle.digest('MD5', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      }
-    }
+    
 
     // Helper for timing-safe comparison
     const timingSafeEqual = (a: string, b: string) => {
@@ -178,16 +166,8 @@ Deno.serve(async (req) => {
           algorithm: DUITKU_SIGNATURE_ALGO
         });
 
-        let expected: string;
-        if (DUITKU_SIGNATURE_ALGO === 'md5') {
-          expected = await md5hex(rawString);
-        } else {
-          // Fallback to SHA-256 if specified
-          const toHex = (buf: ArrayBuffer) => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-          const enc = new TextEncoder();
-          const digest = await crypto.subtle.digest('SHA-256', enc.encode(rawString));
-          expected = toHex(digest);
-        }
+                                        const rawString = `${merchantCode}${amount}${merchantOrderId}${DUITKU_MERCHANT_KEY}`;
+        const expected = md5(rawString);
 
         console.log('🔐 Signature Verification:', {
           expected,

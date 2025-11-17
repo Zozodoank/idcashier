@@ -1,7 +1,6 @@
 {
-    "imports": {
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
-    "md5": "https://deno.land/std@0.224.0/crypto/mod.ts"
+            "imports": {
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
   },
   "deploy": {
     "verifyJWT": false
