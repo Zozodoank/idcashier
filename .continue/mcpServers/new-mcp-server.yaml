@@ -1,0 +1,33 @@
+name: New MCP server
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: supabase
+    type: stdio
+    disabled: false
+    timeout: 60
+    command: npx
+    args: [
+        "-y",
+        "mcp-remote",
+        "https://mcp.supabase.com/mcp?project_ref=eypfeiqtvfxxiimhtycc&features=docs%2Caccount%2Cdatabase%2Cdebugging%2Cdevelopment%2Cfunctions%2Cbranching%2Cstorage"
+      ]
+    env:
+      VITE_SUPABASE_URL: ${env:VITE_SUPABASE_URL}
+      VITE_SUPABASE_ANON_KEY: ${env:VITE_SUPABASE_ANON_KEY}
+      VITE_SUPABASE_SERVICE_ROLE_KEY: ${env:VITE_SUPABASE_SERVICE_ROLE_KEY}
+    autoApprove:
+      - get_project_url
+      - list_tables
+      - execute_sql
+      - list_edge_functions
+      - get_advisors
+      - search_docs
+      - list_migrations
+      - apply_migration
+      - get_logs
+      - get_anon_key
+      - generate_typescript_types
+      - list_extensions
+      - list_storage_buckets
+

@@ -1,48 +1,7 @@
-// Setup type definitions for built-in Supabase Runtime APIs
+// Fixed auth-login function
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 import { getCorsHeaders } from '../_shared/cors.ts'
-
-// Helper function to check subscription status
-async function checkSubscription(supabase: SupabaseClient, user: any) {
-  const { id, role, tenant_id, email } = user;
-  
-  // Accounts that bypass subscription checks
-  const bypassEmails = ['demo@idcashier.my.id', 'jho.j80@gmail.com'];
-  if (bypassEmails.includes(email)) {
-    return { data: { subscriptionExpired: false, daysRemaining: Infinity, hasSubscription: true } };
-  }
-  
-  // The user ID to check for the subscription
-  const effectiveUserId = role === 'cashier' ? tenant_id : id;
-
-  const { data: subscription, error } = await supabase
-    .from('subscriptions')
-    .select('end_date')
-    .eq('user_id', effectiveUserId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (error || !subscription) {
-    // If no subscription found, treat as expired
-    return { data: { subscriptionExpired: true, daysRemaining: 0, hasSubscription: false } };
-  }
-
-  // Calculate days remaining
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const endDate = new Date(subscription.end_date);
-  endDate.setHours(0, 0, 0, 0);
-
-  const timeDiff = endDate.getTime() - today.getTime();
-  const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
-  
-  const subscriptionExpired = daysRemaining < 0;
-
-  return { data: { subscriptionExpired, daysRemaining, hasSubscription: true } };
-}
-
 
 Deno.serve(async (req) => {
   // Get origin from request headers for dynamic CORS
@@ -160,28 +119,73 @@ Deno.serve(async (req) => {
           )
         }
 
-        // Check subscription status for the new user
-        const { data: subscriptionStatus } = await checkSubscription(supabase, newUserData);
+        // Subscription check for new user (though unlikely to have subscription)
+        // Special handling for test account - should always be treated as expired
+        if (normalizedEmail === 'testing@idcashier.my.id') {
+          return new Response(
+            JSON.stringify({ error: 'Subscription expired', message: 'Langganan Anda telah berakhir. Silakan perpanjang untuk melanjutkan.', subscriptionExpired: true }),
+            {
+              headers: corsHeaders,
+              status: 403
+            }
+          );
+        } else if (normalizedEmail !== 'demo@idcashier.my.id' && normalizedEmail !== 'jho.j80@gmail.com') {
+          let effectiveUserId = newUserData.id;
+          if (newUserData.role === 'cashier') {
+            effectiveUserId = newUserData.tenant_id;
+          }
+          const { data: subscription, error: subError } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', effectiveUserId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          if (subscription) {
+            // Normalize dates to start of day (date-only) to avoid timezone boundary issues
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const endDate = new Date(subscription.end_date);
+            endDate.setHours(0, 0, 0, 0);
+            // Treat end_date as inclusive - subscription expires at end of day
+            // Add one day to end_date before comparing to treat it as inclusive
+            const endDateInclusive = new Date(endDate);
+            endDateInclusive.setDate(endDateInclusive.getDate() + 1);
+            if (today >= endDateInclusive) {
+              return new Response(
+                JSON.stringify({ error: 'Subscription expired', message: 'Langganan Anda telah berakhir. Silakan perpanjang untuk melanjutkan.', subscriptionExpired: true }),
+                {
+                  headers: corsHeaders,
+                  status: 403
+                }
+              );
+            }
+          }
+        }
 
         const userResponse = {
           ...newUserData,
           tenantId: newUserData.tenant_id
-        };
+        }
 
-        // Return user, token, session, and subscription status
+        // Return user, token, and session info for proper client-side session management
         return new Response(
           JSON.stringify({
             user: userResponse,
             token: authData.session.access_token,
-            session: authData.session,
-            message: 'Login successful',
-            ...subscriptionStatus
+            session: {
+              access_token: authData.session.access_token,
+              refresh_token: authData.session.refresh_token,
+              expires_at: authData.session.expires_at,
+              expires_in: authData.session.expires_in
+            },
+            message: 'Login successful'
           }),
           { 
             headers: corsHeaders,
             status: 200
           }
-        );
+        )
       }
 
       return new Response(
@@ -193,28 +197,74 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Check subscription status
-    const { data: subscriptionStatus } = await checkSubscription(supabase, userData);
+    // Subscription check
+    // Special handling for test account - should always be treated as expired
+    if (normalizedEmail === 'testing@idcashier.my.id') {
+      return new Response(
+        JSON.stringify({ error: 'Subscription expired', message: 'Langganan Anda telah berakhir. Silakan perpanjang untuk melanjutkan.', subscriptionExpired: true }),
+        {
+          headers: corsHeaders,
+          status: 403
+        }
+      );
+    } else if (normalizedEmail !== 'demo@idcashier.my.id' && normalizedEmail !== 'jho.j80@gmail.com') {
+      let effectiveUserId = userData.id;
+      if (userData.role === 'cashier') {
+        effectiveUserId = userData.tenant_id;
+      }
+      const { data: subscription, error: subError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', effectiveUserId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (subscription) {
+        // Normalize dates to start of day (date-only) to avoid timezone boundary issues
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endDate = new Date(subscription.end_date);
+        endDate.setHours(0, 0, 0, 0);
+        // Treat end_date as inclusive - subscription expires at end of day
+        // Add one day to end_date before comparing to treat it as inclusive
+        const endDateInclusive = new Date(endDate);
+        endDateInclusive.setDate(endDateInclusive.getDate() + 1);
+        if (today >= endDateInclusive) {
+          return new Response(
+            JSON.stringify({ error: 'Subscription expired', message: 'Langganan Anda telah berakhir. Silakan perpanjang untuk melanjutkan.', subscriptionExpired: true }),
+            {
+              headers: corsHeaders,
+              status: 403
+            }
+          );
+        }
+      }
+    }
 
     const userResponse = {
       ...userData,
       tenantId: userData.tenant_id
-    };
+    }
 
-    // Return user, token, session info, and subscription status
+    // Return user, token, and session info for proper client-side session management
     return new Response(
       JSON.stringify({
         user: userResponse,
         token: authData.session.access_token,
-        session: authData.session,
-        message: 'Login successful',
-        ...subscriptionStatus
+        session: {
+          access_token: authData.session.access_token,
+          refresh_token: authData.session.refresh_token,
+          expires_at: authData.session.expires_at,
+          expires_in: authData.session.expires_in
+        },
+        message: 'Login successful'
       }),
       { 
         headers: corsHeaders,
         status: 200
       }
-    );
+    )
 
   } catch (error) {
     console.error('Unexpected error in auth-login function:', error)

@@ -33,6 +33,54 @@ Deno.serve(async (req) => {
     // Get user ID from token (now properly awaited)
     let userId = await getUserIdFromToken(token);
 
+    // Get user email to check for test account
+    const { data: userWithEmail, error: emailError } = await supabase
+      .from('users')
+      .select('email')
+      .eq('id', userId)
+      .single();
+
+    if (emailError || !userWithEmail) {
+      return createErrorResponse('User not found', 404);
+    }
+
+        // Special handling for test account - should always be treated as expired
+    if (userWithEmail.email === 'testing@idcashier.my.id') {
+      // Return expired subscription for test account
+      const expiredDate = new Date();
+      expiredDate.setDate(expiredDate.getDate() - 7); // 7 days ago
+      return createResponse({
+        user_id: userId,
+        has_subscription: true,
+        is_active: false,
+        plan_name: '1_month',
+        duration: 1,
+        amount: 50000,
+        start_date: expiredDate.toISOString().split('T')[0],
+        end_date: expiredDate.toISOString().split('T')[0],
+        status: 'expired',
+        created_at: expiredDate.toISOString(),
+        updated_at: expiredDate.toISOString()
+      });
+    } else if (userWithEmail.email === 'demo@idcashier.my.id' || userWithEmail.email === 'jho.j80@gmail.com') {
+      // Always return active subscription for demo and dev accounts
+      const futureDate = new Date();
+      futureDate.setFullYear(futureDate.getFullYear() + 1);
+      return createResponse({
+        user_id: userId,
+        has_subscription: true,
+        is_active: true,
+        plan_name: 'developer',
+        duration: 12,
+        amount: 0,
+        start_date: new Date().toISOString().split('T')[0],
+        end_date: futureDate.toISOString().split('T')[0],
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    }
+
     // For cashiers, use the owner's subscription (tenantId)
     // First get user role and tenantId
     const { data: userData, error: userError } = await supabase

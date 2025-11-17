@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Subscription Renewal Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Subscription Renewal Test</h1>
+    <button id="loginBtn">Login as Test User</button>
+    <button id="checkSubscriptionBtn" disabled>Check Subscription</button>
+    <button id="renewSubscriptionBtn" disabled>Renew Subscription (3 Months)</button>
+    <div id="output"></div>
+
+    <script>
+        // Initialize Supabase
+        const supabase = window.supabase.createClient(
+            'https://your-project-ref.supabase.co', // Replace with your Supabase URL
+            'your-anon-key' // Replace with your anon key
+        );
+
+        let accessToken = null;
+
+        // DOM elements
+        const loginBtn = document.getElementById('loginBtn');
+        const checkSubscriptionBtn = document.getElementById('checkSubscriptionBtn');
+        const renewSubscriptionBtn = document.getElementById('renewSubscriptionBtn');
+        const output = document.getElementById('output');
+
+        // Log function
+        function log(message) {
+            output.innerHTML += `<p>${message}</p>`;
+            console.log(message);
+        }
+
+        // Login as test user
+        loginBtn.addEventListener('click', async () => {
+            try {
+                log('Logging in as test user...');
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: 'testing@idcashier.my.id',
+                    password: 'Tesajakalobisa'
+                });
+
+                if (error) {
+                    log(`Login failed: ${error.message}`);
+                    return;
+                }
+
+                accessToken = data.session.access_token;
+                log('Login successful!');
+                checkSubscriptionBtn.disabled = false;
+                renewSubscriptionBtn.disabled = false;
+            } catch (error) {
+                log(`Error: ${error.message}`);
+            }
+        });
+
+        // Check subscription status
+        checkSubscriptionBtn.addEventListener('click', async () => {
+            if (!accessToken) {
+                log('Please login first');
+                return;
+            }
+
+            try {
+                log('Checking subscription status...');
+                const { data, error } = await supabase.functions.invoke(
+                    'subscriptions-get-current-user',
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`
+                        }
+                    }
+                );
+
+                if (error) {
+                    log(`Failed to get subscription: ${error.message}`);
+                    return;
+                }
+
+                log(`Subscription status: ${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                log(`Error: ${error.message}`);
+            }
+        });
+
+        // Renew subscription
+        renewSubscriptionBtn.addEventListener('click', async () => {
+            if (!accessToken) {
+                log('Please login first');
+                return;
+            }
+
+            try {
+                log('Creating renewal payment...');
+                const { data, error } = await supabase.functions.invoke(
+                    'renew-subscription-payment',
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            plan_id: '3_months'
+                        })
+                    }
+                );
+
+                if (error) {
+                    log(`Failed to create payment: ${error.message}`);
+                    return;
+                }
+
+                log(`Payment created successfully: ${JSON.stringify(data, null, 2)}`);
+                
+                // In a real scenario, we would redirect to the payment URL
+                // window.location.href = data.paymentUrl;
+            } catch (error) {
+                log(`Error: ${error.message}`);
+            }
+        });
+    </script>
+</body>
+</html>

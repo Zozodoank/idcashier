@@ -413,7 +413,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 [functions.auth-login]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/auth-login/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
@@ -838,7 +838,7 @@ entrypoint = "./functions/subscriptions-update-user/index.ts"
 
 [functions.renew-subscription-payment]
 enabled = true
-verify_jwt = false
+verify_jwt = true
 import_map = "./functions/renew-subscription-payment/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx

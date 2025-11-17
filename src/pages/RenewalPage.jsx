@@ -19,7 +19,7 @@ const RenewalPage = () => {
   const { toast } = useToast();
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [processingPlan, setProcessingPlan] = useState(null);
+    const [processingPlan, setProcessingPlan] = useState(null);
   const [userEmail, setUserEmail] = useState('');
   const [emailInputMode, setEmailInputMode] = useState(false);
 
@@ -60,7 +60,7 @@ const RenewalPage = () => {
     }
   ];
 
-  useEffect(() => {
+      useEffect(() => {
     const fetchCurrentSubscription = async () => {
       // If no token, check for email in URL params or show input form
       if (!token) {
@@ -114,7 +114,7 @@ const RenewalPage = () => {
     fetchCurrentSubscription();
   }, [token, toast]);
 
-  const handleRenewal = async (planId) => {
+      const handleRenewal = async (planId) => {
     // Validate planId before proceeding
     if (!planId || !['1_month', '3_months', '6_months', '12_months'].includes(planId)) {
       console.error('Invalid planId:', planId);
@@ -146,7 +146,11 @@ const RenewalPage = () => {
         ? { plan_id: planId }  // Use plan_id for consistency
         : { plan_id: planId, email: userEmail || new URLSearchParams(window.location.search).get('email') };
 
-      const data = await invokeFn('renew-subscription-payment', requestBody);
+            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+            const data = await invokeFn('renew-subscription-payment', requestBody, { 
+        method: 'POST',
+        headers
+      });
 
       window.location.href = data.paymentUrl;
     } catch (error) {
@@ -223,7 +227,7 @@ const RenewalPage = () => {
   const isExpired = getDaysRemaining() < 0;
   const daysRemaining = Math.abs(getDaysRemaining());
 
-  if (loading) {
+      if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader className="animate-spin h-8 w-8" />

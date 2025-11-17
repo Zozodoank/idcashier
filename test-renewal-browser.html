@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Subscription Renewal Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px 0; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        button:hover:not(:disabled) { background: #0056b3; }
+        #output { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin: 20px 0; min-height: 100px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>Subscription Renewal Test</h1>
+    
+    <div>
+        <h2>Step 1: Login</h2>
+        <button id="loginBtn">Login as Test User</button>
+    </div>
+    
+    <div>
+        <h2>Step 2: Check Subscription</h2>
+        <button id="checkSubscriptionBtn" disabled>Check Subscription Status</button>
+    </div>
+    
+    <div>
+        <h2>Step 3: Renew Subscription</h2>
+        <button id="renew1MonthBtn" disabled>Renew - 1 Month (Rp 50.000)</button>
+        <button id="renew3MonthsBtn" disabled>Renew - 3 Months (Rp 150.000)</button>
+        <button id="renew6MonthsBtn" disabled>Renew - 6 Months (Rp 270.000)</button>
+        <button id="renew12MonthsBtn" disabled>Renew - 12 Months (Rp 500.000)</button>
+    </div>
+    
+    <div id="output">
+        <p>Test output will appear here...</p>
+    </div>
+
+    <script>
+        // Initialize Supabase
+        const supabaseUrl = 'https://eypfeiqtvfxxiimhtycc.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5cGZlaXF0dmZ4eGlpbWh0eWNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4MzEyODEsImV4cCI6MjA3NjQwNzI4MX0.mB5EVpFQbayjPvAuEmg98tsyrhFW_FQxf2SCQhdZHSI';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+        let accessToken = null;
+
+        // DOM elements
+        const loginBtn = document.getElementById('loginBtn');
+        const checkSubscriptionBtn = document.getElementById('checkSubscriptionBtn');
+        const renew1MonthBtn = document.getElementById('renew1MonthBtn');
+        const renew3MonthsBtn = document.getElementById('renew3MonthsBtn');
+        const renew6MonthsBtn = document.getElementById('renew6MonthsBtn');
+        const renew12MonthsBtn = document.getElementById('renew12MonthsBtn');
+        const output = document.getElementById('output');
+
+        // Log function
+        function log(message, type = 'info') {
+            const messageElement = document.createElement('p');
+            messageElement.textContent = message;
+            messageElement.className = type;
+            output.appendChild(messageElement);
+            output.scrollTop = output.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // Clear output
+        function clearOutput() {
+            output.innerHTML = '';
+        }
+
+        // Login as test user
+        loginBtn.addEventListener('click', async () => {
+            try {
+                clearOutput();
+                log('Logging in as test user...', 'info');
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: 'testing@idcashier.my.id',
+                    password: 'Tesajakalobisa'
+                });
+
+                if (error) {
+                    log(`Login failed: ${error.message}`, 'error');
+                    return;
+                }
+
+                accessToken = data.session.access_token;
+                log('Login successful!', 'success');
+                log(`Access token: ${accessToken.substring(0, 20)}...`, 'info');
+                
+                // Enable other buttons
+                checkSubscriptionBtn.disabled = false;
+                renew1MonthBtn.disabled = false;
+                renew3MonthsBtn.disabled = false;
+                renew6MonthsBtn.disabled = false;
+                renew12MonthsBtn.disabled = false;
+                
+                log('You can now check subscription status or renew subscription', 'info');
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Check subscription status
+        checkSubscriptionBtn.addEventListener('click', async () => {
+            if (!accessToken) {
+                log('Please login first', 'error');
+                return;
+            }
+
+            try {
+                log('Checking subscription status...', 'info');
+                const { data, error } = await supabase.functions.invoke(
+                    'subscriptions-get-current-user',
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`
+                        }
+                    }
+                );
+
+                if (error) {
+                    log(`Failed to get subscription: ${error.message}`, 'error');
+                    return;
+                }
+
+                log('Subscription status retrieved successfully:', 'success');
+                log(JSON.stringify(data, null, 2), 'info');
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Renew subscription with specific plan
+        async function renewSubscription(planId, planName) {
+            if (!accessToken) {
+                log('Please login first', 'error');
+                return;
+            }
+
+            try {
+                log(`Creating renewal payment for ${planName}...`, 'info');
+                const { data, error } = await supabase.functions.invoke(
+                    'renew-subscription-payment',
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            plan_id: planId
+                        })
+                    }
+                );
+
+                if (error) {
+                    log(`Failed to create payment: ${error.message}`, 'error');
+                    return;
+                }
+
+                log(`Payment created successfully for ${planName}:`, 'success');
+                log(JSON.stringify(data, null, 2), 'info');
+                
+                // In a real scenario, we would redirect to the payment URL
+                // window.location.href = data.paymentUrl;
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Event listeners for renewal buttons
+        renew1MonthBtn.addEventListener('click', () => renewSubscription('1_month', '1 Month'));
+        renew3MonthsBtn.addEventListener('click', () => renewSubscription('3_months', '3 Months'));
+        renew6MonthsBtn.addEventListener('click', () => renewSubscription('6_months', '6 Months'));
+        renew12MonthsBtn.addEventListener('click', () => renewSubscription('12_months', '12 Months'));
+    </script>
+</body>
+</html>

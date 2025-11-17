@@ -1,5 +1,4 @@
-// Setup type definitions for built-in Supabase Runtime APIs
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { Md5 } from 'md5';
 
 // Import Supabase client
 import { createClient } from '@supabase/supabase-js';
@@ -98,6 +97,7 @@ const PLAN_MAPPING: Record<string, PlanData> = {
   '12_months': { duration: 12, amount: 500000, productDetails: 'Perpanjangan Langganan 12 Bulan' }
 };
 
+
 // Duitku API integration
 const createDuitkuPayment = async (
   merchantOrderId: string,
@@ -146,20 +146,14 @@ const createDuitkuPayment = async (
       paymentAmount,
       productDetails,
       customerVaName,
-      customerEmail,
+            customerEmail,
       customerPhone,
-      paymentMethod: 'ALL', // ALL = All payment methods
       callbackUrl: `${SUPABASE_URL}/functions/v1/duitku-callback`,
       returnUrl: `${FRONTEND_URL}/payment-callback?renewal=1`
     };
     
-    // Generate signature using SHA-256
-    const signatureString = ACTIVE_MERCHANT + merchantOrderId + paymentAmount + ACTIVE_API_KEY;
-    const encoder = new TextEncoder();
-    const data = encoder.encode(signatureString);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        // Generate signature using MD5
+
     
     duitkuRequestData.signature = signature;
     duitkuRequestData.expiryPeriod = 60;
@@ -209,7 +203,7 @@ Deno.serve(async (req) => {
     url: req.url, 
     headers: Object.fromEntries(req.headers.entries())
   });
-  // Handle preflight request
+      // Handle preflight request
   if (req.method === 'OPTIONS') {
     return handleOptions(req);
   }
@@ -282,119 +276,58 @@ Deno.serve(async (req) => {
       return createErrorResponse('Invalid or missing JSON body', 400);
     }
     
-    // Support both plan_id and plan for backward compatibility
-    const plan_id = body?.plan_id ?? body?.plan;
+            const { plan_id, email: rawEmail } = body || {};
+    const unauthenticatedEmail = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : undefined;
+
     if (!plan_id) {
-      logger.warn('Plan parameter is missing', { requestBody: body });
-      return createErrorResponse('Plan parameter is required', 400);
+      return createErrorResponse('Missing plan_id', 400);
     }
-    
+
     if (!PLAN_MAPPING[plan_id]) {
       const receivedPlanStr = plan_id ? `'${plan_id}'` : 'undefined/null';
       return createErrorResponse(`Invalid plan ${receivedPlanStr}. Must be one of: 1_month, 3_months, 6_months, 12_months`, 400);
     }
 
-    // Create Supabase client
-    let supabase;
-    try {
-      supabase = createSupabaseForFunction(authHeader);
-      logger.info('Supabase client created successfully');
-    } catch (clientError) {
-      logger.error('Failed to create Supabase client', { message: clientError.message });
-      return createErrorResponse('Failed to initialize database connection', 500);
-    }
-    let userId: string;
-    let userData: any;
+    const supabase = createSupabaseClient();
+    let userId;
+    let userData;
 
-    // Support both token-based and email-based authentication
-    // Extract email from body for email-based authentication
-    const email = body?.email;
-    logger.info('Authentication check', { hasAuthHeader: !!authHeader, hasEmail: !!email });
-
-    if (authHeader && validateAuthHeader(authHeader)) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
       logger.info('Using token-based authentication');
-      // Token-based authentication (authenticated users)
       const token = authHeader.replace('Bearer ', '');
       try {
         userId = await getUserIdFromToken(token);
         logger.info('Token validated', { userId: '[REDACTED]' });
       } catch (error) {
         logger.error('Token validation failed', { message: error.message });
-        // If token validation fails but email is provided, fall back to email-based auth
-        if (email) {
-          logger.info('Falling back to email-based authentication', { email: maskSensitiveString(email) });
-          const normalizedEmail = email.trim().toLowerCase();
-          const { data, error: userError } = await supabase
-            .from('users')
-            .select('id, name, email, phone')
-            .eq('email', normalizedEmail)
-            .single();
-
-          if (userError || !data) {
-            logger.error('User fetch by email failed', { email: maskSensitiveString(email), error: userError?.message });
-            return createErrorResponse('User not found', 404);
-          }
-          userId = data.id;
-          userData = data;
-          logger.info('User data fetched via email fallback', { email: maskSensitiveString(userData.email) });
-        } else {
-          return createErrorResponse('Invalid token', 401);
-        }
+        return createErrorResponse('Invalid token', 401);
       }
-
-      // If we have a userId but no userData yet, fetch user data
-      if (!userData) {
-        logger.info('Fetching user data by ID', { userId: '[REDACTED]' });
-        try {
-          // Fetch user data by ID using service role to bypass RLS
-          const { data, error: userError } = await supabase
-            .from('users')
-            .select('id, name, email, phone, role, tenant_id')
-            .eq('id', userId)
-            .single();
-
-          if (userError || !data) {
-            logger.error('User fetch by ID failed', { userId: '[REDACTED]', error: userError?.message });
-            return createErrorResponse('User not found', 404);
-          }
-          userData = data;
-          logger.info('User data fetched via token', { email: maskSensitiveString(userData.email) });
-        } catch (fetchError) {
-          logger.error('Exception during user fetch by ID', { userId: '[REDACTED]', error: fetchError.message });
-          return createErrorResponse('Failed to fetch user data', 500);
-        }
-      }
-    } else if (email) {
-      logger.info('Using email-based authentication', { email: maskSensitiveString(email) });
-      // Email-based authentication (for expired users accessing renewal page)
-      const normalizedEmail = email.trim().toLowerCase();
       
-      try {
-        // Use service role to bypass RLS when fetching user by email
-        const { data, error: userError } = await supabase
-          .from('users')
-          .select('id, name, email, phone')
-          .eq('email', normalizedEmail)
-          .single();
+      const { data, error: userError } = await supabase.from('users').select('id, name, email, phone, role, tenant_id').eq('id', userId).single();
 
-        if (userError || !data) {
-          logger.error('User fetch by email failed', { email: maskSensitiveString(email), error: userError?.message });
-          return createErrorResponse('User not found', 404);
-        }
-        userId = data.id;
-        userData = data;
-        logger.info('User data fetched via email', { email: maskSensitiveString(userData.email) });
-      } catch (fetchError) {
-        logger.error('Exception during user fetch by email', { email: maskSensitiveString(email), error: fetchError.message });
-        return createErrorResponse('Failed to fetch user data', 500);
+      if (userError || !data) {
+        logger.error('User fetch by ID failed', { userId: '[REDACTED]', error: userError?.message });
+        return createErrorResponse('User not found', 404);
       }
+      userData = data;
+      logger.info('User data fetched via token', { email: maskSensitiveString(userData.email) });
+
+    } else if (unauthenticatedEmail) {
+      logger.info('Using email-based authentication for unauthenticated user');
+      const { data, error: userError } = await supabase.from('users').select('id, name, email, phone, role, tenant_id').eq('email', unauthenticatedEmail).single();
+
+      if (userError || !data) {
+        logger.error('User fetch by email failed', { email: maskSensitiveString(unauthenticatedEmail), error: userError?.message });
+        return createErrorResponse('User not found for the provided email', 404);
+      }
+      userId = data.id;
+      userData = data;
+      logger.info('User data fetched via email', { email: maskSensitiveString(userData.email) });
     } else {
-      logger.warn('No authentication provided');
-      return createErrorResponse('Authentication required - please login or provide email', 401);
+      logger.warn('Missing authorization header or email');
+      return createErrorResponse('Missing authorization header or email', 401);
     }
 
-    // Log plan selection and proceed
-    logger.info('Plan selected and user authenticated', { plan_id, userId: '[REDACTED]' });
 
     // Get plan data
     const planData = PLAN_MAPPING[plan_id];

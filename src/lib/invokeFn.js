@@ -1,71 +1,57 @@
 import { supabase } from './supabaseClient';
 
 /**
- * Wrapper function for calling Supabase Edge Functions with proper authentication and error handling
- * @param {string} name - The name of the Edge Function to call
- * @param {object} [body] - The body to send with the request (for POST requests)
- * @param {object} [options] - Additional options for the function call
- * @returns {Promise<any>} The data returned by the Edge Function
- * @throws {Error} If there's an error calling the function or if no auth token is available
+ * Wrapper for Supabase Edge Functions using the native fetch API for maximum control.
+ * @param {string} name - The Edge Function name.
+ * @param {object} [body] - The request body for POST.
+ * @param {object} [options] - Additional options like method and headers.
+ * @returns {Promise<any>} - The data from the Edge Function.
+ * @throws {Error} - If the call fails.
  */
 export async function invokeFn(name, body, options = {}) {
   try {
-    // Get the current session
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
-    
-    // Throw error if no token is available and not explicitly provided in options
+
     if (!token && !options.headers?.Authorization) {
-      throw new Error('No auth token/session. Ensure login completed before calling functions.');
+      throw new Error('Authentication token is missing.');
     }
     
-    // Prepare the options for the function call
-    const invokeOptions = {
+        // Build the function URL manually for stability
+    const functionsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+    const url = `${functionsUrl}/${name}`;
+
+    // Explicitly build fetch options
+    const fetchOptions = {
+      method: options.method || (body ? 'POST' : 'GET'),
       headers: {
         'Content-Type': 'application/json',
-        ...options.headers // Allow custom headers to override defaults
-      }
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, // Manually add the anon key
+        ...options.headers,
+      },
     };
-    
-    // Add Authorization header if token is available and not already provided
-    if (token && !options.headers?.Authorization) {
-      invokeOptions.headers.Authorization = `Bearer ${token}`;
+
+    if (token && !fetchOptions.headers.Authorization) {
+      fetchOptions.headers.Authorization = `Bearer ${token}`;
+    }
+
+    if (body && (fetchOptions.method === 'POST' || fetchOptions.method === 'PUT' || fetchOptions.method === 'PATCH')) {
+      fetchOptions.body = JSON.stringify(body);
     }
     
-    // Add body for POST requests
-    if (body) {
-      invokeOptions.body = JSON.stringify(body); // Stringify the body for proper JSON transmission
+    console.log(`Invoking function '${name}' via fetch with URL: ${url} and options:`, fetchOptions);
+
+    const response = await fetch(url, fetchOptions);
+
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+        console.error(`Error from function '${name}' (status ${response.status}):`, errorBody);
+        throw new Error(errorBody.error || `Edge Function returned a non-2xx status code: ${response.status}`);
     }
-    
-    // Call the Supabase Edge Function
-    const { data, error } = await supabase.functions.invoke(name, invokeOptions);
-    
-    // Throw error if the function call failed
-    if (error) {
-      // Try to parse structured error response
-      if (error.message && error.message.includes('{') && error.message.includes('}')) {
-        try {
-          const errorObj = JSON.parse(error.message);
-          if (errorObj.code === 401) {
-            throw new Error('Sesi login telah berakhir. Silakan login ulang.');
-          } else if (errorObj.code === 404) {
-            throw new Error('Data tidak ditemukan.');
-          } else if (errorObj.code === 400) {
-            throw new Error(errorObj.error || errorObj.message || 'Permintaan tidak valid.');
-          } else {
-            throw new Error(errorObj.error || errorObj.message || 'Gagal memanggil fungsi.');
-          }
-        } catch (parseError) {
-          throw new Error(error.message || 'Gagal memanggil fungsi.');
-        }
-      } else {
-        throw new Error(error.message || 'Gagal memanggil fungsi.');
-      }
-    }
-    
-    return data;
+
+    return await response.json();
   } catch (error) {
-    console.error(`Error calling function ${name}:`, error);
-    throw error;
+    console.error(`Error in invokeFn (fetch) calling '${name}':`, error.message);
+    throw new Error(`Failed to call function '${name}': ${error.message}`);
   }
 }

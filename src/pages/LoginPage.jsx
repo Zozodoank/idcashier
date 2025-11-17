@@ -43,8 +43,8 @@ const LoginPage = () => {
         });
         
         // Redirect to renewal page after 2 seconds
-        setTimeout(() => {
-          navigate('/renewal');
+                setTimeout(() => {
+          navigate(`/renewal?email=${encodeURIComponent(normalizedEmail)}`);
         }, 2000);
         
         return;
