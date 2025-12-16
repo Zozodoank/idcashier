@@ -310,6 +310,7 @@ Deno.serve(async (req) => {
       paymentCompleted,
       email
     });
+    
     let planDurationNum = Number(planDuration)
     if (paymentCompleted && (isNaN(planDurationNum) || planDurationNum <= 0)) {
       planDurationNum = 1;
@@ -340,7 +341,7 @@ Deno.serve(async (req) => {
       // Trial Subscription
       try {
         const today = new Date()
-        if (trialDaysNum > 0) {
+        if (effectiveTrialDays > 0) {
           const endDate = new Date(today)
           endDate.setDate(endDate.getDate() + effectiveTrialDays)
           const { error: subscriptionError } = await supabase
@@ -433,7 +434,7 @@ Deno.serve(async (req) => {
     
     const message = paymentCompleted 
       ? `User registered successfully with paid subscription.`
-      : `User registered successfully with ${trialDaysNum} days trial.`
+      : `User registered successfully with ${effectiveTrialDays} days trial.`
 
     return new Response(
       JSON.stringify({
