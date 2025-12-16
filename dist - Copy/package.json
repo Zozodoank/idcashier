@@ -1,0 +1,9 @@
+{
+  "name": "idcashier-webapp",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "serve -s dist -l 3000"
+  }
+}

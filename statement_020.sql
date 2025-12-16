@@ -1,0 +1,2 @@
+CREATE POLICY "Allow tenant access on expenses" ON expenses
+        FOR ALL USING (tenant_id = auth.uid() OR tenant_id = (SELECT id FROM users WHERE email = 'demo@idcashier.my.id')) WITH CHECK (tenant_id = auth.uid());

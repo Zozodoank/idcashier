@@ -1,0 +1,108 @@
+// Script untuk testing Supabase connection dan validation
+// Testing basic connection tanpa authentication
+
+console.log('🔧 Testing Supabase Configuration...\n');
+
+// Test dengan curl untuk basic connectivity
+async function testSupabaseBasic() {
+  console.log('📡 Testing Basic Supabase Connection...');
+  
+  const supabaseUrl = 'https://eypfeiqtvfxxiimhtycc.supabase.co';
+  const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5cGZlaXF0dmZ4eGlpbWh0eWNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjQ5MjUzNTYsImV4cCI6MjA0MDUwMTM1Nn0.BqM5g9F3mGq9T7C_0vK4gJ5q0jL6WwN3s8R8vY4xQwQ';
+  
+  try {
+    // Test dengan fetch
+    const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+      headers: {
+        'apikey': supabaseAnonKey,
+        'Authorization': `Bearer ${supabaseAnonKey}`
+      }
+    });
+    
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+    
+    if (response.ok) {
+      console.log('✅ Basic Supabase connection successful');
+      
+      // Test specific table access
+      const tablesResponse = await fetch(`${supabaseUrl}/rest/v1/`, {
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`
+        }
+      });
+      
+      if (tablesResponse.ok) {
+        console.log('✅ Table access successful');
+      } else {
+        console.log('❌ Table access failed:', tablesResponse.status);
+      }
+    } else {
+      console.log('❌ Basic Supabase connection failed:', response.status);
+      const errorText = await response.text();
+      console.log('Error details:', errorText);
+    }
+  } catch (error) {
+    console.log('❌ Supabase connection error:', error.message);
+  }
+}
+
+// Test environment variables
+function testEnvironmentVariables() {
+  console.log('🌍 Testing Environment Variables...\n');
+  
+  console.log('Expected environment variables:');
+  console.log('- VITE_SUPABASE_URL:', process.env.VITE_SUPABASE_URL || 'Not set');
+  console.log('- VITE_SUPABASE_ANON_KEY:', process.env.VITE_SUPABASE_ANON_KEY ? 'Set (hidden)' : 'Not set');
+  
+  console.log('\n✅ Environment variables check completed');
+}
+
+// Test file configurations
+function testFileConfigurations() {
+  console.log('📁 Testing File Configurations...\n');
+  
+  const fs = require('fs');
+  
+  // Check if .env files exist
+  const envFiles = ['.env', '.env.duitku', '.env.local'];
+  
+  envFiles.forEach(file => {
+    if (fs.existsSync(file)) {
+      console.log(`✅ ${file} exists`);
+      
+      // Check if it contains Supabase variables
+      const content = fs.readFileSync(file, 'utf8');
+      if (content.includes('VITE_SUPABASE_URL') || content.includes('SUPABASE_URL')) {
+        console.log(`  ✅ Contains Supabase URL configuration`);
+      }
+      if (content.includes('VITE_SUPABASE_ANON_KEY')) {
+        console.log(`  ✅ Contains Supabase Anon Key configuration`);
+      }
+    } else {
+      console.log(`❌ ${file} not found`);
+    }
+  });
+  
+  console.log('\n✅ File configuration check completed');
+}
+
+// Main validation function
+async function runValidation() {
+  testEnvironmentVariables();
+  console.log('');
+  testFileConfigurations();
+  console.log('');
+  await testSupabaseBasic();
+  
+  console.log('\n🎉 Validation Completed!');
+  console.log('\n📋 Summary:');
+  console.log('1. Check if environment variables are properly set');
+  console.log('2. Verify Supabase project is active and accessible');
+  console.log('3. Ensure API keys are valid and not expired');
+  console.log('4. Check RLS policies if database access is blocked');
+}
+
+// Run validation
+runValidation().catch(console.error);

@@ -1,0 +1,131 @@
+{
+  "timestamp": "2025-12-12T19:18:20.609Z",
+  "payments": [
+    {
+      "id": "21348b96-aff7-4372-83a3-93f3dafee5f5",
+      "user_id": "ecf0741d-e4ae-4de3-bee0-f43d27411366",
+      "amount": 150000,
+      "merchant_order_id": "RENEWAL-ecf0741d-1765566836956",
+      "product_details": "Perpanjangan Langganan 3 Bulan",
+      "customer_va_name": "testing",
+      "customer_email": "testing@idcashier.my.id",
+      "customer_phone": "081234567890",
+      "payment_method": null,
+      "reference": "DS2574625FKR8X70IY5O4VBF",
+      "status": "pending",
+      "payment_url": "https://sandbox.duitku.com/topup/topupdirectv2.aspx?ref=GQ25E0P13SBJAFWRPA4",
+      "created_at": "2025-12-12T19:13:58.607508+00:00",
+      "updated_at": "2025-12-12T19:13:58.607508+00:00"
+    },
+    {
+      "id": "05c19893-431c-4c33-b9a4-5b218f95a961",
+      "user_id": "ecf0741d-e4ae-4de3-bee0-f43d27411366",
+      "amount": 150000,
+      "merchant_order_id": "RENEWAL-ecf0741d-1765566836871",
+      "product_details": "Perpanjangan Langganan 3 Bulan",
+      "customer_va_name": "testing",
+      "customer_email": "testing@idcashier.my.id",
+      "customer_phone": "081234567890",
+      "payment_method": null,
+      "reference": "DS25746254NE4GCSBQG64A7Y",
+      "status": "pending",
+      "payment_url": "https://sandbox.duitku.com/topup/topupdirectv2.aspx?ref=GQ25NHKT21BNRTZKJPO",
+      "created_at": "2025-12-12T19:13:58.358548+00:00",
+      "updated_at": "2025-12-12T19:13:58.358548+00:00"
+    },
+    {
+      "id": "98d125ef-c6ea-44f9-a5f7-5750b3e89ccf",
+      "user_id": "ecf0741d-e4ae-4de3-bee0-f43d27411366",
+      "amount": 50000,
+      "merchant_order_id": "RENEWAL-ecf0741d-1765566469685",
+      "product_details": "Perpanjangan Langganan 1 Bulan",
+      "customer_va_name": "testing",
+      "customer_email": "testing@idcashier.my.id",
+      "customer_phone": "081234567890",
+      "payment_method": null,
+      "reference": "DS2574625DXZB140WF1K435Z",
+      "status": "pending",
+      "payment_url": "https://sandbox.duitku.com/topup/topupdirectv2.aspx?ref=GQ2510NSJA1ZQ58RYLD",
+      "created_at": "2025-12-12T19:07:51.264252+00:00",
+      "updated_at": "2025-12-12T19:07:51.264252+00:00"
+    },
+    {
+      "id": "6c6d99be-46cf-4f39-a1b9-f265010d1416",
+      "user_id": "ecf0741d-e4ae-4de3-bee0-f43d27411366",
+      "amount": 150000,
+      "merchant_order_id": "RENEWAL-ecf0741d-1765565805896",
+      "product_details": "Perpanjangan Langganan 3 Bulan",
+      "customer_va_name": "testing",
+      "customer_email": "testing@idcashier.my.id",
+      "customer_phone": "081234567890",
+      "payment_method": null,
+      "reference": "DS2574625XC7UNX1ODSP8YFM",
+      "status": "pending",
+      "payment_url": "https://sandbox.duitku.com/topup/topupdirectv2.aspx?ref=GQ25VM7K50AWH7CZ1H2",
+      "created_at": "2025-12-12T18:56:47.5557+00:00",
+      "updated_at": "2025-12-12T18:56:47.5557+00:00"
+    },
+    {
+      "id": "c30fdbf9-3755-477d-ad52-c3aba6c4bdd5",
+      "user_id": "ecf0741d-e4ae-4de3-bee0-f43d27411366",
+      "amount": 270000,
+      "merchant_order_id": "RENEWAL-ecf0741d-1765565102309",
+      "product_details": "Perpanjangan Langganan 6 Bulan",
+      "customer_va_name": "testing",
+      "customer_email": "testing@idcashier.my.id",
+      "customer_phone": "081234567890",
+      "payment_method": null,
+      "reference": "DS25746257BKXT7Z887WLXDR",
+      "status": "pending",
+      "payment_url": "https://sandbox.duitku.com/topup/topupdirectv2.aspx?ref=GQ25VJ8XBZDNNIEGJH5",
+      "created_at": "2025-12-12T18:45:04.785879+00:00",
+      "updated_at": "2025-12-12T18:45:04.785879+00:00"
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "939d541f-8cbe-458a-b4f9-3424bcb3c086",
+      "user_id": "ecf0741d-e4ae-4de3-bee0-f43d27411366",
+      "start_date": "2025-10-25",
+      "end_date": "2025-10-28",
+      "created_at": "2025-11-04T06:25:56.102832",
+      "updated_at": "2025-11-04T06:25:56.102832"
+    },
+    {
+      "id": "f0f7587c-9b96-420b-87c0-a22094874b32",
+      "user_id": "21da4acf-6008-4b4c-9bde-4dc2efaef287",
+      "start_date": "2025-10-25",
+      "end_date": "2026-10-25",
+      "created_at": "2025-10-25T04:55:40.403",
+      "updated_at": "2025-10-25T04:55:40.403"
+    }
+  ],
+  "users": [
+    {
+      "id": "b9ec125d-5d91-4b96-b55a-1478130a5a4b",
+      "email": "demo@idcashier.my.id",
+      "role": "owner",
+      "created_at": "2025-11-03T14:41:56.338661",
+      "updated_at": "2025-11-03T14:41:56.338661"
+    },
+    {
+      "id": "ecf0741d-e4ae-4de3-bee0-f43d27411366",
+      "email": "testing@idcashier.my.id",
+      "role": "owner",
+      "created_at": "2025-11-01T09:13:00.331012",
+      "updated_at": "2025-11-01T09:13:00.331012"
+    },
+    {
+      "id": "21da4acf-6008-4b4c-9bde-4dc2efaef287",
+      "email": "jho.j80@gmail.com",
+      "role": "admin",
+      "created_at": "2025-10-22T15:56:43.080572",
+      "updated_at": "2025-10-22T15:56:43.080572"
+    }
+  ],
+  "errors": {
+    "payErr": null,
+    "subErr": null,
+    "userErr": null
+  }
+}

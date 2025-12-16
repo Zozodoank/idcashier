@@ -1,0 +1,173 @@
+# ========================================
+# PRODUCTION BUILD OPTIMIZATION
+# ========================================
+
+# NODE MODULES ( Development only )
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# BUILD OUTPUT ( Will be generated fresh )
+dist/
+build/
+
+# ========================================
+# DEVELOPMENT FILES TO EXCLUDE
+# ========================================
+
+# Documentation files (Not needed in production)
+*.md
+!README.md
+
+# SQL Migration files (Backend only)
+*.sql
+
+# JavaScript/TypeScript development tools
+tools/
+testsprite_tests/
+*.test.js
+*.spec.js
+test-*.js
+debug-*.js
+comprehensive-*.js
+create-*.js
+investigate-*.js
+load-*.js
+reset-*.js
+verify-*.js
+fix-*.js
+direct-*.js
+alternative-*.js
+apply-*.js
+cleanup-*.js
+check-*.js
+run-*.js
+deploy-*.js
+build-*.js
+push-*.js
+sync-*.js
+products-cleanup-*.js
+real-*.js
+load-*.js
+
+# Configuration files (Development only)
+.env.*
+!.env.example
+.stylelintrc.json
+postcss.config.js
+tailwind.config.js
+deno.json
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Version control
+.git/
+.gitignore
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ========================================
+# BACKEND/DATABASE FILES ( Exclude from frontend build )
+# ========================================
+
+# Supabase functions and migrations (Backend only)
+supabase/
+migrations/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+db_backup.sql
+
+# PHP library (Backend only)
+duitku_library/
+
+# Documentation directories
+docs/
+
+# Plugin directories (Development only)
+plugins/
+
+# ========================================
+# TEMPORARY AND LOG FILES
+# ========================================
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Cache files
+.cache/
+.parcel-cache/
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# ========================================
+# DEVELOPMENT ENVIRONMENTS
+# ========================================
+
+# Environment variables (Keep .env.example only)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ========================================
+# FRONTEND BUILD OPTIMIZATION
+# ========================================
+
+# Exclude non-essential directories
+.continue/
+.kiro/
+.roo/
+
+# Test and development images (if any)
+*.png
+!public/logo.png
+!public/favicon.ico
+
+# ========================================
+# OPTIONAL: KEEP THESE IF NEEDED
+# ========================================
+
+# Main entry file (Keep for production)
+index.html
+
+# Public assets (Keep)
+public/
+# Exception: Remove debug files
+public/debug-*.html
+public/diagnostic.html
+public/test-*.html
+public/llms.txt
+
+# Source code (Keep)
+src/

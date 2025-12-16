@@ -1,0 +1,146 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: 'Functions to deploy (e.g., "auth-login", or "*" for all)'
+        required: true
+        default: '*'
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Validate Required Secrets
+        run: |
+          echo "Validating required secrets..."
+          MISSING_SECRETS=()
+          
+          if [ -z "$SUPABASE_PROJECT_REF" ]; then
+            MISSING_SECRETS+=("SUPABASE_PROJECT_REF")
+          fi
+          
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            MISSING_SECRETS+=("SUPABASE_ACCESS_TOKEN")
+          fi
+          
+          if [ -z "$VITE_SUPABASE_URL" ]; then
+            MISSING_SECRETS+=("VITE_SUPABASE_URL")
+          fi
+          
+          if [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            MISSING_SECRETS+=("VITE_SUPABASE_ANON_KEY")
+          fi
+          
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            MISSING_SECRETS+=("SUPABASE_SERVICE_ROLE_KEY")
+          fi
+          
+          if [ ${#MISSING_SECRETS[@]} -ne 0 ]; then
+            echo "::error::Missing required secrets: ${MISSING_SECRETS[*]}"
+            echo "Please configure the following secrets in your repository settings:"
+            for secret in "${MISSING_SECRETS[@]}"; do
+              echo "- $secret"
+            done
+            exit 1
+          fi
+          
+          echo "All required secrets are present."
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Preflight Supabase CLI Check
+        run: |
+          echo "Checking Supabase CLI version and status..."
+          supabase --version
+          # Login with access token for management API calls
+          echo "::add-mask::$SUPABASE_ACCESS_TOKEN"
+          supabase login --token $SUPABASE_ACCESS_TOKEN
+          supabase status
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Deploy Auth Edge Functions
+        if: github.event.inputs.functions == '*' || contains(github.event.inputs.functions, 'auth')
+        run: |
+          echo "Deploying auth functions..."
+          # Deploy auth functions that require JWT verification
+          supabase functions deploy auth-me --project-ref $SUPABASE_PROJECT_REF
+          # Deploy auth functions that do NOT require JWT verification
+          supabase functions deploy auth-login --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
+          supabase functions deploy auth-register --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
+          supabase functions deploy auth-request-password-reset --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Deploy Specific Function
+        if: github.event.inputs.functions != '*' && !contains(github.event.inputs.functions, 'auth')
+        run: |
+          echo "Deploying function: $FUNCTIONS_DEPLOYED"
+          supabase functions deploy $FUNCTIONS_DEPLOYED --project-ref $SUPABASE_PROJECT_REF
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          FUNCTIONS_DEPLOYED: ${{ github.event.inputs.functions }}
+
+      - name: Verify Deployment
+        run: |
+          echo "Verifying deployed functions..."
+          supabase functions list --project-ref $SUPABASE_PROJECT_REF
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Run Post-Deployment Verification Script
+        run: |
+          npm install
+          node tools/verify-deployment.js
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "=== Deployment Summary ===" > deployment-summary.txt
+          echo "Functions deployed: $FUNCTIONS_DEPLOYED" >> deployment-summary.txt
+          echo "Project Ref: $SUPABASE_PROJECT_REF" >> deployment-summary.txt
+          echo "CLI Version: $(supabase --version)" >> deployment-summary.txt
+          echo "Workflow Status: ${{ job.status }}" >> deployment-summary.txt
+          echo "==========================" >> deployment-summary.txt
+          
+          # Upload as artifact
+          echo "Uploading deployment summary..."
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          FUNCTIONS_DEPLOYED: ${{ github.event.inputs.functions }}
+
+      - name: Upload Deployment Summary
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-summary
+          path: deployment-summary.txt

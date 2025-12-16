@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TC001",
+    "title": "verify_user_authentication_flow",
+    "description": "Test the complete user authentication flow including registration, login, password reset, and session management using Supabase Auth to ensure secure access."
+  },
+  {
+    "id": "TC002",
+    "title": "validate_multi_tenant_data_isolation",
+    "description": "Verify that multi-tenant support correctly isolates data per tenant and that store setup functions properly to prevent data leakage between tenants."
+  },
+  {
+    "id": "TC003",
+    "title": "test_product_catalog_crud_operations",
+    "description": "Ensure that product catalog CRUD operations (create, read, update, delete) work correctly and reflect accurately in the sales and product management pages."
+  },
+  {
+    "id": "TC004",
+    "title": "check_employee_role_and_attendance_management",
+    "description": "Validate employee management features including role assignment, permission enforcement, and attendance tracking to ensure proper workforce administration."
+  },
+  {
+    "id": "TC005",
+    "title": "validate_sales_transaction_processing",
+    "description": "Test sales transaction processing through the POS system including transaction recording and receipt printing to ensure accurate sales management."
+  },
+  {
+    "id": "TC006",
+    "title": "verify_expense_logging_and_reporting",
+    "description": "Check that business expenses can be logged, categorized, and retrieved correctly in reporting dashboards for accurate expense management."
+  },
+  {
+    "id": "TC007",
+    "title": "test_payment_gateway_integration_and_subscription_handling",
+    "description": "Verify integration with the Duitku payment gateway for subscription payments, renewals, and payment status tracking to ensure seamless billing."
+  },
+  {
+    "id": "TC008",
+    "title": "validate_internationalization_and_language_switching",
+    "description": "Test the internationalization features including language selection, dynamic UI translation updates, and correct display of multi-language content."
+  },
+  {
+    "id": "TC009",
+    "title": "check_theme_toggle_and_persistence",
+    "description": "Ensure that toggling between dark and light themes updates the UI correctly and that user preferences persist across sessions."
+  },
+  {
+    "id": "TC010",
+    "title": "verify_protected_routes_and_navigation_flow",
+    "description": "Test that all navigation flows maintain protected routes, enforce user session validation, and prevent unauthorized access to secure pages."
+  }
+]

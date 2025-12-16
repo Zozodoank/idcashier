@@ -1,0 +1,1 @@
+RAISE NOTICE 'Created policies for all related tables';

@@ -1,0 +1,20 @@
+{
+  "buildDate": "2025-12-12T12:38:57.482Z",
+  "nodeVersion": "v24.7.0",
+  "platform": "win32",
+  "optimization": {
+    "filesIncluded": [
+      "index.html",
+      "assets/ (Optimized bundles)",
+      "src/ (Application source)",
+      "public/ (Static assets)"
+    ],
+    "filesExcluded": [
+      "Development files (.js, .test.js, debug-*.js)",
+      "Documentation (*.md files)",
+      "Backend files (supabase/, migrations/)",
+      "Development tools (tools/, testsprite_tests/)",
+      "Configuration files (.stylelintrc.json, etc.)"
+    ]
+  }
+}

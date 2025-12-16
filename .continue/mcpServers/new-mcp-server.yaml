@@ -1,0 +1,125 @@
+name: New MCP server
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: supabase
+    type: stdio
+    disabled: false
+    timeout: 60
+    command: npx
+    args: [
+        "-y",
+        "mcp-remote",
+        "--access-token",
+        "sbp_ea7ee6e719e0f9dbd27542171ac64501f76eddb8",
+        "https://mcp.supabase.com/mcp?project_ref=eypfeiqtvfxxiimhtycc"
+      ]
+    autoApprove:
+        - get_project_url
+        - get_project_info
+        - list_projects
+        - list_organizations
+        - get_organization_info  
+        - list_tables
+        - get_table_info
+        - get_table_schema
+        - execute_sql
+        - query_table
+        - insert_record
+        - update_record
+        - delete_record
+        - create_table
+        - alter_table
+        - drop_table
+        - list_extensions
+        - enable_extension
+        - disable_extension
+        - get_database_size
+        - get_connection_pool
+        - get_database_health
+        - list_migrations
+        - create_migration
+        - apply_migration
+        - revert_migration
+        - get_migration_status
+        - squash_migrations
+        - list_edge_functions
+        - get_edge_function
+        - create_edge_function
+        - update_edge_function
+        - delete_edge_function
+        - invoke_edge_function
+        - get_function_logs
+        - list_storage_buckets
+        - create_storage_bucket
+        - update_storage_bucket
+        - delete_storage_bucket
+        - list_storage_files
+        - download_storage_file
+        - delete_storage_file
+        - get_storage_usage
+  # Authentication
+        - list_auth_users
+        - get_auth_user
+        - create_auth_user
+        - update_auth_user
+        - delete_auth_user
+        - get_auth_settings
+    # Realtime
+        - get_realtime_status
+        - manage_realtime_channels
+   # API & Keys
+        - get_anon_key
+        - get_service_key
+        - rotate_api_keys
+        - list_api_keys
+  # Types & Documentation
+        - generate_typescript_types
+        - generate_api_docs
+        - get_openapi_spec
+    # Documentation & Search
+        - search_docs
+        - get_advisors
+        - get_documentation
+  # Logs & Monitoring
+        - get_logs
+        - get_metrics
+        - get_analytics
+        - get_performance
+        - get_error_rates
+    # Debugging & Development
+        - debug_query
+        - explain_query
+        - get_query_performance
+        - test_connection
+        - health_check
+  # Branching & Environments
+        - list_branches
+        - create_branch
+        - delete_branch
+        - promote_branch
+        - get_environment_info
+    # Secrets Management
+        - list_secrets
+        - set_secret
+        - delete_secret
+        - get_secret
+    # Backups & Recovery
+        - list_backups
+        - create_backup
+        - restore_backup
+        - get_backup_status   
+  # Settings & Configuration
+        - get_project_settings
+        - update_project_settings
+        - get_database_settings
+        - update_database_settings
+    # Network & Security
+        - get_network_restrictions
+        - update_network_restrictions
+        - get_ssl_certificates
+        - get_firewall_rules
+    # Billing & Usage
+        - get_usage_metrics
+        - get_billing_info
+        - get_quotas

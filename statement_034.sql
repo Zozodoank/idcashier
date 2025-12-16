@@ -1,0 +1,1 @@
+RAISE NOTICE 'Created is_system_context() function';

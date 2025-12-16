@@ -1,0 +1,57 @@
+// Simple database connection test
+async function testDatabaseConnection() {
+  console.log('🧪 Testing Database Connection...');
+  
+  try {
+    // Test basic database query
+    const response = await fetch('/api/test-db', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    const data = await response.json();
+    console.log('✅ Database test result:', data);
+    
+  } catch (error) {
+    console.error('❌ Database test failed:', error);
+  }
+}
+
+// Test product creation
+async function testProductCreation() {
+  console.log('🔧 Testing Product Creation...');
+  
+  const testProduct = {
+    name: 'Test Product ' + Date.now(),
+    price: 10000,
+    cost: 5000,
+    stock: 10
+  };
+  
+  try {
+    const response = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('auth_token')
+      },
+      body: JSON.stringify(testProduct)
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      console.log('✅ Product created:', data);
+      return data;
+    } else {
+      console.error('❌ Product creation failed:', data);
+    }
+    
+  } catch (error) {
+    console.error('❌ Product creation error:', error);
+  }
+}
+
+// Run tests
+testDatabaseConnection();
+testProductCreation();

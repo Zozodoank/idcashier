@@ -1,0 +1,559 @@
+[
+  {
+    "id": "TC001",
+    "title": "User Registration Success",
+    "description": "Verify that a new user can register successfully with valid input data, set up a store, and be redirected to the dashboard.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to registration page"
+      },
+      {
+        "type": "action",
+        "description": "Fill in valid user details and store setup information"
+      },
+      {
+        "type": "action",
+        "description": "Submit registration form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify registration success message is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify user is authenticated and redirected to dashboard page"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "User Login with Correct Credentials",
+    "description": "Verify that users can login successfully with correct username/email and password.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to login page"
+      },
+      {
+        "type": "action",
+        "description": "Enter valid username/email and password"
+      },
+      {
+        "type": "action",
+        "description": "Click login button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify user is authenticated and dashboard is displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "User Login Failure with Incorrect Credentials",
+    "description": "Verify that login fails with invalid username/email or password and appropriate error is shown.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to login page"
+      },
+      {
+        "type": "action",
+        "description": "Enter invalid username/email or password"
+      },
+      {
+        "type": "action",
+        "description": "Click login button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify login error message is displayed and no access to dashboard"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Password Reset Request and Completion",
+    "description": "Verify that users can request a password reset and successfully reset their password using the emailed link.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to password reset page"
+      },
+      {
+        "type": "action",
+        "description": "Enter registered email for password reset"
+      },
+      {
+        "type": "action",
+        "description": "Submit password reset request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify password reset email is sent"
+      },
+      {
+        "type": "action",
+        "description": "Use received link to navigate to password reset form"
+      },
+      {
+        "type": "action",
+        "description": "Enter new valid password and submit"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify password reset success confirmation"
+      },
+      {
+        "type": "action",
+        "description": "Login with new password"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify login succeeds with new password"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Multi-Tenancy Data Isolation",
+    "description": "Verify that multiple tenants have separated data and cannot access each other's business data or settings.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as Tenant A user"
+      },
+      {
+        "type": "action",
+        "description": "Create or view business data (products, employees, sales)"
+      },
+      {
+        "type": "action",
+        "description": "Logout Tenant A"
+      },
+      {
+        "type": "action",
+        "description": "Login as Tenant B user"
+      },
+      {
+        "type": "action",
+        "description": "Verify Tenant B cannot see Tenant A's data"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify data access is restricted per tenant"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Product Management CRUD Operations",
+    "description": "Verify product catalog supports creating, reading, updating, and deleting products correctly and updates are reflected in sales pages.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to products page"
+      },
+      {
+        "type": "action",
+        "description": "Add a new product with valid details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify new product appears in catalog"
+      },
+      {
+        "type": "action",
+        "description": "Update the product's details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify product details are updated"
+      },
+      {
+        "type": "action",
+        "description": "Delete the product"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify product is removed from catalog and sales page"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Employee Role Assignment and Permission Enforcement",
+    "description": "Verify that employees can be assigned roles with permissions and the system enforces access control accordingly.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to employee management page"
+      },
+      {
+        "type": "action",
+        "description": "Create new employee and assign role with defined permissions"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify employee appears with assigned role"
+      },
+      {
+        "type": "action",
+        "description": "Login as employee with restricted permissions"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify employee cannot access unauthorized features"
+      },
+      {
+        "type": "action",
+        "description": "Login as employee with elevated permissions"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify employee can access permitted features"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Attendance Tracking Accuracy",
+    "description": "Verify employees can log attendance and managers can view and edit attendance records accurately.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Employee logs attendance for the current day"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify attendance record is saved correctly"
+      },
+      {
+        "type": "action",
+        "description": "Manager views employee attendance records"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify attendance records are displayed with correct data"
+      },
+      {
+        "type": "action",
+        "description": "Manager edits an attendance record"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify changes are saved and reflected"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Sales Transaction Processing and Receipt Printing",
+    "description": "Verify sales transactions are processed correctly with cart calculation and printable receipts generated with accurate data.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to sales page"
+      },
+      {
+        "type": "action",
+        "description": "Add multiple products to cart with valid quantities"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify total sale amount and calculation are correct"
+      },
+      {
+        "type": "action",
+        "description": "Complete the sales transaction"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify transaction is saved and receipt is generated"
+      },
+      {
+        "type": "action",
+        "description": "Print the receipt and verify printed content matches transaction details"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Business Expense Logging and Reporting",
+    "description": "Verify users can add, categorize, and retrieve business expenses with accurate reporting summaries.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to expenses page"
+      },
+      {
+        "type": "action",
+        "description": "Add a new expense with category, amount, and date"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify expense is saved and displayed in expense list"
+      },
+      {
+        "type": "action",
+        "description": "Generate expense report for specified date range"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify report reflects all expenses with correct totals and categories"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "HPP Cost of Goods Management Calculations",
+    "description": "Verify raw materials, recipes, and custom costs inputs correctly calculate HPP with expected breakdowns and totals.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to HPP management page"
+      },
+      {
+        "type": "action",
+        "description": "Add raw materials with prices"
+      },
+      {
+        "type": "action",
+        "description": "Define recipes with raw materials and quantities"
+      },
+      {
+        "type": "action",
+        "description": "Input custom costs"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify HPP breakdown and total is calculated accurately"
+      },
+      {
+        "type": "action",
+        "description": "Update recipe or materials"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify corresponding HPP recalculation"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Payment Gateway Integration with Duitku",
+    "description": "Verify subscription and renewal payments can be processed through Duitku gateway with correct payment statuses reflected.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to subscription page"
+      },
+      {
+        "type": "action",
+        "description": "Select subscription plan and proceed to payment"
+      },
+      {
+        "type": "action",
+        "description": "Complete payment through Duitku gateway"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify payment success confirmation and subscription activated"
+      },
+      {
+        "type": "action",
+        "description": "Test subscription renewal before expiry"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify renewal payment processes successfully and subscription status updates"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Internationalization and Language Selection",
+    "description": "Verify language selector dynamically updates UI language and all translations display correctly for supported languages.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Locate and open language selector"
+      },
+      {
+        "type": "action",
+        "description": "Select each available language one by one"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify UI texts update instantly to selected language"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify no placeholder or untranslated strings are visible in the UI"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Theme Toggle Dark/Light Mode",
+    "description": "Verify that users can toggle between dark and light themes and the selected preference persists across sessions.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Locate theme toggle control"
+      },
+      {
+        "type": "action",
+        "description": "Switch from light to dark mode"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify UI changes to dark mode style"
+      },
+      {
+        "type": "action",
+        "description": "Reload the application"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify dark mode preference is retained"
+      },
+      {
+        "type": "action",
+        "description": "Toggle back to light mode and verify same persistence"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Protected Routes and Session Management",
+    "description": "Verify that protected routes are accessible only to authenticated users and unauthorized users are redirected to login.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Attempt to navigate to dashboard without authentication"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify redirection to login page"
+      },
+      {
+        "type": "action",
+        "description": "Login with valid credentials"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to multiple protected routes (sales, employees, reports)"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify pages load successfully without errors"
+      },
+      {
+        "type": "action",
+        "description": "Logout and attempt to access protected route again"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify user is redirected to login page"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Landing and Legal Pages Accessibility",
+    "description": "Verify the public landing page and legal pages (privacy policy, terms of service, about) are accessible and display correct content and links.",
+    "category": "functional",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to landing page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify hero section, call-to-action, and welcome message are visible"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to privacy policy page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify privacy policy content and links are present"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to terms of service page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify terms of service content and links are present"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to about page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify about page content is correct"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Developer Tools and Supabase Edge Functions Invocation",
+    "description": "Verify developer utilities load successfully and Supabase Edge Functions can be invoked without errors.",
+    "category": "functional",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to developer tools page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify developer tool UI loads correctly"
+      },
+      {
+        "type": "action",
+        "description": "Invoke sample Supabase Edge Function"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify function invocation returns expected result without errors"
+      }
+    ]
+  }
+]

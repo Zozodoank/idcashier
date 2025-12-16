@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="id">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice Template</title>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    .invoice-container {
+      background: white;
+      width: 100%;
+      max-width: 850px;
+      padding: 60px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+    }
+
+    .invoice-header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding-bottom: 30px;
+      border-bottom: 3px solid #667eea;
+    }
+
+    .invoice-title {
+      font-size: 36px;
+      font-weight: bold;
+      color: #667eea;
+      margin: 0 0 5px 0;
+      letter-spacing: 3px;
+    }
+
+    .invoice-number {
+      font-size: 18px;
+      color: #666;
+      margin: 0;
+    }
+
+    .info-section {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 40px;
+      gap: 40px;
+    }
+
+    .company-info, .recipient-info {
+      flex: 1;
+    }
+
+    .recipient-info {
+      text-align: right;
+      padding-top: 95px;
+    }
+
+    .company-logo {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 12px;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: white;
+    }
+
+    .company-name {
+      font-size: 20px;
+      font-weight: bold;
+      color: #333;
+      margin: 10px 0;
+    }
+
+    .company-address, .recipient-address {
+      color: #666;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .recipient-label {
+      font-weight: 600;
+      color: #667eea;
+      margin-bottom: 8px;
+    }
+
+    .recipient-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      margin: 5px 0;
+    }
+
+    .date-section {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 40px;
+      padding: 20px;
+      background: #f8f9ff;
+      border-radius: 8px;
+    }
+
+    .date-item {
+      flex: 1;
+    }
+
+    .date-label {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 5px;
+    }
+
+    .date-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .invoice-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 40px;
+    }
+
+    .invoice-table thead {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .invoice-table th {
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+
+    .invoice-table td {
+      padding: 15px;
+      border-bottom: 1px solid #e0e0e0;
+      color: #333;
+    }
+
+    .invoice-table tbody tr:hover {
+      background: #f8f9ff;
+    }
+
+    .invoice-table .text-right {
+      text-align: right;
+    }
+
+    .invoice-table .text-center {
+      text-align: center;
+    }
+
+    .footer-section {
+      display: flex;
+      justify-content: space-between;
+      gap: 40px;
+      margin-bottom: 50px;
+    }
+
+    .notes {
+      flex: 1;
+    }
+
+    .notes-label {
+      font-weight: 600;
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .notes-text {
+      color: #666;
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    .totals {
+      flex: 0 0 300px;
+    }
+
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      margin-bottom: 5px;
+    }
+
+    .total-label {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .total-value {
+      font-weight: bold;
+      color: #333;
+      font-size: 16px;
+    }
+
+    .signature-section {
+      margin-top: 60px;
+      text-align: left;
+    }
+
+    .signature-text {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 80px;
+    }
+
+    .signature-name {
+      font-weight: 600;
+      color: #999;
+      margin-bottom: 5px;
+    }
+
+    .signature-line {
+      width: 150px;
+      height: 1px;
+      background: #999;
+      margin-top: 5px;
+    }
+
+    .signature-position {
+      font-size: 13px;
+      color: #999;
+      margin-top: 8px;
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
+ </head>
+ <body>
+  <div class="invoice-container">
+   <div class="invoice-header">
+    <h1 class="invoice-title" id="invoice-title">INVOICE</h1>
+    <p class="invoice-number" id="invoice-number">INV-2024-001</p>
+   </div>
+   <div class="info-section">
+    <div class="company-info">
+     <div class="company-logo">
+      🏢
+     </div>
+     <div class="company-name" id="company-name">
+      PT Nama Perusahaan
+     </div>
+     <div class="company-address" id="company-address">
+      Jl. Contoh No. 123, Jakarta<br>
+      Telp: (021) 1234-5678
+     </div>
+    </div>
+    <div class="recipient-info">
+     <div class="recipient-label" id="recipient-label">
+      Kepada Yth:
+     </div>
+     <div class="recipient-name" id="recipient-name">
+      Nama Pelanggan
+     </div>
+     <div class="recipient-address" id="recipient-address">
+      Alamat Pelanggan<br>
+      Jakarta Selatan
+     </div>
+    </div>
+   </div>
+   <div class="date-section">
+    <div class="date-item">
+     <div class="date-label" id="date-label">
+      Tanggal
+     </div>
+     <div class="date-value" id="date-value">
+      15 Januari 2024
+     </div>
+    </div>
+    <div class="date-item">
+     <div class="date-label" id="due-date-label">
+      Jatuh Tempo
+     </div>
+     <div class="date-value" id="due-date-value">
+      30 Januari 2024
+     </div>
+    </div>
+   </div>
+   <table class="invoice-table">
+    <thead>
+     <tr>
+      <th style="width: 50px;" id="header-no">No</th>
+      <th id="header-description">Deskripsi</th>
+      <th class="text-center" style="width: 70px;" id="header-qty">Qty</th>
+      <th class="text-right" style="width: 150px;" id="header-price">Harga</th>
+      <th class="text-right" style="width: 150px;" id="header-total">Total</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td class="text-center">1</td>
+      <td>Jasa Konsultasi Website</td>
+      <td class="text-center">1</td>
+      <td class="text-right">Rp 5.000.000</td>
+      <td class="text-right">Rp 5.000.000</td>
+     </tr>
+     <tr>
+      <td class="text-center">2</td>
+      <td>Desain UI/UX Mobile App</td>
+      <td class="text-center">1</td>
+      <td class="text-right">Rp 7.500.000</td>
+      <td class="text-right">Rp 7.500.000</td>
+     </tr>
+     <tr>
+      <td class="text-center">3</td>
+      <td>Development Backend API</td>
+      <td class="text-center">1</td>
+      <td class="text-right">Rp 10.000.000</td>
+      <td class="text-right">Rp 10.000.000</td>
+     </tr>
+    </tbody>
+   </table>
+   <div class="footer-section">
+    <div class="notes">
+     <div class="notes-label" id="notes-label">
+      Catatan:
+     </div>
+     <div class="notes-text" id="notes-text">
+      Pembayaran dapat dilakukan melalui transfer bank ke rekening perusahaan. Mohon konfirmasi setelah melakukan pembayaran.
+     </div>
+    </div>
+    <div class="totals">
+     <div class="total-row"><span class="total-label" id="subtotal-label">Subtotal</span> <span class="total-value">Rp 22.500.000</span>
+     </div>
+     <div class="total-row"><span class="total-label" id="tax-label">Pajak (11%)</span> <span class="total-value">Rp 2.475.000</span>
+     </div>
+     <div class="total-row"><span class="total-label" id="discount-label">Diskon</span> <span class="total-value">- Rp 0</span>
+     </div>
+     <div class="total-row" style="border-top: 2px solid #333; padding-top: 12px; margin-top: 8px;"><span class="total-label" style="font-size: 18px;" id="grand-total-label">Total</span> <span class="total-value" style="font-size: 20px;">Rp 24.975.000</span>
+     </div>
+    </div>
+   </div>
+   <div class="signature-section">
+    <div class="signature-text" id="signature-text">
+     Hormat Kami,
+    </div>
+    <div class="signature-name" id="signature-name">
+     Nama Lengkap
+    </div>
+    <div class="signature-line"></div>
+    <div class="signature-position" id="signature-position">
+     Jabatan
+    </div>
+   </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      invoice_title: "INVOICE",
+      invoice_number: "INV-2024-001",
+      company_name: "PT Nama Perusahaan",
+      company_address: "Jl. Contoh No. 123, Jakarta<br>Telp: (021) 1234-5678",
+      recipient_label: "Kepada Yth:",
+      recipient_name: "Nama Pelanggan",
+      recipient_address: "Alamat Pelanggan<br>Jakarta Selatan",
+      date_label: "Tanggal",
+      date_value: "15 Januari 2024",
+      due_date_label: "Jatuh Tempo",
+      due_date_value: "30 Januari 2024",
+      header_no: "No",
+      header_description: "Deskripsi",
+      header_qty: "Qty",
+      header_price: "Harga",
+      header_total: "Total",
+      notes_label: "Catatan:",
+      notes_text: "Pembayaran dapat dilakukan melalui transfer bank ke rekening perusahaan. Mohon konfirmasi setelah melakukan pembayaran.",
+      subtotal_label: "Subtotal",
+      tax_label: "Pajak (11%)",
+      discount_label: "Diskon",
+      grand_total_label: "Total",
+      signature_text: "Hormat Kami,",
+      signature_name: "Nama Lengkap",
+      signature_position: "Jabatan",
+      primary_color: "#667eea",
+      secondary_color: "#764ba2",
+      background_color: "#ffffff",
+      text_color: "#333333",
+      accent_color: "#f8f9ff",
+      font_family: "Segoe UI",
+      font_size: 16
+    };
+
+    async function onConfigChange(config) {
+      const customFont = config.font_family || defaultConfig.font_family;
+      const baseFontStack = 'Tahoma, Geneva, Verdana, sans-serif';
+      const baseSize = config.font_size || defaultConfig.font_size;
+
+      document.body.style.fontFamily = `${customFont}, ${baseFontStack}`;
+      document.body.style.fontSize = `${baseSize}px`;
+
+      const primaryColor = config.primary_color || defaultConfig.primary_color;
+      const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
+      const backgroundColor = config.background_color || defaultConfig.background_color;
+      const textColor = config.text_color || defaultConfig.text_color;
+      const accentColor = config.accent_color || defaultConfig.accent_color;
+
+      document.body.style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+      document.querySelector('.invoice-container').style.background = backgroundColor;
+      document.querySelector('.invoice-header').style.borderBottomColor = primaryColor;
+      document.querySelector('.invoice-title').style.color = primaryColor;
+
+      const invoiceTable = document.querySelector('.invoice-table thead');
+      invoiceTable.style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+
+      const companyLogo = document.querySelector('.company-logo');
+      companyLogo.style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+
+      const dateSection = document.querySelector('.date-section');
+      dateSection.style.background = accentColor;
+
+      document.querySelectorAll('.company-name, .recipient-name, .date-value, .signature-text, .signature-name, .total-label').forEach(el => {
+        el.style.color = textColor;
+      });
+
+      document.querySelectorAll('.recipient-label, .notes-label').forEach(el => {
+        el.style.color = primaryColor;
+      });
+
+      document.querySelectorAll('.total-value').forEach(el => {
+        el.style.color = textColor;
+      });
+
+      document.querySelector('.invoice-title').style.fontSize = `${baseSize * 3}px`;
+      document.querySelector('.invoice-number').style.fontSize = `${baseSize * 1.125}px`;
+      document.querySelector('.company-name').style.fontSize = `${baseSize * 1.25}px`;
+      document.querySelector('.recipient-name').style.fontSize = `${baseSize * 1.125}px`;
+      document.querySelector('.date-value').style.fontSize = `${baseSize}px`;
+      document.querySelectorAll('.invoice-table th').forEach(el => {
+        el.style.fontSize = `${baseSize * 0.875}px`;
+      });
+      document.querySelector('.total-value').style.fontSize = `${baseSize * 1.125}px`;
+
+      document.getElementById('invoice-title').textContent = config.invoice_title || defaultConfig.invoice_title;
+      document.getElementById('invoice-number').textContent = config.invoice_number || defaultConfig.invoice_number;
+      document.getElementById('company-name').textContent = config.company_name || defaultConfig.company_name;
+      document.getElementById('company-address').innerHTML = config.company_address || defaultConfig.company_address;
+      document.getElementById('recipient-label').textContent = config.recipient_label || defaultConfig.recipient_label;
+      document.getElementById('recipient-name').textContent = config.recipient_name || defaultConfig.recipient_name;
+      document.getElementById('recipient-address').innerHTML = config.recipient_address || defaultConfig.recipient_address;
+      document.getElementById('date-label').textContent = config.date_label || defaultConfig.date_label;
+      document.getElementById('date-value').textContent = config.date_value || defaultConfig.date_value;
+      document.getElementById('due-date-label').textContent = config.due_date_label || defaultConfig.due_date_label;
+      document.getElementById('due-date-value').textContent = config.due_date_value || defaultConfig.due_date_value;
+      document.getElementById('header-no').textContent = config.header_no || defaultConfig.header_no;
+      document.getElementById('header-description').textContent = config.header_description || defaultConfig.header_description;
+      document.getElementById('header-qty').textContent = config.header_qty || defaultConfig.header_qty;
+      document.getElementById('header-price').textContent = config.header_price || defaultConfig.header_price;
+      document.getElementById('header-total').textContent = config.header_total || defaultConfig.header_total;
+      document.getElementById('notes-label').textContent = config.notes_label || defaultConfig.notes_label;
+      document.getElementById('notes-text').textContent = config.notes_text || defaultConfig.notes_text;
+      document.getElementById('subtotal-label').textContent = config.subtotal_label || defaultConfig.subtotal_label;
+      document.getElementById('tax-label').textContent = config.tax_label || defaultConfig.tax_label;
+      document.getElementById('discount-label').textContent = config.discount_label || defaultConfig.discount_label;
+      document.getElementById('grand-total-label').textContent = config.grand_total_label || defaultConfig.grand_total_label;
+      document.getElementById('signature-text').textContent = config.signature_text || defaultConfig.signature_text;
+      document.getElementById('signature-name').textContent = config.signature_name || defaultConfig.signature_name;
+      document.getElementById('signature-position').textContent = config.signature_position || defaultConfig.signature_position;
+    }
+
+    function mapToCapabilities(config) {
+      return {
+        recolorables: [
+          {
+            get: () => config.primary_color || defaultConfig.primary_color,
+            set: (value) => {
+              config.primary_color = value;
+              window.elementSdk.setConfig({ primary_color: value });
+            }
+          },
+          {
+            get: () => config.secondary_color || defaultConfig.secondary_color,
+            set: (value) => {
+              config.secondary_color = value;
+              window.elementSdk.setConfig({ secondary_color: value });
+            }
+          },
+          {
+            get: () => config.background_color || defaultConfig.background_color,
+            set: (value) => {
+              config.background_color = value;
+              window.elementSdk.setConfig({ background_color: value });
+            }
+          },
+          {
+            get: () => config.text_color || defaultConfig.text_color,
+            set: (value) => {
+              config.text_color = value;
+              window.elementSdk.setConfig({ text_color: value });
+            }
+          },
+          {
+            get: () => config.accent_color || defaultConfig.accent_color,
+            set: (value) => {
+              config.accent_color = value;
+              window.elementSdk.setConfig({ accent_color: value });
+            }
+          }
+        ],
+        borderables: [],
+        fontEditable: {
+          get: () => config.font_family || defaultConfig.font_family,
+          set: (value) => {
+            config.font_family = value;
+            window.elementSdk.setConfig({ font_family: value });
+          }
+        },
+        fontSizeable: {
+          get: () => config.font_size || defaultConfig.font_size,
+          set: (value) => {
+            config.font_size = value;
+            window.elementSdk.setConfig({ font_size: value });
+          }
+        }
+      };
+    }
+
+    function mapToEditPanelValues(config) {
+      return new Map([
+        ["invoice_title", config.invoice_title || defaultConfig.invoice_title],
+        ["invoice_number", config.invoice_number || defaultConfig.invoice_number],
+        ["company_name", config.company_name || defaultConfig.company_name],
+        ["company_address", config.company_address || defaultConfig.company_address],
+        ["recipient_label", config.recipient_label || defaultConfig.recipient_label],
+        ["recipient_name", config.recipient_name || defaultConfig.recipient_name],
+        ["recipient_address", config.recipient_address || defaultConfig.recipient_address],
+        ["date_label", config.date_label || defaultConfig.date_label],
+        ["date_value", config.date_value || defaultConfig.date_value],
+        ["due_date_label", config.due_date_label || defaultConfig.due_date_label],
+        ["due_date_value", config.due_date_value || defaultConfig.due_date_value],
+        ["header_no", config.header_no || defaultConfig.header_no],
+        ["header_description", config.header_description || defaultConfig.header_description],
+        ["header_qty", config.header_qty || defaultConfig.header_qty],
+        ["header_price", config.header_price || defaultConfig.header_price],
+        ["header_total", config.header_total || defaultConfig.header_total],
+        ["notes_label", config.notes_label || defaultConfig.notes_label],
+        ["notes_text", config.notes_text || defaultConfig.notes_text],
+        ["subtotal_label", config.subtotal_label || defaultConfig.subtotal_label],
+        ["tax_label", config.tax_label || defaultConfig.tax_label],
+        ["discount_label", config.discount_label || defaultConfig.discount_label],
+        ["grand_total_label", config.grand_total_label || defaultConfig.grand_total_label],
+        ["signature_text", config.signature_text || defaultConfig.signature_text],
+        ["signature_name", config.signature_name || defaultConfig.signature_name],
+        ["signature_position", config.signature_position || defaultConfig.signature_position]
+      ]);
+    }
+
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange,
+        mapToCapabilities,
+        mapToEditPanelValues
+      });
+    }
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9aa538c0a764b5eb',t:'MTc2NTEyMzA3Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

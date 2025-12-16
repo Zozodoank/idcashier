@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Allow tenant access on products" ON products;

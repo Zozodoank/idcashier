@@ -1,0 +1,283 @@
+{
+  "meta": {
+    "project": "idCashier",
+    "date": "2025-11-19",
+    "prepared_by": "Software Development Manager"
+  },
+  "product_overview": "idCashier is a comprehensive multi-tenant point-of-sale and business management application built with React and Supabase. It enables small to medium business owners to manage sales, inventory, employees, expenses, subscriptions, payments, and reporting efficiently within a unified dashboard.",
+  "core_goals": [
+    "Provide a robust and secure user authentication system integrating login, registration, and password reset functionalities to protect user data.",
+    "Enable multi-tenant support to allow multiple businesses to operate independently with isolated data and configuration.",
+    "Offer comprehensive sales management features including product catalog CRUD, transaction handling, and receipt printing.",
+    "Facilitate employee management with roles, permissions, and attendance tracking to optimize workforce administration.",
+    "Support expense tracking and detailed business analytics through reporting dashboards for informed decision-making.",
+    "Integrate payment gateway for subscription management, renewals, and payment processing seamlessly.",
+    "Ensure a user-friendly interface with internationalization, dark/light theme modes, and responsive navigation for accessibility and usability."
+  ],
+  "key_features": [
+    "Authentication system using Supabase Auth with login, registration, password resets, and session management.",
+    "Multi-tenancy architecture enabling isolated data stores per tenant for secure and scalable business management.",
+    "Dashboard with protected routes and navigation facilitating easy access to key business functions.",
+    "Sales management including point-of-sale transaction processing and product catalog management with CRUD operations.",
+    "Employee management featuring roles, permissions, and attendance tracking for efficient HR workflows.",
+    "Business expense management tools to log and track expenses effectively.",
+    "HPP (Cost of Goods) management incorporating raw materials, recipes, and custom cost calculations.",
+    "Payment integration through Duitku gateway supporting subscriptions and renewal payments.",
+    "Subscription and renewal management modules enabling easy billing cycles and payment status tracking.",
+    "Printing support for receipts, invoices, and delivery notes with configurable print styles.",
+    "Internationalization support with runtime language selection and translations to cater to multi-language audiences.",
+    "Theming system allowing users to toggle between dark and light modes for personalized UI experience.",
+    "Landing page and legal pages providing user-facing information and compliance documentation.",
+    "Developer tools and utilities including debugging interfaces and Supabase Edge Functions integration for backend operations."
+  ],
+  "user_flow_summary": [
+    "User visits the landing page and can navigate to register or login pages.",
+    "New users register an account and set up a store in the multi-tenant environment.",
+    "Authenticated users access the dashboard with navigation to sales, products, employees, attendance, expenses, reports, payments, and settings.",
+    "Business owners manage product catalog by adding, updating, or removing products.",
+    "Managers handle employee information, assign roles and permissions, and monitor attendance records.",
+    "Users record sales transactions and issue receipts using the POS system.",
+    "Business expenses are added and categorized for tracking purposes.",
+    "Users view analytics and reports summarizing sales, expenses, and employee data for business insights.",
+    "Subscription management allows users to select plans, process payments through integrated gateway, and handle renewals.",
+    "Users customize application settings such as language preferences and UI themes.",
+    "Developers can utilize integrated tools and invoke Supabase Edge Functions for extended backend capabilities."
+  ],
+  "validation_criteria": [
+    "Successful user registration, login, password reset, and session management with Supabase Auth.",
+    "Multi-tenancy data isolation verified by ensuring tenant-specific data access and store setup functionality.",
+    "CRUD operations on products reflect correctly in the product catalog and sales pages.",
+    "Employee role assignment and attendance tracking work as intended with appropriate permissions.",
+    "Sales transactions process correctly and generate printable receipts and invoices.",
+    "Expenses log accurately and are retrievable in reporting views.",
+    "Payment gateway integration is functional with subscription payment processing and renewal handling.",
+    "Localization features correctly display language translations and language selector updates UI dynamically.",
+    "Theme toggling between dark and light modes updates the UI and persists user preference.",
+    "All navigation flows maintain protected routes and user sessions without unauthorized access.",
+    "Landing and legal pages are accessible with correct content and links.",
+    "Developer tools and Supabase Edge Functions invoke successfully without errors."
+  ],
+  "code_summary": {
+    "tech_stack": [
+      "JavaScript",
+      "React 18",
+      "Vite",
+      "React Router v6",
+      "Supabase",
+      "TailwindCSS",
+      "Radix UI",
+      "Framer Motion",
+      "PostgreSQL"
+    ],
+    "features": [
+      {
+        "name": "Authentication",
+        "description": "User authentication system with login, register, password reset, and session management using Supabase Auth",
+        "files": [
+          "src/contexts/AuthContext.jsx",
+          "src/pages/LoginPage.jsx",
+          "src/pages/RegisterPage.jsx",
+          "src/pages/ResetPasswordPage.jsx",
+          "src/components/AuthGuard.jsx"
+        ]
+      },
+      {
+        "name": "Multi-tenancy",
+        "description": "Multi-tenant architecture with tenant-based data isolation and store setup",
+        "files": [
+          "src/pages/StoreSetupPage.jsx",
+          "src/lib/supabaseClient.js"
+        ]
+      },
+      {
+        "name": "Dashboard",
+        "description": "Main dashboard layout with navigation and protected routes",
+        "files": [
+          "src/components/DashboardLayout.jsx",
+          "src/pages/DashboardPage.jsx"
+        ]
+      },
+      {
+        "name": "Sales Management",
+        "description": "Point of sale system for managing sales transactions",
+        "files": [
+          "src/pages/SalesPage.jsx"
+        ]
+      },
+      {
+        "name": "Product Management",
+        "description": "Product catalog management with CRUD operations",
+        "files": [
+          "src/pages/ProductsPage.jsx"
+        ]
+      },
+      {
+        "name": "Employee Management",
+        "description": "Employee management system with roles and permissions",
+        "files": [
+          "src/pages/EmployeesPage.jsx",
+          "src/hooks/usePermissions.js"
+        ]
+      },
+      {
+        "name": "Attendance Tracking",
+        "description": "Employee attendance tracking system",
+        "files": [
+          "src/pages/AttendancePage.jsx",
+          "src/components/attendance/",
+          "src/types/attendance.ts"
+        ]
+      },
+      {
+        "name": "Expense Management",
+        "description": "Business expense tracking and management",
+        "files": [
+          "src/pages/ExpensesPage.jsx"
+        ]
+      },
+      {
+        "name": "Reports",
+        "description": "Business analytics and reporting dashboard",
+        "files": [
+          "src/pages/ReportsPage.jsx"
+        ]
+      },
+      {
+        "name": "HPP (Cost of Goods) Management",
+        "description": "Cost of goods calculation with raw materials, recipes, and custom costs",
+        "files": [
+          "src/contexts/HPPContext.jsx",
+          "src/pages/HPPInfoPage.jsx",
+          "src/components/HPPSettings.jsx",
+          "src/components/HPPBreakdownInput.jsx",
+          "src/components/RawMaterialsManagement.jsx",
+          "src/components/RecipeInput.jsx",
+          "src/components/CustomCostsInput.jsx",
+          "src/components/GlobalHPPManagement.jsx"
+        ]
+      },
+      {
+        "name": "Payment Integration",
+        "description": "Payment gateway integration with Duitku for subscription and renewal payments",
+        "files": [
+          "src/api/payments.js",
+          "src/components/PayButton.jsx",
+          "src/components/PaymentMethodSelector.jsx",
+          "src/pages/PaymentCallbackPage.jsx"
+        ]
+      },
+      {
+        "name": "Subscription Management",
+        "description": "Subscription and renewal management system",
+        "files": [
+          "src/pages/SubscriptionPage.jsx",
+          "src/pages/RenewalPage.jsx"
+        ]
+      },
+      {
+        "name": "Printing",
+        "description": "Receipt and invoice printing functionality",
+        "files": [
+          "src/components/PrintReceipt.jsx",
+          "src/components/InvoiceA4.jsx",
+          "src/components/DeliveryNote.jsx",
+          "src/hooks/usePrintStyles.js"
+        ]
+      },
+      {
+        "name": "Settings",
+        "description": "Application settings and configuration",
+        "files": [
+          "src/pages/SettingsPage.jsx"
+        ]
+      },
+      {
+        "name": "Internationalization",
+        "description": "Multi-language support with language context and translations",
+        "files": [
+          "src/contexts/LanguageContext.jsx",
+          "src/components/LanguageSelector.jsx",
+          "src/lib/translations.js"
+        ]
+      },
+      {
+        "name": "Theme Management",
+        "description": "Dark/light theme toggle and management",
+        "files": [
+          "src/contexts/ThemeContext.jsx",
+          "src/components/ThemeToggle.jsx"
+        ]
+      },
+      {
+        "name": "Navigation",
+        "description": "Navigation state management and routing",
+        "files": [
+          "src/contexts/NavigationContext.jsx",
+          "src/components/NavigationDemo.jsx"
+        ]
+      },
+      {
+        "name": "UI Components",
+        "description": "Reusable UI components library based on Radix UI",
+        "files": [
+          "src/components/ui/",
+          "src/components/Skeleton.jsx",
+          "src/components/Toaster.jsx"
+        ]
+      },
+      {
+        "name": "Landing Page",
+        "description": "Public landing page with hero section and call-to-action",
+        "files": [
+          "src/pages/LandingPage.jsx",
+          "src/components/HeroImage.jsx",
+          "src/components/CallToAction.jsx",
+          "src/components/WelcomeMessage.jsx"
+        ]
+      },
+      {
+        "name": "Legal Pages",
+        "description": "Privacy policy, terms of service, and about pages",
+        "files": [
+          "src/pages/PrivacyPolicyPage.jsx",
+          "src/pages/TermsPage.jsx",
+          "src/pages/AboutPage.jsx"
+        ]
+      },
+      {
+        "name": "Developer Tools",
+        "description": "Developer utilities and debugging tools",
+        "files": [
+          "src/pages/DeveloperPage.jsx"
+        ]
+      },
+      {
+        "name": "Edge Functions Integration",
+        "description": "Supabase Edge Functions integration for serverless backend operations",
+        "files": [
+          "src/hooks/useEdgeFunction.js",
+          "src/lib/invokeFn.js"
+        ]
+      },
+      {
+        "name": "API Layer",
+        "description": "API client and utilities for backend communication",
+        "files": [
+          "src/lib/api.js",
+          "src/lib/supabaseClient.js",
+          "src/lib/utils.js"
+        ]
+      },
+      {
+        "name": "MCP Integration",
+        "description": "Model Context Protocol integration for AI-powered features",
+        "files": [
+          "src/lib/mcpClient.js",
+          "src/lib/mcpProtocol.js",
+          "src/lib/mcpRegisterClient.js",
+          "src/lib/mcpSecurity.js"
+        ]
+      }
+    ]
+  }
+}

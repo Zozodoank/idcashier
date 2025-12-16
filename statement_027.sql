@@ -1,0 +1,1 @@
+GRANT ALL ON suppliers TO authenticated;

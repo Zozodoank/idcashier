@@ -1,0 +1,197 @@
+/* stylelint-disable at-rule-no-unknown */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+
+    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  }
+}
+
+@layer utilities {
+  /* Smooth transition for sidebar */
+  .sidebar-transition {
+    transition: transform 0.3s ease-in-out;
+  }
+
+  /* Hide number input spinners for safer POS input */
+  .no-spin::-webkit-outer-spin-button,
+  .no-spin::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .no-spin[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.dark .gradient-bg {
+  background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+}
+
+.glass-effect {
+  background: rgb(255 255 255 / 10%);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgb(255 255 255 / 20%);
+}
+
+.dark .glass-effect {
+  background: rgb(0 0 0 / 30%);
+  border: 1px solid rgb(255 255 255 / 10%);
+}
+
+/* ========================================
+   PRINT STYLES - DYNAMIC INJECTION VIA HOOK
+   CSS print sekarang di-inject secara dinamis oleh usePrintStyles hook
+   Hanya CSS untuk tipe yang dipilih yang akan dimuat
+   ======================================== */
+
+/* Print preview styles for screen - untuk tampilan web */
+@media screen {
+  .printable-invoice-area {
+    color: #000;
+    background-color: #fff;
+  }
+
+  .printable-invoice-area .invoice-container {
+    color: #000;
+    background-color: #fff;
+    max-width: 21cm;
+    min-height: 29.7cm;
+  }
+}
+
+/* ========================================
+   DISABLE SCROLL ON NUMBER INPUTS
+   Prevents accidental value changes when scrolling
+   ======================================== */
+input[type="number"] {
+  -moz-appearance: textfield; /* Firefox: hide spinner */
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none; /* Chrome/Safari: hide spinner */
+  margin: 0;
+}
+
+/* Disable mouse wheel on ALL number inputs globally */
+input[type="number"] {
+  pointer-events: auto;
+}
+
+@layer utilities {
+  /* Utility class to prevent scroll wheel changes */
+  .no-scroll-number {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  
+  .no-scroll-number::-webkit-outer-spin-button,
+  .no-scroll-number::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+/* ========================================
+   LANDING PAGE ANIMATIONS
+   ======================================== */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+  will-change: transform;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* Hide sidebar when in design mode */
+body.design-mode-active aside {
+  display: none !important;
+}
+
+body.design-mode-active header {
+  display: none !important;
+}
+
+/* stylelint-enable at-rule-no-unknown */
