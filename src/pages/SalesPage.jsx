@@ -21,6 +21,7 @@ import { useHPP } from '@/contexts/HPPContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import InvoiceA4 from '@/components/InvoiceA4';
 import DeliveryNoteSimple from '@/components/DeliveryNoteSimple';
+import DeliveryNote from '@/components/DeliveryNote';
 import PrintReceipt, { ReceiptContent } from '@/components/PrintReceipt';
 import CustomCostsInput from '@/components/CustomCostsInput';
 import { formatCurrency as formatCurrencyUtil, getCurrencyFromStorage, getCurrencySymbol } from '@/lib/utils';
@@ -78,6 +79,7 @@ const SalesPage = () => {
   const [deliveryNoteDesignSettings, setDeliveryNoteDesignSettings] = useState({});
   const [invoiceA4DesignSettings, setInvoiceA4DesignSettings] = useState({});
   const [vehicleNumber, setVehicleNumber] = useState('');
+  const [deliveryNoteTemplate, setDeliveryNoteTemplate] = useState('simple');
   
   // Receipt Settings
   const [receiptSettings, setReceiptSettings] = useState({
@@ -97,6 +99,8 @@ const SalesPage = () => {
   // Specific receipt settings for A4 and delivery note (includes invoicePrefix)
   const [receiptSettingsA4, setReceiptSettingsA4] = useState({});
   const [receiptSettingsDeliveryNote, setReceiptSettingsDeliveryNote] = useState({});
+  const [receiptSettings55mm, setReceiptSettings55mm] = useState({});
+  const [receiptSettings80mm, setReceiptSettings80mm] = useState({});
   
   // Receipt type for unified print dialog
   const [receiptType, setReceiptType] = useState('thermal-80mm');
@@ -481,6 +485,16 @@ const SalesPage = () => {
         setReceiptSettingsDeliveryNote(dnSettings);
       }
       
+      const saved55mmSettings = localStorage.getItem(`idcashier_receipt_settings_55mm_${ownerId}`);
+      if (saved55mmSettings) {
+        setReceiptSettings55mm(JSON.parse(saved55mmSettings));
+      }
+
+      const saved80mmSettings = localStorage.getItem(`idcashier_receipt_settings_80mm_${ownerId}`);
+      if (saved80mmSettings) {
+        setReceiptSettings80mm(JSON.parse(saved80mmSettings));
+      }
+      
       // Load enabled receipt types
       const savedEnabledTypes = localStorage.getItem(`idcashier_enabled_receipt_types_${ownerId}`);
       if (savedEnabledTypes) {
@@ -619,15 +633,12 @@ const SalesPage = () => {
         email: newCustomer.email || null
       }, token);
       
-      // Update customers list with the new customer, maintaining the default customer at the beginning
-      const defaultCustomer = { id: 'default', name: t('defaultCustomer'), phone: '' };
-      const updatedCustomers = [defaultCustomer, ...customers.filter(c => c.id !== 'default'), data];
-      
-      setCustomers(updatedCustomers);
+      // Optimistically update the customer list
+      setCustomers(prevCustomers => [...prevCustomers, data]);
       toast({ title: t('success'), description: t('customerAdded') });
       setNewCustomer({ name: '', phone: '' });
       setSelectedCustomer(data.id);
-      setIsCustomerDialogOpen(false);
+      setIsAddCustomerDialogOpen(false);
     } catch (error) {
       console.error('Error adding customer:', error);
       toast({ title: t('error'), description: `${t('failedToAddCustomer')} ${error.message}`, variant: "destructive" });
@@ -1715,7 +1726,7 @@ const SalesPage = () => {
                     
                     <div className="p-0 max-h-[75vh] overflow-auto flex justify-center bg-gray-100 rounded-md border">
                       {receiptType === 'invoice-a4' ? (
-                        <div className="py-4 overflow-hidden" style={{ width: '480px' }}>
+                        <div className="py-4 overflow-auto" style={{ width: '480px', maxHeight: '70vh' }}>
                           <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
                             <div className="printable-invoice-area bg-white shadow-md">
                               {transformedSale && (
@@ -1732,7 +1743,7 @@ const SalesPage = () => {
                           </div>
                         </div>
                       ) : receiptType === 'delivery-note' ? (
-                        <div className="py-4 overflow-hidden" style={{ width: '480px' }}>
+                        <div className="py-4 overflow-auto" style={{ width: '480px', maxHeight: '70vh' }}>
                           <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
                             <div className="printable-invoice-area bg-white shadow-md">
                               {transformedSale && (
@@ -1761,7 +1772,11 @@ const SalesPage = () => {
                             paymentAmount={completedSaleData?.paymentAmount || paymentAmount} 
                             change={completedSaleData?.change || change} 
                             customer={completedSaleData?.customer || customerForReceipt} 
-                            settings={receiptSettings} 
+                            settings={
+                              receiptType === 'thermal-55mm'
+                                ? { ...receiptSettings, ...receiptSettings55mm }
+                                : { ...receiptSettings, ...receiptSettings80mm }
+                            }
                             paperSize={receiptType.replace('thermal-', '')}
                             useTwoDecimals={useTwoDecimals}
                             showBarcode={showBarcode}
@@ -2282,7 +2297,7 @@ const SalesPage = () => {
               <div className="flex flex-wrap gap-4 p-4 bg-muted rounded-lg">
                 <div className="flex items-center gap-2">
                   <Label className="text-sm whitespace-nowrap">Template:</Label>
-                  <Select value={deliveryNoteTemplate} onValueChange={setDeliveryNoteTemplate}>
+                  <Select value={deliveryNoteTemplate || 'simple'} onValueChange={setDeliveryNoteTemplate}>
                     <SelectTrigger className="w-[140px]">
                       <SelectValue />
                     </SelectTrigger>
@@ -2314,7 +2329,7 @@ const SalesPage = () => {
             {/* Preview Area */}
             <div className="border rounded-md p-0 bg-gray-100 max-h-[75vh] overflow-auto flex justify-center">
                {receiptType === 'invoice-a4' ? (
-                 <div className="py-4 overflow-hidden" style={{ width: '480px' }}>
+                 <div className="py-4 overflow-auto" style={{ width: '480px', maxHeight: '70vh' }}>
                    <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
                      <div className="printable-invoice-area bg-white shadow-md">
                        {finalSaleData && (
@@ -2331,7 +2346,7 @@ const SalesPage = () => {
                    </div>
                  </div>
                ) : receiptType === 'delivery-note' ? (
-                 <div className="py-4 overflow-hidden" style={{ width: '480px' }}>
+                 <div className="py-4 overflow-auto" style={{ width: '480px', maxHeight: '70vh' }}>
                    <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
                      <div className="printable-invoice-area bg-white shadow-md">
                        {finalSaleData && (
@@ -2364,7 +2379,11 @@ const SalesPage = () => {
                        paymentAmount={selectedSaleForPrint.payment_amount} 
                        change={selectedSaleForPrint.change_amount} 
                        customer={selectedSaleForPrint.customer} 
-                       settings={receiptSettings} 
+                       settings={
+                         receiptType === 'thermal-55mm'
+                           ? { ...receiptSettings, ...receiptSettings55mm }
+                           : { ...receiptSettings, ...receiptSettings80mm }
+                       }
                        paperSize={receiptType.replace('thermal-', '')}
                        useTwoDecimals={useTwoDecimals}
                        showBarcode={showBarcode}
@@ -2420,7 +2439,11 @@ const SalesPage = () => {
               paymentAmount={completedSaleData.paymentAmount} 
               change={completedSaleData.change} 
               customer={completedSaleData.customer} 
-              settings={receiptSettings} 
+              settings={
+                receiptType === 'thermal-55mm'
+                  ? { ...receiptSettings, ...receiptSettings55mm }
+                  : { ...receiptSettings, ...receiptSettings80mm }
+              }
               paperSize={receiptType.replace('thermal-', '')}
               useTwoDecimals={useTwoDecimals}
               showBarcode={showBarcode}
@@ -2439,7 +2462,11 @@ const SalesPage = () => {
               paymentAmount={selectedSaleForPrint.payment_amount} 
               change={selectedSaleForPrint.change_amount} 
               customer={selectedSaleForPrint.customer} 
-              settings={receiptSettings} 
+              settings={
+                receiptType === 'thermal-55mm'
+                  ? { ...receiptSettings, ...receiptSettings55mm }
+                  : { ...receiptSettings, ...receiptSettings80mm }
+              }
               paperSize={receiptType.replace('thermal-', '')}
               useTwoDecimals={useTwoDecimals}
               showBarcode={showBarcode}
