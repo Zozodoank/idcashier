@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from '@/components/ui/switch';
-import { Plus, Upload, Download, Edit, Trash2 } from 'lucide-react';
+import { Plus, Upload, Download, Edit, Trash2, Package } from 'lucide-react';
 import { exportToExcel } from '@/lib/utils';
 import { productsAPI, categoriesAPI, suppliersAPI, settingsAPI, productHPPBreakdownAPI, rawMaterialsAPI, productRecipesAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +19,12 @@ import * as XLSX from 'xlsx';
 import HPPBreakdownInput from '@/components/HPPBreakdownInput';
 import RawMaterialsManagement from '@/components/RawMaterialsManagement';
 import RecipeInput from '@/components/RecipeInput';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from "@/components/ui/tooltip";
 
 const ProductsPage = ({ user }) => {
   const { t } = useLanguage();
@@ -29,6 +35,9 @@ const ProductsPage = ({ user }) => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]); // Will store full category objects
   const [suppliers, setSuppliers] = useState([]); // Will store full supplier objects
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
   
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
@@ -42,11 +51,18 @@ const ProductsPage = ({ user }) => {
   
   // HPP feature state - removed local state, using context instead
   const canViewHPP = user?.permissions?.canViewHPP || false;
+  // Izinkan edit HPP (resep & breakdown) secara default untuk owner / demo,
+  // dan hormati permissions.canEditHPP jika sudah diset eksplisit ke false.
+  const canEditHPP =
+    user?.permissions?.canEditHPP !== undefined
+      ? user.permissions.canEditHPP
+      : (user?.role === 'owner' || isDemoAccount || user?.email === 'jho.j80@gmail.com');
   const [hppBreakdown, setHppBreakdown] = useState([]);
   
   // Recipe and Materials state
   const [recipes, setRecipes] = useState([]);
   const [rawMaterials, setRawMaterials] = useState([]);
+  const [dialogRawMaterials, setDialogRawMaterials] = useState([]); // State for dialog to prevent stale data
   
   // Profit share configuration
   const [profitShareMode, setProfitShareMode] = useState('automatic');
@@ -58,6 +74,11 @@ const ProductsPage = ({ user }) => {
     fetchData();
     loadProfitShareConfig();
   }, [authUser]);
+
+  // Reset pagination ketika pencarian berubah
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const loadProfitShareConfig = async () => {
     if (!token) return;
@@ -74,66 +95,45 @@ const ProductsPage = ({ user }) => {
   };
 
   const fetchData = async () => {
-    if (!authUser || !token) return;
+    if (!authUser || !token) return { rawMaterialsData: [] }; // Return empty on auth failure
     
     try {
-      // Fetch products using the API
-      const productsData = await productsAPI.getAll(token);
+      // Fetch products, categories, and suppliers concurrently
+      const [productsData, categoriesData, suppliersData, rawMaterialsData] = await Promise.all([
+        productsAPI.getAll(token),
+        categoriesAPI.getAll(token).catch(e => { console.error('Error fetching categories:', e); return []; }),
+        suppliersAPI.getAll(token).catch(e => { console.error('Error fetching suppliers:', e); return []; }),
+        rawMaterialsAPI.getAll(token).catch(e => { console.error(`Error fetching ${t('rawMaterials')}:`, e); return []; })
+      ]);
       
-      // Transform products data to include category and supplier names directly
+      // Process Products
       const transformedProducts = productsData.map(product => ({
         ...product,
         category: product.category_name || '',
         supplier: product.supplier_name || ''
       }));
-      
       setProducts(transformedProducts);
       
-      // Fetch categories and suppliers from backend APIs
-      try {
-        const categoriesData = await categoriesAPI.getAll(token);
-        setCategories(categoriesData);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-        // For demo account, if no categories exist, add some demo data
-        if (isDemoAccount) {
-          setCategories([
-            { id: '1', name: 'Kopi', user_id: authUser.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-            { id: '2', name: 'Pastry', user_id: authUser.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
-          ]);
-        } else {
-          setCategories([]);
-        }
-      }
+      // Process Categories
+      setCategories(categoriesData);
       
-      try {
-        const suppliersData = await suppliersAPI.getAll(token);
-        setSuppliers(suppliersData);
-      } catch (error) {
-        console.error('Error fetching suppliers:', error);
-        // For demo account, if no suppliers exist, add some demo data
-        if (isDemoAccount) {
-          setSuppliers([
-            { id: '1', name: 'Supplier A', address: 'Jl. Kopi No. 1', phone: '08123456789', user_id: authUser.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-            { id: '2', name: 'Supplier B', address: 'Jl. Kue No. 2', phone: '08987654321', user_id: authUser.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
-          ]);
-        } else {
-          setSuppliers([]);
-        }
-      }
+      // Process Suppliers
+      setSuppliers(suppliersData);
       
-      // Fetch materials data
-      try {
-        const rawMaterialsData = await rawMaterialsAPI.getAll(token);
-        console.log(`${t('rawMaterials')} fetched:`, rawMaterialsData?.length || 0, 'items');
-        setRawMaterials(rawMaterialsData || []);
-      } catch (error) {
-        console.error(`Error fetching ${t('rawMaterials')}:`, error);
-        setRawMaterials([]);
-      }
+      // Process Raw Materials
+      console.log(`${t('rawMaterials')} fetched:`, rawMaterialsData?.length || 0, 'items');
+      console.log('Raw materials data sample:', rawMaterialsData?.slice(0, 2)); // Debug first 2 items
+      
+      // Don't show toast if no raw materials found - let the UI handle this
+      setRawMaterials(rawMaterialsData || []);
+      
+      // Return the fetched data so it can be used immediately
+      return { rawMaterialsData: rawMaterialsData || [] };
+      
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({ title: t('error'), description: `${t('failedLoadData')} ${error.message}`, variant: "destructive" });
+      return { rawMaterialsData: [] }; // Return empty on error
     }
   };
 
@@ -170,25 +170,34 @@ const ProductsPage = ({ user }) => {
       
       console.log('🎯 Prepared product data:', productData);
       
-      // Calculate total HPP from recipes if enabled
-      if (hppEnabled) {
-        // Calculate from recipes if exists
-        const totalHPPFromRecipe = recipes.reduce((sum, recipe) => {
-          if (!recipe.raw_material_id || !recipe.quantity) return sum;
-          const material = rawMaterials.find(m => m.id === recipe.raw_material_id);
-          const pricePerUnit = material ? parseFloat(material.price_per_unit) : 0;
-          const quantity = parseFloat(recipe.quantity) || 0;
-          return sum + (pricePerUnit * quantity);
-        }, 0);
-        
-        // Calculate from HPP breakdown if exists (fallback for old system)
-        const totalHPPFromBreakdown = hppBreakdown.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-        
-        // Use recipe HPP if exists, otherwise use breakdown HPP, otherwise use cost
-        productData.hpp = totalHPPFromRecipe > 0 
-          ? totalHPPFromRecipe 
-          : (totalHPPFromBreakdown > 0 ? totalHPPFromBreakdown : parseFloat(currentProduct.cost) || 0);
+      // Always calculate HPP from recipes if mereka ada, supaya profit tidak salah (tidak double modal)
+      // Hitung dari resep kalau ada
+      const totalHPPFromRecipe = recipes.reduce((sum, recipe) => {
+        if (!recipe.raw_material_id || !recipe.quantity) return sum;
+        const material = dialogRawMaterials.find(m => m.id === recipe.raw_material_id);
+        const pricePerUnit = material ? parseFloat(material.price_per_unit) : 0;
+        const quantity = parseFloat(recipe.quantity) || 0;
+        return sum + (pricePerUnit * quantity);
+      }, 0);
+      
+      // Hitung dari HPP breakdown kalau ada (fallback sistem lama)
+      const totalHPPFromBreakdown = hppBreakdown.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+      
+      // Jika ada HPP dari resep atau breakdown, pakai itu.
+      // Jika tidak ada sama sekali, jangan isi dengan cost lagi supaya tidak dobel (Modal sudah ada di field cost).
+      if (totalHPPFromRecipe > 0) {
+        productData.hpp = totalHPPFromRecipe;
+      } else if (totalHPPFromBreakdown > 0) {
+        productData.hpp = totalHPPFromBreakdown;
+      } else {
+        productData.hpp = 0;
       }
+      
+      console.log('📊 HPP calculation:', {
+        recipe: totalHPPFromRecipe,
+        breakdown: totalHPPFromBreakdown,
+        final: productData.hpp
+      });
       
       // Only include category_id if it's not null/empty
       if (currentProduct.category_id) {
@@ -246,45 +255,27 @@ const ProductsPage = ({ user }) => {
   };
 
   const handleEditProduct = async (product) => {
-    // Refresh materials data to ensure it's up to date
+    let freshRawMaterials = rawMaterials;
     if (rawMaterials.length === 0) {
       console.log(`${t('rawMaterials')} empty, fetching data...`);
-      await fetchData();
+      const { rawMaterialsData } = await fetchData();
+      freshRawMaterials = rawMaterialsData;
     }
-    
-    // Find category ID by name
-    let categoryId = null;
-    if (product.category) {
-      const category = categories.find(cat => cat.name === product.category);
-      if (category) {
-        categoryId = category.id;
-      }
-    }
-    
-    // Find supplier ID by name
-    let supplierId = null;
-    if (product.supplier) {
-      const supplier = suppliers.find(sup => sup.name === product.supplier);
-      if (supplier) {
-        supplierId = supplier.id;
-      }
-    }
-    
+    setDialogRawMaterials(freshRawMaterials);
+
+    const category = categories.find(cat => cat.name === product.category);
+    const supplier = suppliers.find(sup => sup.name === product.supplier);
+
     setCurrentProduct({
       ...product,
-      category_id: categoryId,
-      supplier_id: supplierId
+      category_id: category ? category.id : null,
+      supplier_id: supplier ? supplier.id : null
     });
-    
-    // Load recipes and HPP breakdown if enabled and product exists
-    if (hppEnabled && product.id && user?.permissions?.canViewHPP) {
+
+    if (product.id) {
       try {
-        // Load recipes
         const recipeData = await productRecipesAPI.getByProduct(product.id, token);
-        console.log('Loaded recipes for product:', recipeData?.length || 0);
         setRecipes(recipeData || []);
-        
-        // Load HPP breakdown (for backward compatibility)
         const breakdown = await productHPPBreakdownAPI.getByProduct(product.id, token);
         setHppBreakdown(breakdown || []);
       } catch (error) {
@@ -296,13 +287,12 @@ const ProductsPage = ({ user }) => {
       setRecipes([]);
       setHppBreakdown([]);
     }
-    
+
     setIsProductDialogOpen(true);
   };
 
   const handleDeleteProduct = async (productId) => {
     if (!window.confirm(t('confirmDeleteProduct'))) return;
-    
     try {
       await productsAPI.delete(productId, token);
       toast({ title: t('deleted'), description: t('productDeleted') });
@@ -314,13 +304,32 @@ const ProductsPage = ({ user }) => {
   };
 
   const handleAddProduct = async () => {
-    console.log(t('rawMaterialsInConsole') + ' count:', rawMaterials.length);
+    console.log('🚀 Opening add product dialog...');
+    console.log('📦 Current raw materials:', rawMaterials.length, 'items');
     
-    // Refresh materials data to ensure it's up to date
+    let freshRawMaterials = rawMaterials;
     if (rawMaterials.length === 0) {
       console.log(`${t('rawMaterials')} empty, fetching data...`);
-      await fetchData();
+      try {
+        const { rawMaterialsData } = await fetchData();
+        freshRawMaterials = rawMaterialsData || [];
+        console.log('✅ Fetched raw materials for add product:', freshRawMaterials.length, 'items');
+        console.log('Raw materials data sample:', freshRawMaterials.slice(0, 2));
+      } catch (error) {
+        console.error('❌ Error fetching raw materials for add product:', error);
+        freshRawMaterials = [];
+        toast({
+          title: t('error'),
+          description: `Gagal memuat bahan baku: ${error.message}`,
+          variant: 'destructive'
+        });
+      }
+    } else {
+      console.log('✅ Using existing raw materials for add product');
     }
+    
+    console.log('🎯 Setting dialogRawMaterials with:', freshRawMaterials.length, 'items');
+    setDialogRawMaterials(freshRawMaterials);
     
     setCurrentProduct({
       name: '',
@@ -559,6 +568,18 @@ const ProductsPage = ({ user }) => {
     }
   };
 
+  // Filtering & pagination untuk tabel produk
+  const filteredProducts = products.filter(p => {
+    const term = searchTerm.toLowerCase();
+    return (
+      p.name.toLowerCase().includes(term) ||
+      (p.barcode && p.barcode.toLowerCase().includes(term))
+    );
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const paginatedProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <>
       <Helmet><title>{t('products')} - idCashier</title></Helmet>
@@ -582,7 +603,12 @@ const ProductsPage = ({ user }) => {
           <TabsContent value="products">
             <Card>
               <CardHeader className="flex-row items-center justify-between">
-                <Input placeholder={t('searchProduct')} className="max-w-sm" />
+                <Input
+                  placeholder={t('searchProduct')}
+                  className="max-w-sm"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
                 <div className="flex gap-2">
                   <label htmlFor="import-file">
                     <Button variant="outline" asChild><span><Download className="w-4 h-4 mr-2" /> {t('import')}</span></Button>
@@ -599,67 +625,118 @@ const ProductsPage = ({ user }) => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="p-3 text-left">{t('productName')}</th>
-                        <th className="p-3 text-left">{t('barcode')}</th>
-                        <th className="p-3 text-left">{t('category')}</th>
-                        <th className="p-3 text-left">{t('supplier')}</th>
-                        <th className="p-3 text-left">{t('sellPrice')}</th>
-                        <th className="p-3 text-left">{t('costPrice')}</th>
-                        {hppEnabled && canViewHPP && (
-                          <>
-                            <th className="p-3 text-left">{t('hpp')}</th>
-                            <th className="p-3 text-left">{t('profitMargin')}</th>
-                          </>
-                        )}
-                        <th className="p-3 text-left">{t('stock')}</th>
-                        <th className="p-3 text-left">{t('actions')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.map(p => {
-                        // Calculate profit margin: ((price - hpp) / price) * 100
-                        const hpp = p.hpp || p.cost || 0;
-                        const profitMargin = p.price > 0 ? (((p.price - hpp) / p.price) * 100).toFixed(1) : 0;
-                        
-                        return (
-                          <tr key={p.id} className="border-b hover:bg-muted/50">
-                            <td className="p-3 font-medium">{p.name}</td>
-                            <td className="p-3">{p.barcode || '-'}</td>
-                            <td className="p-3">{p.category}</td>
-                            <td className="p-3">{p.supplier || '-'}</td>
-                            <td className="p-3">Rp {p.price.toLocaleString()}</td>
-                            <td className="p-3">Rp {p.cost.toLocaleString()}</td>
+                {filteredProducts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-4 text-lg font-semibold">{t('noProducts') || 'Belum ada produk'}</h3>
+                    <p className="text-muted-foreground">{t('startByAddingProduct') || 'Mulai dengan menambahkan produk pertama'}</p>
+                    <Button onClick={handleAddProduct} className="mt-4">
+                      <Plus className="w-4 h-4 mr-2" /> {t('addProduct')}
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="p-3 text-left">{t('productName')}</th>
+                            <th className="p-3 text-left">{t('barcode')}</th>
+                            <th className="p-3 text-left">{t('category')}</th>
+                            <th className="p-3 text-left">{t('supplier')}</th>
+                            <th className="p-3 text-left">{t('sellPrice')}</th>
+                            <th className="p-3 text-left">{t('costPrice')}</th>
                             {hppEnabled && canViewHPP && (
                               <>
-                                <td className="p-3">Rp {hpp.toLocaleString()}</td>
-                                <td className="p-3">
-                                  <span className={profitMargin >= 30 ? 'text-green-600 font-medium' : profitMargin >= 15 ? 'text-yellow-600' : 'text-red-600'}>
-                                    {profitMargin}%
-                                  </span>
-                                </td>
+                                <th className="p-3 text-left">{t('hpp')}</th>
+                                <th className="p-3 text-left">{t('profitMargin')}</th>
                               </>
                             )}
-                            <td className="p-3">{p.stock}</td>
-                            <td className="p-3">
-                              <div className="flex gap-2">
-                                <Button size="sm" variant="outline" onClick={() => handleEditProduct(p)}>
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleDeleteProduct(p.id)}>
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </td>
+                            <th className="p-3 text-left">{t('stock')}</th>
+                            <th className="p-3 text-left">{t('actions')}</th>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                        </thead>
+                        <tbody>
+                          {paginatedProducts.map(p => {
+                            // Calculate profit margin: ((price - hpp) / price) * 100
+                            // Use product.hpp if available, fallback to cost
+                            const hpp = p.hpp || p.cost || 0;
+                            const profitMargin = p.price > 0 ? (((p.price - hpp) / p.price) * 100).toFixed(1) : 0;
+                            
+                            return (
+                              <tr key={p.id} className="border-b hover:bg-muted/50">
+                                <td className="p-3 font-medium">{p.name}</td>
+                                <td className="p-3">{p.barcode || '-'}</td>
+                                <td className="p-3">{p.category}</td>
+                                <td className="p-3">{p.supplier || '-'}</td>
+                                <td className="p-3">Rp {p.price.toLocaleString()}</td>
+                                <td className="p-3">Rp {p.cost.toLocaleString()}</td>
+                                {hppEnabled && canViewHPP && (
+                                  <>
+                                    <td className="p-3">Rp {hpp.toLocaleString()}</td>
+                                    <td className="p-3">
+                                      <span className={profitMargin >= 30 ? 'text-green-600 font-medium' : profitMargin >= 15 ? 'text-yellow-600' : 'text-red-600'}>
+                                        {profitMargin}%
+                                      </span>
+                                    </td>
+                                  </>
+                                )}
+                                <td className="p-3">{p.stock}</td>
+                                <td className="p-3">
+                                  <TooltipProvider>
+                                    <div className="flex gap-2">
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button size="sm" variant="outline" onClick={() => handleEditProduct(p)}>
+                                            <Edit className="w-4 h-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{t('edit') || 'Edit'}</TooltipContent>
+                                      </Tooltip>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button size="sm" variant="destructive" onClick={() => handleDeleteProduct(p.id)}>
+                                            <Trash2 className="w-4 h-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{t('delete') || 'Delete'}</TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                  </TooltipProvider>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="flex items-center justify-between mt-4">
+                      <div className="text-sm text-muted-foreground">
+                        {t('page')} {currentPage} / {totalPages}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          {t('prev') || 'Prev'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          {t('next') || 'Next'}
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -690,9 +767,12 @@ const ProductsPage = ({ user }) => {
         </Tabs>
       </div>
 
-      <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}><DialogContent className="max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{currentProduct?.id ? t('edit') : t('add')} {t('products')}</DialogTitle></DialogHeader>
-        <div className="grid gap-4 py-4">
+      <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto min-w-[50vw] max-w-[90vw] w-[50vw] px-6">
+          <DialogHeader>
+            <DialogTitle>{currentProduct?.id ? t('edit') : t('add')} {t('products')}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-5 py-4">
           <div className="space-y-2"><Label htmlFor="name">{t('productName')}</Label><Input id="name" value={currentProduct?.name || ''} onChange={e => setCurrentProduct({...currentProduct, name: e.target.value})} /></div>
           <div className="space-y-2"><Label htmlFor="barcode">{t('barcode')}</Label><Input id="barcode" value={currentProduct?.barcode || ''} onChange={e => setCurrentProduct({...currentProduct, barcode: e.target.value})} /></div>
           <div className="space-y-2"><Label htmlFor="category">{t('category')}</Label>
@@ -725,93 +805,92 @@ const ProductsPage = ({ user }) => {
           </div>
           <div className="space-y-2"><Label htmlFor="price">{t('sellPrice')}</Label><Input id="price" type="number" value={currentProduct?.price || ''} onChange={e => setCurrentProduct({...currentProduct, price: Number(e.target.value)})} /></div>
           <div className="space-y-2"><Label htmlFor="cost">{t('costPrice')}</Label><Input id="cost" type="number" value={currentProduct?.cost || ''} onChange={e => setCurrentProduct({...currentProduct, cost: Number(e.target.value)})} /></div>
-          {hppEnabled && user?.permissions?.canEditHPP && (
-            <>
-              <RecipeInput
-                recipe={recipes}
-                setRecipe={setRecipes}
-                rawMaterials={rawMaterials}
-                readOnly={!user?.permissions?.canEditHPP}
-              />
-              <HPPBreakdownInput
-                hppBreakdown={hppBreakdown}
-                setHppBreakdown={setHppBreakdown}
-                readOnly={!user?.permissions?.canEditHPP}
-              />
-              
-              {/* Profit Share Section - Only show if mode is automatic */}
-              {profitShareMode === 'automatic' && (
-                <div className="space-y-4 p-4 border rounded-lg bg-purple-50 dark:bg-purple-950/20">
-                  <div className="flex items-center justify-between">
-                    <Label className="font-semibold text-purple-900 dark:text-purple-100">
-                      {t('profitShareSettings')}
-                    </Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Switch 
-                      id="profit-share-enabled"
-                      checked={currentProduct?.profit_share_enabled || false}
-                      onCheckedChange={v => setCurrentProduct({...currentProduct, profit_share_enabled: v})}
-                    />
-                    <Label htmlFor="profit-share-enabled">{t('enableProfitShare')}</Label>
-                  </div>
-                  
-                  {currentProduct?.profit_share_enabled && (
-                    <div className="space-y-3 pl-6 border-l-2 border-purple-200">
-                      <div className="space-y-2">
-                        <Label>{t('shareType')}</Label>
-                        <Select 
-                          value={currentProduct?.profit_share_type || 'percentage'} 
-                          onValueChange={v => setCurrentProduct({...currentProduct, profit_share_type: v})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="percentage">{t('percentage')} (%)</SelectItem>
-                            <SelectItem value="fixed">{t('fixedAmount')} (Rp)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label>{t('shareValue')}</Label>
-                        <Input 
-                          type="number"
-                          placeholder={currentProduct?.profit_share_type === 'percentage' ? '10' : '5000'}
-                          value={currentProduct?.profit_share_value || ''}
-                          onChange={e => setCurrentProduct({...currentProduct, profit_share_value: Number(e.target.value)})}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          {currentProduct?.profit_share_type === 'percentage' 
-                            ? t('profitShareExamplePercentage')
-                            : t('profitShareExampleFixed')}
-                        </p>
-                      </div>
+          <>
+            <RecipeInput
+              recipe={recipes}
+              setRecipe={setRecipes}
+              rawMaterials={dialogRawMaterials}
+              readOnly={!canEditHPP}
+            />
+            <HPPBreakdownInput
+              hppBreakdown={hppBreakdown}
+              setHppBreakdown={setHppBreakdown}
+              readOnly={!canEditHPP}
+            />
+            
+            {/* Profit Share Section - Only show if mode is automatic */}
+            {profitShareMode === 'automatic' && (
+              <div className="space-y-4 p-4 border rounded-lg bg-purple-50 dark:bg-purple-950/20">
+                <div className="flex items-center justify-between">
+                  <Label className="font-semibold text-purple-900 dark:text-purple-100">
+                    {t('profitShareSettings')}
+                  </Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="profit-share-enabled"
+                    checked={currentProduct?.profit_share_enabled || false}
+                    onCheckedChange={v => setCurrentProduct({...currentProduct, profit_share_enabled: v})}
+                  />
+                  <Label htmlFor="profit-share-enabled">{t('enableProfitShare')}</Label>
+                </div>
+                
+                {currentProduct?.profit_share_enabled && (
+                  <div className="space-y-3 pl-6 border-l-2 border-purple-200">
+                    <div className="space-y-2">
+                      <Label>{t('shareType')}</Label>
+                      <Select
+                        value={currentProduct?.profit_share_type || 'percentage'}
+                        onValueChange={v => setCurrentProduct({...currentProduct, profit_share_type: v})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percentage">{t('percentage')} (%)</SelectItem>
+                          <SelectItem value="fixed">{t('fixedAmount')} (Rp)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Show message when manual mode is selected */}
-              {profitShareMode === 'manual' && (
-                <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg text-sm border border-blue-200">
-                  <span className="text-blue-900 dark:text-blue-100">
-                    💡 {t('profitShareManualNote')}
-                  </span>
-                </div>
-              )}
-            </>
-          )}
+                    
+                    <div className="space-y-2">
+                      <Label>{t('shareValue')}</Label>
+                      <Input
+                        type="number"
+                        placeholder={currentProduct?.profit_share_type === 'percentage' ? '10' : '5000'}
+                        value={currentProduct?.profit_share_value || ''}
+                        onChange={e => setCurrentProduct({...currentProduct, profit_share_value: Number(e.target.value)})}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {currentProduct?.profit_share_type === 'percentage'
+                          ? t('profitShareExamplePercentage')
+                          : t('profitShareExampleFixed')}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Show message when manual mode is selected */}
+            {profitShareMode === 'manual' && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg text-sm border border-blue-200">
+                <span className="text-blue-900 dark:text-blue-100">
+                  💡 {t('profitShareManualNote')}
+                </span>
+              </div>
+            )}
+          </>
           <div className="space-y-2"><Label htmlFor="stock">{t('stock')}</Label><Input id="stock" type="number" value={currentProduct?.stock || ''} onChange={e => setCurrentProduct({...currentProduct, stock: Number(e.target.value)})} /></div>
-        </div>
-        <DialogFooter>
-          <Button onClick={handleProductSubmit} disabled={isSubmitting}>
-            {isSubmitting ? t('saving') : t('save')}
-          </Button>
-        </DialogFooter>
-      </DialogContent></Dialog>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleProductSubmit} disabled={isSubmitting}>
+              {isSubmitting ? t('saving') : t('save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}><DialogContent>
         <DialogHeader><DialogTitle>{currentCategory?.id ? t('edit') : t('add')} {t('category')}</DialogTitle></DialogHeader>

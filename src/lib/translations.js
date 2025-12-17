@@ -1,4 +1,4 @@
-﻿export const translations = {
+export const translations = {
   en: {
     login: 'Login',
     tagline: 'Point of Sale System',
@@ -215,6 +215,11 @@
     // Raw materials (Products page)
     rawMaterials: 'Raw Materials',
     rawMaterialsInConsole: 'Raw Materials',
+    recipe: 'Recipe',
+    addIngredient: 'Add Ingredient',
+    selectRawMaterial: 'Select Raw Material',
+    totalRecipeCost: 'Total Recipe Cost',
+    noRawMaterials: 'No raw materials available. Add them in the Raw Materials tab first.',
     bankAccountPlaceholder: 'Enter bank account number',
     bankNamePlaceholder: 'Bank name',
     accountHolderPlaceholder: 'Account holder name',
@@ -1818,6 +1823,11 @@
     // Raw materials (Products page)
     rawMaterials: 'Bahan Baku',
     rawMaterialsInConsole: 'Bahan baku',
+    recipe: 'Resep',
+    addIngredient: 'Tambah Bahan',
+    selectRawMaterial: 'Pilih Bahan Baku',
+    totalRecipeCost: 'Total Biaya Resep',
+    noRawMaterials: 'Belum ada bahan baku, tambahkan di tab bahan baku terlebih dahulu',
     rawMaterialName: 'Nama Bahan Baku',
     rawMaterial: 'Bahan Baku',
     pricePerUnit: 'Harga/Unit',
@@ -3026,6 +3036,11 @@
     // Raw materials (Products page)
     rawMaterials: '原材料',
     rawMaterialsInConsole: '原材料',
+    recipe: '食谱',
+    addIngredient: '添加成分',
+    selectRawMaterial: '选择原材料',
+    totalRecipeCost: '配方总成本',
+    noRawMaterials: '暂无原材料，请先在原材料选项卡中添加',
     rawMaterialName: '原材料名称',
     rawMaterial: '原材料',
     pricePerUnit: '单价',

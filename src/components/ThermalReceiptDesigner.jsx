@@ -14,7 +14,7 @@ import { Save, X, Settings, Layout, FileText, Table, Palette, MoreHorizontal } f
 import { storeSettingsAPI } from '@/lib/api';
 import PrintReceipt from './PrintReceipt';
 
-const ThermalReceiptDesigner = ({ paperSize, storeSettings, onSave }) => {
+const ThermalReceiptDesigner = ({ paperSize, storeSettings, initialSettings, onSave }) => {
   const { t } = useLanguage();
   const { user, token } = useAuth();
   const { theme } = useTheme();
@@ -81,61 +81,29 @@ const ThermalReceiptDesigner = ({ paperSize, storeSettings, onSave }) => {
     decimalPlaces: 0
   });
 
-  // Load saved design settings
+  // Settings are now passed via props, so internal loading is removed.
   useEffect(() => {
-    const loadDesignSettings = async () => {
-      if (!user?.id || !token) return;
-      
-      try {
-        const allSettings = await storeSettingsAPI.load(token);
-        const settingsKey = `receipt${paperSize}Design`;
-        if (allSettings[settingsKey]) {
-          // Use functional update to avoid stale closure
-          setDesignSettings(prev => ({ ...prev, ...allSettings[settingsKey] }));
-        }
-      } catch (error) {
-        console.error('Error loading design settings:', error);
-      }
-    };
-    
-    loadDesignSettings();
-  }, [user, token, paperSize]);
+    // When initialSettings prop changes, update the internal state
+    if (initialSettings) {
+      setDesignSettings(prev => ({ ...prev, ...initialSettings }));
+    }
+  }, [initialSettings]);
 
   const handleSaveDesign = async () => {
-    if (!user?.id || !token) {
-      toast({ title: t('error'), description: t('userNotAuthenticated'), variant: 'destructive' });
-      return;
-    }
-
     setIsSaving(true);
     try {
-      const ownerId = user.role === 'cashier' ? user.tenantId : user.id;
-      const settingsKey = `receipt${paperSize}Design`;
-      
-      // Save design settings
-      await storeSettingsAPI.save(
-        {},
-        {},
-        { [settingsKey]: designSettings },
-        ownerId,
-        token
-      );
-      
-      // Also save to localStorage
-      localStorage.setItem(`idcashier_receipt_${paperSize}_design_${ownerId}`, JSON.stringify(designSettings));
-      
+      // Call the onSave callback from props to handle saving in the parent
+      if (onSave) {
+        await onSave(designSettings);
+      }
       toast({ title: t('success'), description: t('designSaved') || 'Desain berhasil disimpan.' });
       handleExitDesign();
-      
-      if (onSave) {
-        onSave(designSettings);
-      }
     } catch (error) {
       console.error('Error saving design:', error);
-      toast({ 
-        title: t('error'), 
+      toast({
+        title: t('error'),
         description: error.message || t('designSaveFailed') || 'Gagal menyimpan desain.',
-        variant: 'destructive' 
+        variant: 'destructive'
       });
     } finally {
       setIsSaving(false);

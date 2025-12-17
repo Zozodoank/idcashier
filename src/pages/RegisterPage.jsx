@@ -58,11 +58,15 @@ export default function RegisterPage() {
       if (isPaymentMode) {
         // Payment Flow: Register without trial, then pay
         let user;
+        // Register user WITHOUT trial - explicitly set skipTrial flag
         const registrationResult = await mcpRegisterClient.registerUser({
           name: name,
           email: email,
           password: password,
-          role: 'owner'
+          role: 'owner',
+          skipTrial: true,
+          isPriceCardRegistration: true,
+          planDuration: planDuration ? parseInt(planDuration, 10) : 1
         });
 
         if (!registrationResult.success) {

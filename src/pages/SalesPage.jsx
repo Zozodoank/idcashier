@@ -99,7 +99,7 @@ const SalesPage = () => {
   // Specific receipt settings for A4 and delivery note (includes invoicePrefix)
   const [receiptSettingsA4, setReceiptSettingsA4] = useState({});
   const [receiptSettingsDeliveryNote, setReceiptSettingsDeliveryNote] = useState({});
-  const [receiptSettings55mm, setReceiptSettings55mm] = useState({});
+  const [receiptSettings58mm, setReceiptSettings58mm] = useState({});
   const [receiptSettings80mm, setReceiptSettings80mm] = useState({});
   
   // Receipt type for unified print dialog
@@ -485,14 +485,22 @@ const SalesPage = () => {
         setReceiptSettingsDeliveryNote(dnSettings);
       }
       
-      const saved55mmSettings = localStorage.getItem(`idcashier_receipt_settings_55mm_${ownerId}`);
-      if (saved55mmSettings) {
-        setReceiptSettings55mm(JSON.parse(saved55mmSettings));
-      }
+      // Load thermal design settings and merge them
+      const saved58mmDesign = JSON.parse(localStorage.getItem(`idcashier_receipt_58mm_design_${ownerId}`)) || {};
+      const saved80mmDesign = JSON.parse(localStorage.getItem(`idcashier_receipt_80mm_design_${ownerId}`)) || {};
 
-      const saved80mmSettings = localStorage.getItem(`idcashier_receipt_settings_80mm_${ownerId}`);
+      const saved58mmSettings = JSON.parse(localStorage.getItem(`idcashier_receipt_settings_58mm_${ownerId}`)) || {};
+      if (saved58mmSettings) {
+        setReceiptSettings58mm({ ...saved58mmSettings, ...saved58mmDesign });
+      } else {
+        setReceiptSettings58mm(saved58mmDesign);
+      }
+      
+      const saved80mmSettings = JSON.parse(localStorage.getItem(`idcashier_receipt_settings_80mm_${ownerId}`)) || {};
       if (saved80mmSettings) {
-        setReceiptSettings80mm(JSON.parse(saved80mmSettings));
+        setReceiptSettings80mm({ ...saved80mmSettings, ...saved80mmDesign });
+      } else {
+        setReceiptSettings80mm(saved80mmDesign);
       }
       
       // Load enabled receipt types
@@ -1747,15 +1755,15 @@ const SalesPage = () => {
                           <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
                             <div className="printable-invoice-area bg-white shadow-md">
                               {transformedSale && (
-                                <DeliveryNote
+                                <DeliveryNoteSimple
                                   sale={transformedSale}
                                   companyInfo={{...receiptSettings, ...receiptSettingsDeliveryNote}}
-                                  designSettings={deliveryNoteDesignSettings}
+                                  vehicleNumber={vehicleNumber}
                                   showPrice={deliveryNoteShowPrice}
                                   receiverName={receiverName}
                                   senderName={senderName}
-                                  context="sales"
-                                  userId={authUser?.id || authUser?.tenantId}
+                                  showSignatureLine={deliveryNoteDesignSettings?.showSignatureLine !== false}
+                                  showNameDottedLine={deliveryNoteDesignSettings?.showNameDottedLine !== false}
                                 />
                               )}
                             </div>
@@ -1773,8 +1781,8 @@ const SalesPage = () => {
                             change={completedSaleData?.change || change} 
                             customer={completedSaleData?.customer || customerForReceipt} 
                             settings={
-                              receiptType === 'thermal-55mm'
-                                ? { ...receiptSettings, ...receiptSettings55mm }
+                              receiptType === 'thermal-58mm'
+                                ? { ...receiptSettings, ...receiptSettings58mm }
                                 : { ...receiptSettings, ...receiptSettings80mm }
                             }
                             paperSize={receiptType.replace('thermal-', '')}
@@ -2366,7 +2374,7 @@ const SalesPage = () => {
                  </div>
                ) : (
                  <div className="bg-white p-4 shadow-sm m-4">
-                   {selectedSaleForPrint && (
+                     {selectedSaleForPrint && (
                      <ReceiptContent 
                        cart={selectedSaleForPrint.items.map(item => ({
                          ...item,
@@ -2380,8 +2388,8 @@ const SalesPage = () => {
                        change={selectedSaleForPrint.change_amount} 
                        customer={selectedSaleForPrint.customer} 
                        settings={
-                         receiptType === 'thermal-55mm'
-                           ? { ...receiptSettings, ...receiptSettings55mm }
+                         receiptType === 'thermal-58mm'
+                           ? { ...receiptSettings, ...receiptSettings58mm }
                            : { ...receiptSettings, ...receiptSettings80mm }
                        }
                        paperSize={receiptType.replace('thermal-', '')}

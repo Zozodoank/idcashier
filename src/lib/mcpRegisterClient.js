@@ -29,6 +29,27 @@ class MCPRegisterClient {
         throw new Error('Name, email, and password are required');
       }
 
+      // Build request body - include skipTrial and isPriceCardRegistration flags if provided
+      const requestBody = {
+        name: userData.name,
+        email: userData.email,
+        password: userData.password,
+        role: userData.role || 'owner',
+        tenant_id: userData.tenant_id
+      };
+
+      // If skipTrial is true, explicitly set it to skip trial subscription
+      if (userData.skipTrial === true) {
+        requestBody.skipTrial = true;
+        requestBody.isPriceCardRegistration = userData.isPriceCardRegistration || true;
+        // Do NOT include trialDays - backend should skip trial
+      }
+
+      // If planDuration is provided (for price card registration), include it
+      if (userData.planDuration) {
+        requestBody.planDuration = userData.planDuration;
+      }
+
       // Call the auth-register Edge Function
       const response = await fetch(`${this.baseUrl}/functions/v1/auth-register`, {
         method: 'POST',
@@ -36,13 +57,7 @@ class MCPRegisterClient {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.anonKey}`
         },
-        body: JSON.stringify({
-          name: userData.name,
-          email: userData.email,
-          password: userData.password,
-          role: userData.role || 'owner',
-          tenant_id: userData.tenant_id
-        })
+        body: JSON.stringify(requestBody)
       });
 
       const result = await response.json();

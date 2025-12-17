@@ -92,8 +92,8 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
   const [generalSettings, setGeneralSettings] = useState({ timezone: 'Asia/Jakarta', currency: 'IDR' });
   
   // Individual receipt settings for each type
-  const [receiptSettings58mm, setReceiptSettings58mm] = useState({ headerText: '', footerText: t('receiptFooter'), showAddress: true, showPhone: true, margin: 10 });
-  const [receiptSettings80mm, setReceiptSettings80mm] = useState({ headerText: '', footerText: t('receiptFooter'), showAddress: true, showPhone: true, margin: 10 });
+  const [designSettings58mm, setDesignSettings58mm] = useState({});
+  const [designSettings80mm, setDesignSettings80mm] = useState({});
   const [receiptSettingsA4, setReceiptSettingsA4] = useState({ headerText: '', footerText: t('receiptFooter'), showAddress: true, showPhone: true, margin: 10, invoicePrefix: '' });
   const [receiptSettingsDeliveryNote, setReceiptSettingsDeliveryNote] = useState({ headerText: '', footerText: t('receiptFooter'), showAddress: true, showPhone: true, margin: 10, invoicePrefix: '' });
   
@@ -246,11 +246,12 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
       });
 
       // Set receipt settings from database or use defaults
-      const defaultReceiptSettings = { headerText: '', footerText: t('receiptFooter'), showAddress: true, showPhone: true, margin: 10 };
+      // Load design settings for thermal printers, fallback to empty object
+      setDesignSettings58mm(allSettings.receipt58mmDesign || {});
+      setDesignSettings80mm(allSettings.receipt80mmDesign || {});
+
+      // Keep legacy settings for A4 and delivery note for now
       const defaultReceiptSettingsWithPrefix = { headerText: '', footerText: t('receiptFooter'), showAddress: true, showPhone: true, margin: 10, invoicePrefix: '' };
-      
-      setReceiptSettings58mm(allSettings.receipt_58mm || defaultReceiptSettings);
-      setReceiptSettings80mm(allSettings.receipt_80mm || defaultReceiptSettings);
       setReceiptSettingsA4(allSettings.receipt_A4 || defaultReceiptSettingsWithPrefix);
       setReceiptSettingsDeliveryNote(allSettings.receipt_delivery_note || defaultReceiptSettingsWithPrefix);
       
@@ -287,15 +288,16 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
         npwp: savedStoreSettings.npwp || ''
       });
 
-      const defaultReceiptSettings = { headerText: '', footerText: t('receiptFooter'), showAddress: true, showPhone: true, margin: 10 };
+      // Fallback to localStorage for design settings
+      const saved58mmDesign = JSON.parse(localStorage.getItem(`idcashier_receipt_58mm_design_${ownerId}`)) || {};
+      const saved80mmDesign = JSON.parse(localStorage.getItem(`idcashier_receipt_80mm_design_${ownerId}`)) || {};
+      setDesignSettings58mm(saved58mmDesign);
+      setDesignSettings80mm(saved80mmDesign);
+
+      // Keep legacy settings for A4 and delivery note for now
       const defaultReceiptSettingsWithPrefix = { headerText: '', footerText: t('receiptFooter'), showAddress: true, showPhone: true, margin: 10, invoicePrefix: '' };
-      const saved58mm = JSON.parse(localStorage.getItem(`idcashier_receipt_settings_58mm_${ownerId}`)) || defaultReceiptSettings;
-      const saved80mm = JSON.parse(localStorage.getItem(`idcashier_receipt_settings_80mm_${ownerId}`)) || defaultReceiptSettings;
       const savedA4 = JSON.parse(localStorage.getItem(`idcashier_receipt_settings_A4_${ownerId}`)) || defaultReceiptSettingsWithPrefix;
       const savedDeliveryNote = JSON.parse(localStorage.getItem(`idcashier_receipt_settings_delivery_note_${ownerId}`)) || defaultReceiptSettingsWithPrefix;
-      
-      setReceiptSettings58mm(saved58mm);
-      setReceiptSettings80mm(saved80mm);
       setReceiptSettingsA4(savedA4);
       setReceiptSettingsDeliveryNote(savedDeliveryNote);
       
@@ -340,62 +342,68 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
     }
   };
 
-  const handleSaveSettings = async (category, data = null) => {
+  const handleSaveSettings = async (category, data) => {
     if (!token) {
-      toast({ title: t('error'), description: t('noAuthToken'), variant: "destructive" });
-      return;
+        toast({ title: t('error'), description: t('noAuthToken'), variant: "destructive" });
+        return;
     }
-    
     try {
-      let settingsToSave = {};
-      
-      // Prepare settings based on category
-      if (category === 'store') {
-        settingsToSave = { store: data || storeSettings };
-      } else if (category === 'receipt_58mm') {
-        settingsToSave = { receipt_58mm: data || receiptSettings58mm };
-      } else if (category === 'receipt_80mm') {
-        settingsToSave = { receipt_80mm: data || receiptSettings80mm };
-      } else if (category === 'receipt_A4') {
-        settingsToSave = { receipt_A4: data || receiptSettingsA4 };
-      } else if (category === 'receipt_delivery_note') {
-        settingsToSave = { receipt_delivery_note: data || receiptSettingsDeliveryNote };
-      } else if (category === 'enabled_receipt_types') {
-        settingsToSave = { enabled_receipt_types: data || enabledReceiptTypes };
-      } else if (category === 'general') {
-        settingsToSave = { general: data || generalSettings };
-      }
-      
-      // Save to database
-      await storeSettingsAPI.save(settingsToSave, token);
-      
-      // Also save to localStorage as backup
-      const ownerId = user.role === 'cashier' ? user.tenantId : user.id;
-      if (category === 'store') {
-        localStorage.setItem(`idcashier_store_settings_${ownerId}`, JSON.stringify(storeSettings));
-      } else if (category.startsWith('receipt_')) {
-        localStorage.setItem(`idcashier_${category}_settings_${ownerId}`, JSON.stringify(
-          category === 'receipt_58mm' ? receiptSettings58mm :
-          category === 'receipt_80mm' ? receiptSettings80mm :
-          category === 'receipt_A4' ? receiptSettingsA4 :
-          receiptSettingsDeliveryNote
-        ));
-      } else if (category === 'enabled_receipt_types') {
-        localStorage.setItem(`idcashier_enabled_receipt_types_${ownerId}`, JSON.stringify(enabledReceiptTypes));
-      } else if (category === 'general') {
-        localStorage.setItem(`idcashier_general_settings_${ownerId}`, JSON.stringify(generalSettings));
-      }
-      
-      toast({ title: t('success'), description: t('settingsSavedDesc') });
+        const settingsToSave = { [category]: data };
+        await storeSettingsAPI.save(settingsToSave, token);
+        
+        const ownerId = user.role === 'cashier' ? user.tenantId : user.id;
+        let localStorageKey;
+        switch(category) {
+            case 'store':
+                localStorageKey = `idcashier_store_settings_${ownerId}`;
+                break;
+            case 'receipt58mmDesign':
+                 localStorageKey = `idcashier_receipt_58mm_design_${ownerId}`;
+                 break;
+            case 'receipt80mmDesign':
+                 localStorageKey = `idcashier_receipt_80mm_design_${ownerId}`;
+                 break;
+            case 'receipt_A4':
+                localStorageKey = `idcashier_receipt_settings_A4_${ownerId}`;
+                break;
+            case 'receipt_delivery_note':
+                localStorageKey = `idcashier_receipt_settings_delivery_note_${ownerId}`;
+                break;
+            case 'enabled_receipt_types':
+                localStorageKey = `idcashier_enabled_receipt_types_${ownerId}`;
+                break;
+            case 'general':
+                localStorageKey = `idcashier_general_settings_${ownerId}`;
+                break;
+            default:
+                // Fallback for old receipt settings keys if needed
+                if (category.startsWith('receipt_')) {
+                    localStorageKey = `idcashier_${category}_settings_${ownerId}`;
+                } else {
+                    console.warn(`Unhandled settings category: ${category}`);
+                    return;
+                }
+        }
+        localStorage.setItem(localStorageKey, JSON.stringify(data));
+
+        // Update state after saving
+        if (category === 'receipt58mmDesign') setDesignSettings58mm(data);
+        if (category === 'receipt80mmDesign') setDesignSettings80mm(data);
+        if (category === 'store') setStoreSettings(data);
+        // ... update other states if necessary
+
+        toast({ title: t('success'), description: t('settingsSavedDesc') });
     } catch (error) {
-      console.error('Error saving settings:', error);
-      toast({
-        title: t('error'),
-        description: `${t('settingsSaveFailed')}: ${error.message}`,
-        variant: "destructive"
-      });
+        console.error(`Error saving ${category}:`, error);
+        toast({
+            title: t('error'),
+            description: `${t('settingsSaveFailed')}: ${error.message}`,
+            variant: "destructive"
+        });
+        // Re-throw the error to be caught by the calling function if needed
+        throw error;
     }
-  };
+};
 
   const handleChangePassword = () => {
     if (!newPassword || newPassword.length < 6) {
@@ -562,7 +570,7 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
                     <Button variant="outline" onClick={() => logoInputRef.current.click()}><ImageIcon className="w-4 h-4 mr-2" /> {t('changeLogo')}</Button>
                   </div>
                 </div>
-                <Button onClick={() => handleSaveSettings('store')}>{t('saveChanges')}</Button>
+                <Button onClick={() => handleSaveSettings('store', storeSettings)}>{t('saveChanges')}</Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -829,181 +837,20 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
                         onSave={loadAllSettings}
                       />
                     ) : selectedReceiptType === '58mm' ? (
-                      <ThermalReceiptDesigner 
+                      <ThermalReceiptDesigner
                         paperSize="58mm"
                         storeSettings={storeSettings}
-                        onSave={loadAllSettings}
+                        initialSettings={designSettings58mm}
+                        onSave={(newSettings) => handleSaveSettings('receipt58mmDesign', newSettings)}
                       />
                     ) : selectedReceiptType === '80mm' ? (
-                      <ThermalReceiptDesigner 
+                      <ThermalReceiptDesigner
                         paperSize="80mm"
                         storeSettings={storeSettings}
-                        onSave={loadAllSettings}
+                        initialSettings={designSettings80mm}
+                        onSave={(newSettings) => handleSaveSettings('receipt80mmDesign', newSettings)}
                       />
-                    ) : (
-                      <div className="space-y-6">
-                        {/* Settings Form */}
-                        <div className="space-y-4">
-                          <h3 className="font-semibold text-lg">
-                            {selectedReceiptType === '58mm' && t('thermal58mm')}
-                            {selectedReceiptType === '80mm' && t('thermal80mm')}
-                            {selectedReceiptType === 'A4' && t('invoiceA4')}
-                            {selectedReceiptType === 'delivery-note' && t('deliveryNote')}
-                          </h3>
-                          
-                          {(() => {
-                            // Get current settings and setter based on selected type
-                            let currentSettings, setCurrentSettings;
-                            if (selectedReceiptType === '58mm') {
-                              currentSettings = receiptSettings58mm;
-                              setCurrentSettings = setReceiptSettings58mm;
-                            } else if (selectedReceiptType === '80mm') {
-                              currentSettings = receiptSettings80mm;
-                              setCurrentSettings = setReceiptSettings80mm;
-                            } else if (selectedReceiptType === 'A4') {
-                              currentSettings = receiptSettingsA4;
-                              setCurrentSettings = setReceiptSettingsA4;
-                            } else if (selectedReceiptType === 'delivery-note') {
-                              currentSettings = receiptSettingsDeliveryNote;
-                              setCurrentSettings = setReceiptSettingsDeliveryNote;
-                            }
-                            
-                            return (
-                              <>
-                                <div className="space-y-2">
-                                  <Label htmlFor="receiptHeader">{t('headerText')}</Label>
-                                  <Input 
-                                    id="receiptHeader" 
-                                    value={currentSettings.headerText} 
-                                    onChange={e => setCurrentSettings({...currentSettings, headerText: e.target.value})} 
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="receiptFooter">{t('footerText')}</Label>
-                                  <Input 
-                                    id="receiptFooter" 
-                                    value={currentSettings.footerText} 
-                                    onChange={e => setCurrentSettings({...currentSettings, footerText: e.target.value})} 
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="receiptMargin">{t('margin')}</Label>
-                                  <Input 
-                                    id="receiptMargin" 
-                                    type="number" 
-                                    value={currentSettings.margin} 
-                                    onChange={e => setCurrentSettings({...currentSettings, margin: Number(e.target.value)})} 
-                                  />
-                                </div>
-                                
-                                {/* Invoice Prefix - Only for A4 and Delivery Note */}
-                                {(selectedReceiptType === 'A4' || selectedReceiptType === 'delivery-note') && (
-                                  <div className="space-y-2">
-                                    <Label htmlFor="invoicePrefix">{t('invoicePrefix')}</Label>
-                                    <Input 
-                                      id="invoicePrefix" 
-                                      value={currentSettings.invoicePrefix || ''} 
-                                      onChange={e => setCurrentSettings({...currentSettings, invoicePrefix: e.target.value})} 
-                                      placeholder={t('invoicePrefixPlaceholder')}
-                                    />
-                                  </div>
-                                )}
-                                
-                                <div className="flex items-center justify-between rounded-lg border p-3">
-                                  <Label>{t('showAddress')}</Label>
-                                  <Switch 
-                                    checked={currentSettings.showAddress} 
-                                    onCheckedChange={v => setCurrentSettings({...currentSettings, showAddress: v})} 
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between rounded-lg border p-3">
-                                  <Label>{t('showPhone')}</Label>
-                                  <Switch 
-                                    checked={currentSettings.showPhone} 
-                                    onCheckedChange={v => setCurrentSettings({...currentSettings, showPhone: v})} 
-                                  />
-                                </div>
-                                <Button 
-                                  onClick={() => {
-                                    const category = `receipt_${selectedReceiptType}`;
-                                    handleSaveSettings(category, currentSettings);
-                                  }}
-                                >
-                                  {t('saveChanges')}
-                                </Button>
-                              </>
-                            );
-                          })()}
-                        </div>
-                        
-                        {/* Preview */}
-                        <div>
-                          <Label>{t('receiptPreview')}</Label>
-                          <div className="mt-2 border rounded-lg overflow-hidden bg-gray-50">
-                            {selectedReceiptType === '58mm' || selectedReceiptType === '80mm' ? (
-                              <div className="bg-gray-200 p-4 overflow-auto">
-                                <PrintReceipt 
-                                  {...exampleTransaction} 
-                                  settings={{
-                                    ...storeSettings, 
-                                    ...(selectedReceiptType === '58mm' ? receiptSettings58mm : receiptSettings80mm)
-                                  }} 
-                                  paperSize={selectedReceiptType} 
-                                />
-                              </div>
-                            ) : selectedReceiptType === 'A4' ? (
-                              <>
-                                <div className="bg-white border-b p-3 flex justify-between items-center">
-                                  <h3 className="font-semibold text-sm">{t('invoicePreview')}</h3>
-                                  <Button onClick={handlePrintInvoiceA4} size="sm" variant="outline">
-                                    <Printer className="w-4 h-4 mr-2" />
-                                    {t('print')}
-                                  </Button>
-                                </div>
-                                <div className="bg-gray-200 p-4 overflow-auto">
-                                  <div style={{ transform: 'scale(0.7)', transformOrigin: 'top left' }}>
-                                    <div className="printable-invoice-area">
-                                      <InvoiceA4 
-                                        ref={invoiceA4Ref} 
-                                        sale={exampleSale} 
-                                        companyInfo={{...storeSettings, ...receiptSettingsA4, logoUrl: storeSettings.logo}} 
-                                        userId={user?.id}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              </>
-                            ) : selectedReceiptType === 'delivery-note' ? (
-                              <>
-                                <div className="bg-white border-b p-3 flex justify-between items-center">
-                                  <h3 className="font-semibold text-sm">{t('deliveryNotePreview')}</h3>
-                                  <Button onClick={handlePrintDeliveryNote} size="sm" variant="outline">
-                                    <Printer className="w-4 h-4 mr-2" />
-                                    {t('print')}
-                                  </Button>
-                                </div>
-                                <div className="bg-gray-200 p-4 overflow-auto">
-                                  <div style={{ transform: 'scale(0.7)', transformOrigin: 'top left' }}>
-                                    <div className="printable-invoice-area">
-                                      <DeliveryNote
-                                        ref={deliveryNoteRef}
-                                        sale={exampleSale}
-                                        companyInfo={{...storeSettings, ...receiptSettingsDeliveryNote, logoUrl: storeSettings.logo}}
-                                        showPrice={true}
-                                        receiverName=""
-                                        senderName=""
-                                        context="settings"
-                                        userId={user?.id}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </CardContent>

@@ -74,22 +74,29 @@ export default function PaymentCallbackPage() {
             }
 
             // ... fetch auth-register ...
+            // Build request body - NO trial for paid registrations
+            const registerRequestBody = {
+              name: pendingRegistration.name,      
+              email: pendingRegistration.email,    
+              password: pendingRegistration.password,
+              planDuration: pendingRegistration.planDuration,
+              useHPP: pendingRegistration.useHPP,  
+              merchantOrderId: pendingRegistration.merchantOrderId,
+              paymentCompleted: true,
+              skipTrial: true, // Skip trial for paid registrations
+              isPriceCardRegistration: true
+            };
+
+            // Only add trialDays if this is NOT a paid registration (shouldn't happen, but safety check)
+            // For paid registrations, subscription will be activated by payment, not trial
+
             const registerRes = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/auth-register', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',  
                 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
               },
-              body: JSON.stringify({
-                name: pendingRegistration.name,      
-                email: pendingRegistration.email,    
-                password: pendingRegistration.password,
-                planDuration: pendingRegistration.planDuration,
-                useHPP: pendingRegistration.useHPP,  
-                merchantOrderId: pendingRegistration.merchantOrderId,
-                paymentCompleted: true,
-                trialDays: 7 // Auto-enable HPP trial for all new registrations
-              })
+              body: JSON.stringify(registerRequestBody)
             });
 
             const regJson = await registerRes.json();

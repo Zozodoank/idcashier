@@ -680,37 +680,38 @@ const ReportsPage = () => {
       
 
       // Create productsMap from products data: { [product_id]: { name, cost, supplier_name, ... } }
-
+      // Gunakan field `cost` (harga beli/modal) yang dipakai di halaman Produk,
+      // dan fallback ke `cost_price` untuk kompatibilitas data lama.
       const productsMapData = {};
 
       productsData.forEach(product => {
+        const baseCost =
+          product.cost !== undefined && product.cost !== null
+            ? Number(product.cost) || 0
+            : (Number(product.cost_price) || 0);
 
         productsMapData[product.id] = {
-
           name: product.name,
-
-          cost: product.cost_price || 0,
-
+          cost: baseCost,
           supplier_name: product.supplier_name || t('unknownSupplier'),
-
           type: 'product', // identifier for finished products
-
+          hpp: Number(product.hpp) || 0,
           ...product
-
         };
-
       });
 
       
 
       // Fetch raw materials
       const rawMaterialsData = await fetchWithTimeout(rawMaterialsAPI.getAll(token), t('rawMaterials'));
-
+      
       // Add raw materials to productsMap with type identifier
+      // Gunakan price_per_unit (sesuai form bahan baku) sebagai dasar biaya per unit,
+      // supaya perhitungan HPP dan laporan tidak nol / salah field.
       rawMaterialsData.forEach(material => {
         productsMapData[material.id] = {
           name: material.name,
-          cost: material.cost_per_unit || 0,
+          cost: material.price_per_unit || 0,
           supplier_name: material.supplier_name || t('unknownSupplier'),
           stock: material.current_stock || 0,
           unit: material.unit || 'unit',

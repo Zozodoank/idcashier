@@ -116,14 +116,24 @@ const AuthCallbackPage = () => {
               email: email,
               password: null, // OAuth
               role: 'owner',
-              // 🔧 CRITICAL FIX: Explicitly set trialDays to 0 for price card registration
               paymentCompleted: false,
-              trialDays: isFromPriceCard ? 0 : 7, // 0 = NO TRIAL for price card, 7 = trial for direct
               oauthProvider: 'google',
               oauthUserId: user.id,
-              // 🔧 ADDITIONAL: Explicit flag for price card registration
               isPriceCardRegistration: isFromPriceCard
             };
+
+            // If from price card, skip trial and redirect to payment
+            if (isFromPriceCard) {
+              requestBody.skipTrial = true;
+              // Get plan details from localStorage
+              const pendingPlan = JSON.parse(pendingOAuthPlan || '{}');
+              if (pendingPlan.planDuration) {
+                requestBody.planDuration = parseInt(pendingPlan.planDuration, 10);
+              }
+            } else {
+              // Only give trial for non-price-card registrations
+              requestBody.trialDays = 7;
+            }
 
             console.log('📋 Request body:', requestBody);
             
@@ -171,10 +181,91 @@ const AuthCallbackPage = () => {
             // Manually update auth context
             localStorage.setItem('idcashier_token', token);
             
-            // 🔧 Clean up price card plan data after successful registration
+            // 🔧 FIXED: If from price card, process payment directly instead of redirecting
             if (isFromPriceCard) {
-              localStorage.removeItem('pendingOAuthPlan');
-              console.log('🗑️ Cleaned up pendingOAuthPlan after successful price card registration');
+              const pendingPlan = JSON.parse(pendingOAuthPlan || '{}');
+              console.log('💰 Price card registration detected, processing payment...');
+              
+              // Store plan details for payment processing
+              if (pendingPlan.planName && pendingPlan.planPrice && pendingPlan.planDuration) {
+                try {
+                  // Process payment directly - call payment gateway
+                  const paymentResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                      paymentAmount: parseInt(pendingPlan.planPrice, 10),
+                      productDetails: pendingPlan.planName,
+                      customerVaName: name,
+                      email: email,
+                      userId: userProfile.id,
+                      isRegistration: true,
+                      // Let backend decide payment method or use default
+                      paymentMethod: undefined
+                    })
+                  });
+
+                  const paymentData = await paymentResponse.json();
+                  
+                  if (!paymentResponse.ok) {
+                    throw new Error(paymentData.error || paymentData.message || 'Payment request failed');
+                  }
+
+                  if (paymentData.paymentUrl) {
+                    // Save pending registration data for callback
+                    const duration = pendingPlan.planDuration ? parseInt(pendingPlan.planDuration, 10) : 1;
+                    localStorage.setItem('pendingRegistration', JSON.stringify({
+                      name,
+                      email,
+                      password: null, // OAuth - no password
+                      planDuration: duration,
+                      merchantOrderId: paymentData.merchantOrderId,
+                      useHPP: false,
+                      role: 'owner',
+                      oauthProvider: 'google'
+                    }));
+
+                    // Clean up OAuth plan data
+                    localStorage.removeItem('pendingOAuthPlan');
+                    
+                    console.log('🔗 Redirecting to payment gateway:', paymentData.paymentUrl);
+                    
+                    setStatus('success');
+                    toast({
+                      title: t('registrationSuccessful') || 'Registrasi Berhasil',
+                      description: 'Mengarahkan ke halaman pembayaran...',
+                    });
+                    
+                    // Redirect to payment gateway
+                    setTimeout(() => {
+                      window.location.href = paymentData.paymentUrl;
+                    }, 1500);
+                    return; // Exit early to prevent dashboard redirect
+                  } else {
+                    throw new Error('Payment URL not received');
+                  }
+                } catch (paymentError) {
+                  console.error('❌ Payment processing error:', paymentError);
+                  // Fallback: clean up and show error
+                  localStorage.removeItem('pendingOAuthPlan');
+                  toast({
+                    title: t('error') || 'Error',
+                    description: paymentError.message || 'Gagal memproses pembayaran. Silakan coba lagi.',
+                    variant: 'destructive'
+                  });
+                  // Still redirect to dashboard but user will need to pay manually
+                }
+              } else {
+                console.warn('⚠️ Price card registration but plan details missing');
+                // Fallback: clean up and redirect to dashboard
+                localStorage.removeItem('pendingOAuthPlan');
+              }
+            } else {
+              // Non-price-card registration - clean up and proceed normally
+              console.log('✅ Standard registration (with trial)');
             }
             
             setStatus('success');
@@ -183,7 +274,7 @@ const AuthCallbackPage = () => {
               description: `Welcome, ${name}!`,
             });
             
-            // Reload page to update auth context
+            // Reload page to update auth context (only for non-price-card)
             setTimeout(() => {
               window.location.href = '/dashboard';
             }, 1000);

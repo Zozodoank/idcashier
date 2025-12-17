@@ -20,7 +20,7 @@ const DeliveryNoteSimple = forwardRef(({
   const settings = {
     showLogo: true,
     showCompanyInfo: true,
-    showBorder: true,
+    showBorder: false,
     titleAlign: 'right',
     showDocNumber: true,
     invoiceFormat: 'SJ/2024/001234',
@@ -377,7 +377,7 @@ const DeliveryNoteSimple = forwardRef(({
                 margin: '0 auto'
               }}>
                 {showNameDottedLine && (
-                  <p style={{ margin: 0 }}>( ............... )</p>
+                  null
                 )}
                 {!showNameDottedLine && senderName && (
                   <p style={{ margin: 0, fontWeight: 'bold' }}>( {senderName} )</p>
@@ -399,7 +399,7 @@ const DeliveryNoteSimple = forwardRef(({
                 margin: '0 auto'
               }}>
                 {showNameDottedLine && (
-                  <p style={{ margin: 0 }}>( ............... )</p>
+                  null
                 )}
                 {!showNameDottedLine && receiverName && (
                   <p style={{ margin: 0, fontWeight: 'bold' }}>( {receiverName} )</p>
@@ -421,7 +421,7 @@ const DeliveryNoteSimple = forwardRef(({
                 margin: '0 auto'
               }}>
                 {showNameDottedLine && (
-                  <p style={{ margin: 0 }}>( ............... )</p>
+                  null
                 )}
                 {!showNameDottedLine && (
                   <p style={{ margin: 0 }}>( )</p>

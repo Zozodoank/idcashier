@@ -180,7 +180,6 @@ const InvoiceA4 = forwardRef(({ sale, companyInfo, useTwoDecimals = true, contex
     : `INV-${sale.id || 'TEMP'}`;
 
   return (
-
     <div ref={ref} className="printable-invoice-area">
       <div
         className="invoice-container mx-auto"
@@ -194,26 +193,19 @@ const InvoiceA4 = forwardRef(({ sale, companyInfo, useTwoDecimals = true, contex
           fontSize: `${mergedSettings.fontSize || 14}px`
         }}
       >
-        {/* INVOICE Title and Number - Position based on titleAlign setting */}
-        <header style={{ textAlign: mergedSettings.titleAlign || 'center', marginBottom: '20px' }}>
-          <h1 style={{ 
-            fontSize: '32px', 
-            fontWeight: 'bold', 
-            margin: '0',
+        {/* Header: Logo dan INVOICE disejajarkan seperti pada Surat Jalan */}
+        <header
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '24px',
             color: mergedSettings.fontColor || '#000000'
-          }}>
-            {t('invoiceTitle')}
-          </h1>
-          {mergedSettings.showInvoiceNumber !== false && (
-            <p style={{ ...userDataStyle, marginTop: '4px', fontSize: '14px' }}>{invoiceNumber}</p>
-          )}
-        </header>
-
-
-        {/* Logo Section */}
-        {mergedSettings.showLogo !== false && (
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ width: '80px', height: '80px', backgroundColor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e0e0e0' }}>
+          }}
+        >
+          {/* Kiri: Logo */}
+          {mergedSettings.showLogo !== false && (
+            <div style={{ width: '80px', height: '80px', flexShrink: 0 }}>
               {safeCompanyInfo.logoUrl && safeCompanyInfo.logoUrl !== '' ? (
                 <img 
                   src={safeCompanyInfo.logoUrl} 
@@ -221,15 +213,31 @@ const InvoiceA4 = forwardRef(({ sale, companyInfo, useTwoDecimals = true, contex
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                   onError={(e) => {
                     e.target.style.display = 'none';
-                    e.target.parentElement.innerHTML = `<span style="color: #808080; font-weight: bold; font-size: 14px;">${t('logo')}</span>`;
                   }}
                 />
               ) : (
                 <span style={{ color: '#808080', fontWeight: 'bold', fontSize: '14px' }}>{t('logo')}</span>
               )}
             </div>
+          )}
+
+          {/* Kanan: Judul INVOICE + nomor */}
+          <div style={{ textAlign: mergedSettings.titleAlign || 'right' }}>
+            <h1
+              style={{
+                fontSize: '32px',
+                fontWeight: 'bold',
+                margin: '0',
+                color: mergedSettings.fontColor || '#000000'
+              }}
+            >
+              {t('invoiceTitle')}
+            </h1>
+            {mergedSettings.showInvoiceNumber !== false && (
+              <p style={{ ...userDataStyle, marginTop: '4px', fontSize: '14px' }}>{invoiceNumber}</p>
+            )}
           </div>
-        )}
+        </header>
 
         {/* Company Info and Recipient Section */}
         <section style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
