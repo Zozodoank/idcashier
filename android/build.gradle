@@ -21,9 +21,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        flatDir {
-            dirs rootProject.file('libs'), rootProject.file('app/libs'), rootProject.file('capacitor-cordova-android-plugins/src/main/libs')
-        }
     }
 }
 
