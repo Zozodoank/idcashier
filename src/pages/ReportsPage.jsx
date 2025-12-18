@@ -2932,9 +2932,13 @@ const ReportsPage = () => {
                         {filteredData.filter(item => !item.hasUnknownProduct && item.payment_status === 'paid').map((item) => {
 
                           const itemTotal = item.itemSubtotal; // Total per item (qty × price)
-                          // Use item.cost which already contains baseCost + hpp (Modal Produk + Bahan Baku)
-                          const cost = item.cost * item.quantity; // Total cost per item
-                          const profit = itemTotal - cost; // Profit per item
+                          
+                          // item.cost = cost per unit (baseCost + hpp per unit)
+                          // Total modal = cost per unit × quantity
+                          const costPerUnit = item.cost || 0;
+                          const totalCost = costPerUnit * item.quantity;
+                          
+                          const profit = itemTotal - totalCost; // Profit per item
 
                           return (
 
@@ -2954,7 +2958,7 @@ const ReportsPage = () => {
 
                               <td className="p-2 text-sm">Rp {itemTotal.toLocaleString()}</td>
 
-                              <td className="p-2 text-sm">Rp {cost.toLocaleString()}</td>
+                              <td className="p-2 text-sm">Rp {totalCost.toLocaleString()}</td>
 
                               <td className="p-2 text-sm">Rp {profit.toLocaleString()}</td>
 
