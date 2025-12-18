@@ -884,17 +884,29 @@ const ReportsPage = () => {
 
             : t('unknownSupplier');
 
-          // Separate MODAL (base cost) and HPP (production cost)
-          // Modal = base cost from products table (cost price/purchase price)
+          // Calculate MODAL (cost)
+          // Modal = Harga Beli (baseCost) + Total Harga Bahan Baku (HPP)
+          // 
+          // Logika:
+          // 1. baseCost = Harga beli produk dari halaman Produk (field "cost")
+          // 2. HPP = Total harga bahan baku dari recipe/raw materials
+          // 3. Modal Total = baseCost + HPP
+          //
+          // Contoh:
+          // - Produk dibeli jadi: baseCost = 5000, HPP = 0 → Modal = 5000
+          // - Produk dengan recipe: baseCost = 0, HPP = 3000 → Modal = 3000  
+          // - Produk semi-finished: baseCost = 2000, HPP = 1000 → Modal = 3000
+          
+          // Get base cost (harga beli) from products table
           const baseCost = (item.product_id && productsMapData[item.product_id]) 
             ? productsMapData[item.product_id].cost 
             : 0;
-
-          // HPP = production cost (from recipe, custom costs, etc)
+          
+          // Get HPP from sale item (total harga bahan baku dari recipe)
           // Use hierarchy: hpp_total (with custom costs) > cost_snapshot > hpp
           const hpp = item.hpp_total || item.cost_snapshot || item.hpp || 0;
           
-          // Total cost = Modal + HPP
+          // Total cost = baseCost + HPP
           const cost = baseCost + hpp;
 
           // Store individual HPP values for detailed reporting

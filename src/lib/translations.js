@@ -1658,7 +1658,7 @@ export const translations = {
     profitMargin: 'Margin Laba',
     totalProfit: 'Total Laba',
     totalCost: 'Total Modal',
-    cost: 'Modal (Harga Beli + Bahan Baku)',
+    cost: 'Modal',
     profit: 'Laba',
     totalRevenue: 'Total Pendapatan',
     totalTransactions: 'Total Transaksi',
