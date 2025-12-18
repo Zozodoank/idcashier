@@ -22,7 +22,7 @@ allprojects {
         google()
         mavenCentral()
         flatDir {
-            dirs 'libs', 'app/libs', 'capacitor-cordova-android-plugins/src/main/libs'
+            dirs rootProject.file('libs'), rootProject.file('app/libs'), rootProject.file('capacitor-cordova-android-plugins/src/main/libs')
         }
     }
 }
