@@ -50,7 +50,9 @@ export default function PaymentCallbackPage() {
           setStatus('success');
           setMessage(t('paymentSuccessful'));        
 
-          // Jika ini adalah proses registrasi, lakukan pendaftaran di Supabase (jika belum)
+          // Payment successful - User sudah pasti diregister sebelum payment
+          // (di RegisterPage untuk email/password atau di AuthCallbackPage untuk OAuth)
+          // PaymentCallbackPage hanya perlu login user dan redirect
           if (isRegistration) {
              let pendingRegistration = null;
             try {
@@ -63,11 +65,11 @@ export default function PaymentCallbackPage() {
             }
 
             if (!pendingRegistration) {
-              console.warn('⚠️ No pending registration data, assuming user already registered');
-              // User might already be registered (OAuth flow), just show success and redirect
+              console.warn('⚠️ No pending registration data found');
+              // No pending data, user might be logged in already (OAuth), just redirect
               toast({
                 title: t('paymentSuccessful'),
-                description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+                description: 'Pembayaran berhasil! Mengarahkan ke setup toko...',
               });
               
               setTimeout(() => {
@@ -76,13 +78,20 @@ export default function PaymentCallbackPage() {
               return;
             }
 
-            // Check if this is OAuth registration (password is null)
-            const isOAuthRegistration = pendingRegistration.oauthProvider === 'google' || pendingRegistration.password === null;
+            console.log('💳 Processing payment callback for registration');
+            console.log('📋 Pending registration data:', { 
+              email: pendingRegistration.email,
+              hasPassword: !!pendingRegistration.password,
+              oauthProvider: pendingRegistration.oauthProvider 
+            });
+
+            // Check if this is OAuth (no password) or email/password registration
+            const isOAuthRegistration = !pendingRegistration.password || pendingRegistration.oauthProvider === 'google';
             
             if (isOAuthRegistration) {
-              // OAuth user was already registered in AuthCallbackPage
-              // Just show success message and redirect to store setup
-              console.log('✅ OAuth user already registered, skipping re-registration');
+              // OAuth user - already registered and logged in via AuthCallbackPage
+              // Just show success and redirect to store setup
+              console.log('✅ OAuth user - already registered and logged in');
               
               localStorage.removeItem('pendingRegistration');
               
@@ -95,54 +104,47 @@ export default function PaymentCallbackPage() {
                 navigate('/store-setup', { replace: true, state: { fromPayment: true } });
               }, 1500);
             } else {
-              // Email/Password registration - need to register in backend
-              console.log('📝 Email/Password registration, calling auth-register...');
+              // Email/Password user - already registered in RegisterPage
+              // Just need to login and redirect
+              console.log('✅ Email/Password user - already registered, just logging in');
               
-              const registerRequestBody = {
-                name: pendingRegistration.name,
-                email: pendingRegistration.email,
-                password: pendingRegistration.password,
-                planDuration: pendingRegistration.planDuration,
-                useHPP: pendingRegistration.useHPP,
-                merchantOrderId: pendingRegistration.merchantOrderId,
-                paymentCompleted: true,
-                skipTrial: true,
-                isPriceCardRegistration: true
-              };
-
-              const registerRes = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/auth-register', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-                },
-                body: JSON.stringify(registerRequestBody)
-              });
-
-              const regJson = await registerRes.json();
-              if (!registerRes.ok) {
-                // Check if error is "already registered" - this is OK for OAuth users
-                if (regJson.error && (regJson.error.includes('already registered') || regJson.error.includes('already exists'))) {
-                  console.log('ℹ️ User already registered (race condition or OAuth), continuing...');
-                } else {
-                  throw new Error(regJson.error || regJson.message || 'Register failed');
+              try {
+                // Login user (user already registered in RegisterPage before payment)
+                const loginRes = await login(pendingRegistration.email, pendingRegistration.password);
+                if (!loginRes.success) {
+                  console.error('❌ Login failed:', loginRes.error);
+                  throw new Error(loginRes.error || 'Failed to login after payment');
                 }
+                
+                console.log('✅ Login successful after payment');
+                
+                localStorage.removeItem('pendingRegistration');
+                
+                toast({
+                  title: t('registrationSuccessful'),
+                  description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+                });
+
+                setTimeout(() => {
+                  navigate('/store-setup', { replace: true, state: { fromPayment: true } });
+                }, 1500);
+              } catch (loginError) {
+                console.error('❌ Error during login after payment:', loginError);
+                
+                // Even if login fails, user is registered and payment is successful
+                // Redirect to login page so they can login manually
+                toast({
+                  title: t('paymentSuccessful'),
+                  description: 'Pembayaran berhasil! Silakan login untuk melanjutkan.',
+                  variant: 'default'
+                });
+                
+                localStorage.removeItem('pendingRegistration');
+                
+                setTimeout(() => {
+                  navigate('/login?payment=success', { replace: true });
+                }, 2000);
               }
-
-              // Login
-              const loginRes = await login(pendingRegistration.email, pendingRegistration.password);
-              if (!loginRes.success) throw new Error(loginRes.error);
-
-              localStorage.removeItem('pendingRegistration');
-
-              toast({
-                title: t('registrationSuccessful'),
-                description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
-              });
-
-              setTimeout(() => {
-                navigate('/store-setup', { replace: true, state: { fromPayment: true } });
-              }, 1500);
             }
 
           } else if (isRenewal) {
