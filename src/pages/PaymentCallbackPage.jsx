@@ -50,9 +50,9 @@ export default function PaymentCallbackPage() {
           setStatus('success');
           setMessage(t('paymentSuccessful'));        
 
-          // Payment successful - User sudah pasti diregister sebelum payment
-          // (di RegisterPage untuk email/password atau di AuthCallbackPage untuk OAuth)
-          // PaymentCallbackPage hanya perlu login user dan redirect
+          // Payment successful - Activate subscription via auth-register
+          // User sudah diregister sebelumnya, tapi perlu call auth-register dengan paymentCompleted=true
+          // untuk aktivasi subscription
           if (isRegistration) {
              let pendingRegistration = null;
             try {
@@ -78,20 +78,71 @@ export default function PaymentCallbackPage() {
               return;
             }
 
-            console.log('💳 Processing payment callback for registration');
+            console.log('💳 Processing payment callback - activating subscription');
             console.log('📋 Pending registration data:', { 
               email: pendingRegistration.email,
               hasPassword: !!pendingRegistration.password,
               oauthProvider: pendingRegistration.oauthProvider 
             });
 
+            // Call auth-register dengan paymentCom pleted=true untuk aktivasi subscription
+            // Error "already registered" akan diabaikan karena memang sudah diregister sebelumnya
+            try {
+              const registerRequestBody = {
+                name: pendingRegistration.name,
+                email: pendingRegistration.email,
+                password: pendingRegistration.password,
+                planDuration: pendingRegistration.planDuration,
+                useHPP: pendingRegistration.useHPP || false,
+                merchantOrderId: pendingRegistration.merchantOrderId,
+                paymentCompleted: true, // PENTING: Ini yang aktivasi subscription
+                skipTrial: true,
+                isPriceCardRegistration: true,
+                role: pendingRegistration.role || 'owner',
+                oauthProvider: pendingRegistration.oauthProvider
+              };
+
+              console.log('📝 Calling auth-register to activate subscription...');
+              
+              const registerRes = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/auth-register', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify(registerRequestBody)
+              });
+
+              const regJson = await registerRes.json();
+              
+              // Ignore "already registered" error - ini expected karena user sudah diregister sebelum payment
+              if (!registerRes.ok) {
+                const isAlreadyRegistered = regJson.error && (
+                  regJson.error.toLowerCase().includes('already') ||
+                  regJson.error.toLowerCase().includes('exists') ||
+                  regJson.error.toLowerCase().includes('duplicate')
+                );
+                
+                if (isAlreadyRegistered) {
+                  console.log('ℹ️ User already registered (expected) - subscription should be activated by backend');
+                } else {
+                  console.error('❌ Unexpected error from auth-register:', regJson.error);
+                  throw new Error(regJson.error || regJson.message || 'Failed to activate subscription');
+                }
+              } else {
+                console.log('✅ Auth-register response:', regJson);
+              }
+            } catch (activationError) {
+              console.error('❌ Error during subscription activation:', activationError);
+              // Don't throw here - continue to login
+            }
+
             // Check if this is OAuth (no password) or email/password registration
             const isOAuthRegistration = !pendingRegistration.password || pendingRegistration.oauthProvider === 'google';
             
             if (isOAuthRegistration) {
-              // OAuth user - already registered and logged in via AuthCallbackPage
-              // Just show success and redirect to store setup
-              console.log('✅ OAuth user - already registered and logged in');
+              // OAuth user - already logged in
+              console.log('✅ OAuth user - already logged in, redirecting to store setup');
               
               localStorage.removeItem('pendingRegistration');
               
@@ -104,12 +155,11 @@ export default function PaymentCallbackPage() {
                 navigate('/store-setup', { replace: true, state: { fromPayment: true } });
               }, 1500);
             } else {
-              // Email/Password user - already registered in RegisterPage
-              // Just need to login and redirect
-              console.log('✅ Email/Password user - already registered, just logging in');
+              // Email/Password user - need to login
+              console.log('✅ Email/Password user - logging in after payment');
               
               try {
-                // Login user (user already registered in RegisterPage before payment)
+                // Login user
                 const loginRes = await login(pendingRegistration.email, pendingRegistration.password);
                 if (!loginRes.success) {
                   console.error('❌ Login failed:', loginRes.error);
