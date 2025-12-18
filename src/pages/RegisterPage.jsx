@@ -14,7 +14,7 @@ import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import mcpRegisterClient from '@/lib/mcpRegisterClient';
 import PaymentMethodSelector from '@/components/PaymentMethodSelector';
-import GoogleOAuthButton from '@/components/GoogleOAuthButton';
+import GoogleOAuthButton, { performGoogleOAuth } from '@/components/GoogleOAuthButton';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -23,6 +23,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [authMethod, setAuthMethod] = useState('email'); // 'email' or 'google'
   const { t } = useLanguage();
   const { login } = useAuth();
   const { toast } = useToast();
@@ -45,10 +46,20 @@ export default function RegisterPage() {
       return;
     }
 
+    setAuthMethod('email');
     if (isPaymentMode) {
       setIsPaymentModalOpen(true);
     } else {
       processRegistration();
+    }
+  };
+
+  const handleGoogleClick = async () => {
+    if (isPaymentMode) {
+      setAuthMethod('google');
+      setIsPaymentModalOpen(true);
+    } else {
+      await performGoogleOAuth({ t, toast, mode: 'signup' });
     }
   };
 
@@ -235,6 +246,7 @@ export default function RegisterPage() {
                 planName={planName}
                 planPrice={planPrice}
                 planDuration={planDuration}
+                onClick={handleGoogleClick}
               />
 
               <div className="relative my-6">
@@ -336,7 +348,19 @@ export default function RegisterPage() {
           amount={planPrice}
           onSelect={(method) => {
             setIsPaymentModalOpen(false);
-            processRegistration(method);
+            if (authMethod === 'google') {
+              performGoogleOAuth({ 
+                planName, 
+                planPrice, 
+                planDuration, 
+                paymentMethod: method,
+                t, 
+                toast, 
+                mode: 'signup' 
+              });
+            } else {
+              processRegistration(method);
+            }
           }}
         />
 

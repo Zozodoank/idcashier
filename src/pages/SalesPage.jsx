@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch'; // Import the Switch component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion } from 'framer-motion';
-import { ScanBarcode, Package, List, LayoutGrid, Ticket, DollarSign, Percent, Printer, Search, Download, Trash2, CalendarIcon } from 'lucide-react';
+import { ScanBarcode, Package, List, LayoutGrid, Ticket, DollarSign, Percent, Printer, Search, Download, Trash2, CalendarIcon, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { salesAPI, productsAPI, customersAPI, settingsAPI, productRecipesAPI, rawMaterialsAPI, profitSharesAPI, storeSettingsAPI } from '@/lib/api';
 import { supabase } from '@/lib/supabaseClient';
@@ -44,7 +44,11 @@ const SalesPage = () => {
   const permissions = usePermissions();
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => {
+    const savedCart = localStorage.getItem('cart');
+    return savedCart ? JSON.parse(savedCart) : [];
+  });
+  const [topProducts, setTopProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState('grid');
   const [selectedCustomer, setSelectedCustomer] = useState('default');
@@ -283,6 +287,46 @@ const SalesPage = () => {
   useEffect(() => {
     fetchData();
   }, [authUser]);
+
+  // Persist cart to localStorage
+  useEffect(() => {
+    localStorage.setItem('cart', JSON.stringify(cart));
+  }, [cart]);
+
+  // Calculate top products
+  useEffect(() => {
+    const fetchTopProducts = async () => {
+      if (!authUser || !token || products.length === 0) return;
+      try {
+        // Fetch last 1000 sales items to determine popularity
+        const { data, error } = await supabase
+          .from('sale_items')
+          .select('product_id, quantity')
+          .order('created_at', { ascending: false })
+          .limit(1000);
+          
+        if (error) throw error;
+        
+        const productCounts = {};
+        data?.forEach(item => {
+          productCounts[item.product_id] = (productCounts[item.product_id] || 0) + item.quantity;
+        });
+        
+        const sortedProductIds = Object.keys(productCounts).sort((a, b) => productCounts[b] - productCounts[a]);
+        const topIds = sortedProductIds.slice(0, 5);
+        
+        // Map to actual product objects
+        const top = products.filter(p => topIds.includes(p.id))
+          .sort((a, b) => productCounts[b.id] - productCounts[a.id]);
+          
+        setTopProducts(top);
+      } catch (err) {
+        console.error('Error fetching top products:', err);
+      }
+    };
+    
+    fetchTopProducts();
+  }, [products, authUser, token]);
 
   // Load delivery note design settings
   useEffect(() => {
@@ -1353,6 +1397,29 @@ const SalesPage = () => {
         <TabsContent value="new-sale" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-10rem)]">
         <div className="lg:col-span-2 flex flex-col h-full">
+          {/* Popular Products Quick Access */}
+          {topProducts.length > 0 && (
+            <Card className="flex-shrink-0 mb-4">
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Produk Populer</CardTitle>
+              </CardHeader>
+              <CardContent className="flex gap-2 overflow-x-auto py-3">
+                {topProducts.map(product => (
+                  <Button
+                    key={product.id}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addToCart(product)}
+                    className="whitespace-nowrap"
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    {product.name}
+                  </Button>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="flex-shrink-0 mb-6">
             <CardHeader>
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -1620,6 +1687,43 @@ const SalesPage = () => {
                   <DialogHeader>
                     <DialogTitle>{t('receiptPreviewTitle')}</DialogTitle>
                   </DialogHeader>
+
+                  {/* Print Presets */}
+                  <div className="flex gap-2 mb-4 justify-center">
+                    <Button 
+                      variant={receiptType.startsWith('thermal') ? 'default' : 'outline'} 
+                      onClick={() => {
+                        setReceiptType('thermal-80mm');
+                        setShowBarcode(true);
+                      }}
+                      className="flex-1"
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Thermal
+                    </Button>
+                    <Button 
+                      variant={receiptType === 'invoice-a4' ? 'default' : 'outline'} 
+                      onClick={() => {
+                        setReceiptType('invoice-a4');
+                        setShowBarcode(false);
+                      }}
+                      className="flex-1"
+                    >
+                      <List className="w-4 h-4 mr-2" />
+                      Invoice
+                    </Button>
+                    <Button 
+                      variant={receiptType === 'delivery-note' ? 'default' : 'outline'} 
+                      onClick={() => {
+                        setReceiptType('delivery-note');
+                        setDeliveryNoteShowPrice(true);
+                      }}
+                      className="flex-1"
+                    >
+                      <Package className="w-4 h-4 mr-2" />
+                      Surat Jalan
+                    </Button>
+                  </div>
                   
                   {/* Unified receipt type selector */}
                   <div className="space-y-4 mb-4">
@@ -2260,6 +2364,43 @@ const SalesPage = () => {
           </DialogHeader>
           
           <div className="flex flex-col gap-4">
+            {/* Print Presets */}
+            <div className="flex gap-2 justify-center">
+              <Button 
+                variant={receiptType.startsWith('thermal') ? 'default' : 'outline'} 
+                onClick={() => {
+                  setReceiptType('thermal-80mm');
+                  setShowBarcode(true);
+                }}
+                className="flex-1"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                Thermal
+              </Button>
+              <Button 
+                variant={receiptType === 'invoice-a4' ? 'default' : 'outline'} 
+                onClick={() => {
+                  setReceiptType('invoice-a4');
+                  setShowBarcode(false);
+                }}
+                className="flex-1"
+              >
+                <List className="w-4 h-4 mr-2" />
+                Invoice
+              </Button>
+              <Button 
+                variant={receiptType === 'delivery-note' ? 'default' : 'outline'} 
+                onClick={() => {
+                  setReceiptType('delivery-note');
+                  setDeliveryNoteShowPrice(true);
+                }}
+                className="flex-1"
+              >
+                <Package className="w-4 h-4 mr-2" />
+                Surat Jalan
+              </Button>
+            </div>
+
             <div className="flex justify-between items-center gap-4">
                <div className="flex items-center gap-2 flex-1">
                   <Label className="text-sm font-semibold whitespace-nowrap">

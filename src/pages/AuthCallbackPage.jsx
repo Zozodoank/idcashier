@@ -11,6 +11,109 @@ const AuthCallbackPage = () => {
   const { t } = useLanguage();
   const [status, setStatus] = useState('processing');
 
+  // Helper to process payment
+  const processDuitkuPayment = async (plan, user, token, methodCode) => {
+    try {
+      setStatus('processing');
+      const paymentResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          paymentAmount: parseInt(plan.planPrice, 10),
+          productDetails: plan.planName,
+          customerVaName: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+          email: user.email,
+          userId: user.id,
+          isRegistration: true,
+          paymentMethod: methodCode // Pass selected payment method
+        })
+      });
+
+      const paymentData = await paymentResponse.json();
+      
+      if (!paymentResponse.ok) {
+        // Map common API errors to user-friendly messages
+        const friendlyError = mapApiErrorToFriendly(paymentData.error || paymentData.message);
+        throw new Error(friendlyError);
+      }
+
+      if (paymentData.paymentUrl) {
+        // Save pending registration data for callback
+        const duration = plan.planDuration ? parseInt(plan.planDuration, 10) : 1;
+        localStorage.setItem('pendingRegistration', JSON.stringify({
+          name: user.user_metadata?.name || '',
+          email: user.email,
+          password: null, // OAuth - no password
+          planDuration: duration,
+          merchantOrderId: paymentData.merchantOrderId,
+          useHPP: false,
+          role: 'owner',
+          oauthProvider: 'google'
+        }));
+
+        // Clean up OAuth plan data
+        localStorage.removeItem('pendingOAuthPlan');
+        
+        // Redirect immediately to payment gateway
+        window.location.href = paymentData.paymentUrl;
+        return true;
+      } else {
+        throw new Error('URL pembayaran tidak ditemukan. Silakan coba lagi.');
+      }
+    } catch (paymentError) {
+      console.error('❌ Payment processing error:', paymentError);
+      
+      setStatus('error');
+      toast({
+        title: 'Gagal Memproses Pembayaran',
+        description: paymentError.message || 'Terjadi kesalahan saat memproses pembayaran. Silakan coba lagi nanti.',
+        variant: 'destructive'
+      });
+      
+      // Redirect back to register with plan details to retry
+      setTimeout(() => {
+        const params = new URLSearchParams();
+        if (plan.planName) params.append('plan', plan.planName);
+        if (plan.planPrice) params.append('price', plan.planPrice);
+        if (plan.planDuration) params.append('duration', plan.planDuration);
+        window.location.href = `/register?${params.toString()}`;
+      }, 3000);
+      return false;
+    }
+  };
+
+  // Helper to map API errors to user-friendly messages
+  const mapApiErrorToFriendly = (errorMsg) => {
+    if (!errorMsg) return 'Terjadi kesalahan yang tidak dikenal.';
+    
+    const msg = errorMsg.toLowerCase();
+    
+    if (msg.includes('payment') || msg.includes('duitku')) {
+      return 'Gagal terhubung ke sistem pembayaran. Silakan coba lagi nanti.';
+    }
+    if (msg.includes('network') || msg.includes('fetch') || msg.includes('connection')) {
+      return 'Masalah koneksi internet. Pastikan koneksi Anda stabil dan coba lagi.';
+    }
+    if (msg.includes('timeout')) {
+      return 'Waktu tunggu habis. Silakan coba lagi.';
+    }
+    if (msg.includes('auth') || msg.includes('unauthorized') || msg.includes('token')) {
+      return 'Sesi Anda telah berakhir. Silakan login kembali.';
+    }
+    if (msg.includes('validation') || msg.includes('required')) {
+      return 'Data yang dikirim tidak lengkap. Silakan coba lagi.';
+    }
+    if (msg.includes('duplicate') || msg.includes('exists')) {
+      return 'Data sudah ada sebelumnya. Silakan gunakan data lain.';
+    }
+    
+    // Default friendly message
+    return 'Terjadi kesalahan saat memproses pembayaran. Silakan coba lagi nanti.';
+  };
+
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
@@ -125,8 +228,20 @@ const AuthCallbackPage = () => {
             // If from price card, skip trial and redirect to payment
             if (isFromPriceCard) {
               requestBody.skipTrial = true;
-              // Get plan details from localStorage
-              const pendingPlan = JSON.parse(pendingOAuthPlan || '{}');
+              requestBody.trialDays = 0; // Explicitly set trial days to 0
+              
+              // Get plan details from localStorage or URL params
+              let pendingPlan = JSON.parse(pendingOAuthPlan || '{}');
+              
+              // Fallback to URL params if localStorage is empty but URL has params
+              if (!pendingPlan.planName && urlParams.get('plan')) {
+                pendingPlan = {
+                  planName: urlParams.get('plan'),
+                  planPrice: urlParams.get('price'),
+                  planDuration: urlParams.get('duration')
+                };
+              }
+
               if (pendingPlan.planDuration) {
                 requestBody.planDuration = parseInt(pendingPlan.planDuration, 10);
               }
@@ -183,98 +298,85 @@ const AuthCallbackPage = () => {
             
             // 🔧 FIXED: If from price card, process payment directly instead of redirecting
             if (isFromPriceCard) {
-              const pendingPlan = JSON.parse(pendingOAuthPlan || '{}');
+              // Prefer URL params for fresh data, fallback to localStorage
+              const pendingPlan = {
+                planName: urlParams.get('plan'),
+                planPrice: urlParams.get('price'),
+                planDuration: urlParams.get('duration'),
+                paymentMethod: urlParams.get('paymentMethod')
+              };
+              
+              // Fill from localStorage if missing in URL
+              const storedPlan = JSON.parse(pendingOAuthPlan || '{}');
+              if (!pendingPlan.planName) pendingPlan.planName = storedPlan.planName;
+              if (!pendingPlan.planPrice) pendingPlan.planPrice = storedPlan.planPrice;
+              if (!pendingPlan.planDuration) pendingPlan.planDuration = storedPlan.planDuration;
+              if (!pendingPlan.paymentMethod) pendingPlan.paymentMethod = storedPlan.paymentMethod;
+
               console.log('💰 Price card registration detected, processing payment...');
               
               // Store plan details for payment processing
               if (pendingPlan.planName && pendingPlan.planPrice && pendingPlan.planDuration) {
-                try {
-                  // Process payment directly - call payment gateway
-                  const paymentResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                      paymentAmount: parseInt(pendingPlan.planPrice, 10),
-                      productDetails: pendingPlan.planName,
-                      customerVaName: name,
-                      email: email,
-                      userId: userProfile.id,
-                      isRegistration: true,
-                      // Let backend decide payment method or use default
-                      paymentMethod: undefined
-                    })
-                  });
-
-                  const paymentData = await paymentResponse.json();
-                  
-                  if (!paymentResponse.ok) {
-                    throw new Error(paymentData.error || paymentData.message || 'Payment request failed');
-                  }
-
-                  if (paymentData.paymentUrl) {
-                    // Save pending registration data for callback
-                    const duration = pendingPlan.planDuration ? parseInt(pendingPlan.planDuration, 10) : 1;
-                    localStorage.setItem('pendingRegistration', JSON.stringify({
-                      name,
-                      email,
-                      password: null, // OAuth - no password
-                      planDuration: duration,
-                      merchantOrderId: paymentData.merchantOrderId,
-                      useHPP: false,
-                      role: 'owner',
-                      oauthProvider: 'google'
-                    }));
-
-                    // Clean up OAuth plan data
-                    localStorage.removeItem('pendingOAuthPlan');
-                    
-                    console.log('🔗 Redirecting to payment gateway:', paymentData.paymentUrl);
-                    
-                    setStatus('success');
-                    toast({
-                      title: t('registrationSuccessful') || 'Registrasi Berhasil',
-                      description: 'Mengarahkan ke halaman pembayaran...',
-                    });
-                    
-                    // Redirect to payment gateway
-                    setTimeout(() => {
-                      window.location.href = paymentData.paymentUrl;
-                    }, 1500);
-                    return; // Exit early to prevent dashboard redirect
-                  } else {
-                    throw new Error('Payment URL not received');
-                  }
-                } catch (paymentError) {
-                  console.error('❌ Payment processing error:', paymentError);
-                  // Fallback: clean up and show error
+                // If payment method is selected, proceed to payment
+                if (pendingPlan.paymentMethod) {
+                  const paymentSuccess = await processDuitkuPayment(pendingPlan, userProfile, token, pendingPlan.paymentMethod);
+                  if (paymentSuccess) return; // Exit if redirecting
+                  // If payment failed (returned false), error already shown, redirect back to register
+                  const params = new URLSearchParams();
+                  params.append('plan', pendingPlan.planName);
+                  params.append('price', pendingPlan.planPrice);
+                  params.append('duration', pendingPlan.planDuration);
                   localStorage.removeItem('pendingOAuthPlan');
+                  setTimeout(() => {
+                    window.location.href = `/register?${params.toString()}`;
+                  }, 2000);
+                  return;
+                } else {
+                  // Payment method missing - redirect back to register page to select payment method
+                  console.warn('⚠️ Payment method missing for price card registration');
                   toast({
-                    title: t('error') || 'Error',
-                    description: paymentError.message || 'Gagal memproses pembayaran. Silakan coba lagi.',
-                    variant: 'destructive'
+                    title: 'Metode Pembayaran Diperlukan',
+                    description: 'Silakan pilih metode pembayaran untuk melanjutkan.',
+                    variant: 'default'
                   });
-                  // Still redirect to dashboard but user will need to pay manually
+                  
+                  const params = new URLSearchParams();
+                  params.append('plan', pendingPlan.planName);
+                  params.append('price', pendingPlan.planPrice);
+                  params.append('duration', pendingPlan.planDuration);
+                  localStorage.removeItem('pendingOAuthPlan');
+                  
+                  setTimeout(() => {
+                    window.location.href = `/register?${params.toString()}`;
+                  }, 1500);
+                  return;
                 }
               } else {
+                // Plan details missing - redirect to register without params
                 console.warn('⚠️ Price card registration but plan details missing');
-                // Fallback: clean up and redirect to dashboard
+                toast({
+                  title: 'Data Paket Tidak Lengkap',
+                  description: 'Silakan pilih paket langganan kembali.',
+                  variant: 'default'
+                });
                 localStorage.removeItem('pendingOAuthPlan');
+                setTimeout(() => {
+                  window.location.href = '/';
+                }, 1500);
+                return;
               }
             } else {
               // Non-price-card registration - clean up and proceed normally
               console.log('✅ Standard registration (with trial)');
             }
             
+            // Standard success path (No payment, or payment skipped/missing data)
             setStatus('success');
             toast({
               title: t('loginSuccess'),
               description: `Welcome, ${name}!`,
             });
             
-            // Reload page to update auth context (only for non-price-card)
             setTimeout(() => {
               window.location.href = '/dashboard';
             }, 1000);
@@ -356,6 +458,8 @@ const AuthCallbackPage = () => {
           </>
         )}
       </div>
+
+
     </div>
   );
 };

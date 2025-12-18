@@ -50,14 +50,8 @@ export default function PaymentCallbackPage() {
           setStatus('success');
           setMessage(t('paymentSuccessful'));        
 
-          // Jika ini adalah proses registrasi, lakukan pendaftaran di Supabase
+          // Jika ini adalah proses registrasi, lakukan pendaftaran di Supabase (jika belum)
           if (isRegistration) {
-             // ... registration logic stays same
-             // ...
-             // But inside registration logic, replace any refreshSession/timeout refresh logic if any
-             // ...
-             // Let's assume registration block is mostly fine as user complained about renewal/expired status
-             
              let pendingRegistration = null;
             try {
               const storedData = localStorage.getItem('pendingRegistration');
@@ -69,53 +63,87 @@ export default function PaymentCallbackPage() {
             }
 
             if (!pendingRegistration) {
-              navigate('/login?payment=success');  
+              console.warn('⚠️ No pending registration data, assuming user already registered');
+              // User might already be registered (OAuth flow), just show success and redirect
+              toast({
+                title: t('paymentSuccessful'),
+                description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+              });
+              
+              setTimeout(() => {
+                navigate('/store-setup', { replace: true, state: { fromPayment: true } });
+              }, 1500);
               return;
             }
 
-            // ... fetch auth-register ...
-            // Build request body - NO trial for paid registrations
-            const registerRequestBody = {
-              name: pendingRegistration.name,      
-              email: pendingRegistration.email,    
-              password: pendingRegistration.password,
-              planDuration: pendingRegistration.planDuration,
-              useHPP: pendingRegistration.useHPP,  
-              merchantOrderId: pendingRegistration.merchantOrderId,
-              paymentCompleted: true,
-              skipTrial: true, // Skip trial for paid registrations
-              isPriceCardRegistration: true
-            };
+            // Check if this is OAuth registration (password is null)
+            const isOAuthRegistration = pendingRegistration.oauthProvider === 'google' || pendingRegistration.password === null;
+            
+            if (isOAuthRegistration) {
+              // OAuth user was already registered in AuthCallbackPage
+              // Just show success message and redirect to store setup
+              console.log('✅ OAuth user already registered, skipping re-registration');
+              
+              localStorage.removeItem('pendingRegistration');
+              
+              toast({
+                title: t('registrationSuccessful'),
+                description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+              });
 
-            // Only add trialDays if this is NOT a paid registration (shouldn't happen, but safety check)
-            // For paid registrations, subscription will be activated by payment, not trial
+              setTimeout(() => {
+                navigate('/store-setup', { replace: true, state: { fromPayment: true } });
+              }, 1500);
+            } else {
+              // Email/Password registration - need to register in backend
+              console.log('📝 Email/Password registration, calling auth-register...');
+              
+              const registerRequestBody = {
+                name: pendingRegistration.name,
+                email: pendingRegistration.email,
+                password: pendingRegistration.password,
+                planDuration: pendingRegistration.planDuration,
+                useHPP: pendingRegistration.useHPP,
+                merchantOrderId: pendingRegistration.merchantOrderId,
+                paymentCompleted: true,
+                skipTrial: true,
+                isPriceCardRegistration: true
+              };
 
-            const registerRes = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/auth-register', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',  
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-              },
-              body: JSON.stringify(registerRequestBody)
-            });
+              const registerRes = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/auth-register', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify(registerRequestBody)
+              });
 
-            const regJson = await registerRes.json();
-            if (!registerRes.ok) throw new Error(regJson.error || regJson.message || 'Register failed');  
+              const regJson = await registerRes.json();
+              if (!registerRes.ok) {
+                // Check if error is "already registered" - this is OK for OAuth users
+                if (regJson.error && (regJson.error.includes('already registered') || regJson.error.includes('already exists'))) {
+                  console.log('ℹ️ User already registered (race condition or OAuth), continuing...');
+                } else {
+                  throw new Error(regJson.error || regJson.message || 'Register failed');
+                }
+              }
 
-            // Login
-            const loginRes = await login(pendingRegistration.email, pendingRegistration.password);        
-            if (!loginRes.success) throw new Error(loginRes.error);
+              // Login
+              const loginRes = await login(pendingRegistration.email, pendingRegistration.password);
+              if (!loginRes.success) throw new Error(loginRes.error);
 
-            localStorage.removeItem('pendingRegistration');
+              localStorage.removeItem('pendingRegistration');
 
-            toast({
-              title: t('registrationSuccessful'),
-              description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
-            });
+              toast({
+                title: t('registrationSuccessful'),
+                description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+              });
 
-            setTimeout(() => {
-              navigate('/store-setup', { replace: true, state: { fromPayment: true } });
-            }, 1500);
+              setTimeout(() => {
+                navigate('/store-setup', { replace: true, state: { fromPayment: true } });
+              }, 1500);
+            }
 
           } else if (isRenewal) {
             // Renewal logic - Redirect to store setup after successful payment (unless HPP activation)
@@ -262,8 +290,11 @@ export default function PaymentCallbackPage() {
       } catch (error) {
         console.error('❌ Payment callback error:', error);
         setStatus('error');
-        // Pesan singkat tanpa detail teknis/developer
-        setMessage(t('paymentProcessingError') || 'Terjadi kesalahan saat memproses pembayaran.');
+        // User-friendly error message dengan spasi yang benar
+        const errorMessage = error.message || 'Terjadi kesalahan saat memproses pembayaran.';
+        // Ensure error message has proper spacing
+        const formattedError = errorMessage.replace(/([a-z])([A-Z])/g, '$1 $2');
+        setMessage(t('paymentProcessingError') || formattedError);
 
         // Remove registration data if this is registration process
         if (isRegistration) {

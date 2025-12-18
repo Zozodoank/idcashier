@@ -42,7 +42,7 @@ class MCPRegisterClient {
       if (userData.skipTrial === true) {
         requestBody.skipTrial = true;
         requestBody.isPriceCardRegistration = userData.isPriceCardRegistration || true;
-        // Do NOT include trialDays - backend should skip trial
+        requestBody.trialDays = 0; // Explicitly set trial days to 0 to prevent fallback
       }
 
       // If planDuration is provided (for price card registration), include it

@@ -3,7 +3,64 @@ import { supabase } from '@/lib/supabaseClient';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/components/ui/use-toast';
 
-const GoogleOAuthButton = ({ mode = 'login', planName, planPrice, planDuration }) => {
+// Export the logic for reuse
+export const performGoogleOAuth = async ({ planName, planPrice, planDuration, paymentMethod, t, toast, mode = 'signup' }) => {
+  try {
+    // If plan details are provided, store them before redirecting
+    if (planName && planPrice && planDuration) {
+      const planDetails = { planName, planPrice, planDuration, paymentMethod };
+      localStorage.setItem('pendingOAuthPlan', JSON.stringify(planDetails));
+      console.log('📝 Storing pending OAuth plan details:', planDetails);
+    }
+
+    const siteUrl = import.meta.env.VITE_SITE_URL || window.location.origin;
+    let redirectTo = `${siteUrl}/auth/callback`;
+
+    // Append plan details to redirect URL to persist state across OAuth flow
+    // This is more reliable than localStorage which might be cleared or inaccessible
+    if (planName) {
+      const params = new URLSearchParams();
+      params.append('plan', planName);
+      if (planPrice) params.append('price', planPrice);
+      if (planDuration) params.append('duration', planDuration);
+      if (paymentMethod) params.append('paymentMethod', paymentMethod);
+      redirectTo = `${redirectTo}?${params.toString()}`;
+    }
+
+    console.log('🔐 Initiating Google OAuth with redirect:', redirectTo);
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectTo,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    // The redirect will happen automatically
+    console.log('✅ Google OAuth redirect initiated');
+    return true;
+  } catch (error) {
+    console.error('❌ Google OAuth error:', error);
+    if (toast && t) {
+      toast({
+        title: mode === 'login' ? t('googleLoginError') : t('googleSignUpError'),
+        description: error.message || 'An error occurred during Google authentication',
+        variant: 'destructive',
+      });
+    }
+    throw error;
+  }
+};
+
+const GoogleOAuthButton = ({ mode = 'login', planName, planPrice, planDuration, onClick }) => {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
@@ -11,43 +68,15 @@ const GoogleOAuthButton = ({ mode = 'login', planName, planPrice, planDuration }
   const handleGoogleAuth = async () => {
     setIsLoading(true);
     try {
-      // If plan details are provided, store them before redirecting
-      if (planName && planPrice && planDuration) {
-        const planDetails = { planName, planPrice, planDuration };
-        localStorage.setItem('pendingOAuthPlan', JSON.stringify(planDetails));
-        console.log('📝 Storing pending OAuth plan details:', planDetails);
+      if (onClick) {
+        // If external handler provided, use it
+        await onClick();
+      } else {
+        // Use internal logic
+        await performGoogleOAuth({ planName, planPrice, planDuration, t, toast, mode });
       }
-
-      const siteUrl = import.meta.env.VITE_SITE_URL || window.location.origin;
-      const redirectTo = `${siteUrl}/auth/callback`;
-
-      console.log('🔐 Initiating Google OAuth with redirect:', redirectTo);
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectTo,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      // The redirect will happen automatically
-      // We'll handle the callback in AuthCallbackPage
-      console.log('✅ Google OAuth redirect initiated');
     } catch (error) {
-      console.error('❌ Google OAuth error:', error);
-      toast({
-        title: mode === 'login' ? t('googleLoginError') : t('googleSignUpError'),
-        description: error.message || 'An error occurred during Google authentication',
-        variant: 'destructive',
-      });
+      // Error already handled in performGoogleOAuth or external handler should handle it
       setIsLoading(false);
     }
   };
@@ -99,4 +128,3 @@ const GoogleOAuthButton = ({ mode = 'login', planName, planPrice, planDuration }
 };
 
 export default GoogleOAuthButton;
-
