@@ -8,7 +8,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import ThemeToggle from '@/components/ThemeToggle';
-import PaymentMethodSelector from '@/components/PaymentMethodSelector';
 import { 
   Smartphone, CreditCard, BarChart3, Users, Shield, Zap, 
   Menu, X, Globe, HeadphonesIcon, Calculator, Check, Star 
@@ -23,9 +22,6 @@ const LandingPage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDemoLoading, setIsDemoLoading] = useState(false);
   const [locale, setLocale] = useState('id');
-  const [isDuitkuProcessing, setIsDuitkuProcessing] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState(null);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   // Handle Supabase Auth Redirects (Fallback if server redirect config is missing)
   useEffect(() => {
@@ -554,23 +550,11 @@ const LandingPage = () => {
                     className="w-full" 
                     variant={plan.popular ? "default" : "outline"}
                     onClick={() => {
-                      if (!user) {
-                        navigate(`/register?plan=${plan.name}&price=${plan.price}&duration=${plan.duration}`);
-                      } else {
-                        setSelectedPlan(plan);
-                        setIsPaymentModalOpen(true);
-                      }
+                      // For new registration (price card), always redirect to register page
+                      navigate(`/register?plan=${plan.name}&price=${plan.price}&duration=${plan.duration}`);
                     }}
-                    disabled={isDuitkuProcessing}
                   >
-                    {user ? (
-                      isDuitkuProcessing ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          {t('paymentProcessing')}
-                        </>
-                      ) : t('landingSubscribe')
-                    ) : t('landingSubscribe')}
+                    {t('landingSubscribe')}
                   </Button>
                 </CardFooter>
               </Card>
@@ -609,18 +593,6 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
-
-      <PaymentMethodSelector
-        isOpen={isPaymentModalOpen}
-        onClose={setIsPaymentModalOpen}
-        amount={selectedPlan?.price}
-        onSelect={(method) => {
-          setIsPaymentModalOpen(false);
-          if (selectedPlan) {
-            handleDuitkuPayment(selectedPlan, method);
-          }
-        }}
-      />
 
       {/* Footer */}
       <footer className="relative z-10 bg-gray-900 text-white py-12 px-4">
