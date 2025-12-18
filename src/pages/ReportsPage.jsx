@@ -2931,6 +2931,20 @@ const ReportsPage = () => {
                           const costPerUnit = item.cost || 0;
                           const totalCost = costPerUnit * item.quantity;
                           
+                          // DEBUG: Log untuk debug masalah cost
+                          if (item.product === 'SOSIS' || item.product === 'wortel') {
+                            console.log(`[DEBUG] ${item.product}:`, {
+                              quantity: item.quantity,
+                              price: item.price,
+                              itemTotal: itemTotal,
+                              costPerUnit: costPerUnit,
+                              baseCost: item.baseCost,
+                              hpp: item.hpp,
+                              totalCost: totalCost,
+                              profit: itemTotal - totalCost
+                            });
+                          }
+                          
                           const profit = itemTotal - totalCost; // Profit per item
 
                           return (
