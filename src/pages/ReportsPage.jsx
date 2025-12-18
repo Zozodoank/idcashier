@@ -1183,17 +1183,10 @@ const ReportsPage = () => {
   // }, [dateRange, token]);
 
   const loadHPPSetting = async () => {
-    if (!token) return;
-    
-    try {
-      const setting = await settingsAPI.get('hpp_enabled', token, user?.id);
-      if (setting && setting.setting_value && setting.setting_value.enabled) {
-        setHppEnabled(true);
-      }
-    } catch (error) {
-      console.error('Error loading HPP setting:', error);
-      setHppEnabled(false);
-    }
+    // HPP setting now managed via HPP Context (useHPP hook)
+    // No need to load or set HPP setting here
+    // hppEnabled is read-only from context
+    return;
   };
 
   // Note: Global HPP loading removed - now managed via Expenses system
