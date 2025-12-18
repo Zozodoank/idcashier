@@ -52,5 +52,26 @@ Jika Anda melakukan perubahan pada kode web (React/Vite):
 2. Buka Android Studio dan jalankan build ulang atau Run ke device/emulator.
 
 ## Troubleshooting
+
+### Error: "Cannot access system provider: 'settings'"
+Ini adalah masalah dengan emulator/device Android, **BUKAN** masalah aplikasi.
+
+**Solusi:**
+1. **Restart Emulator**: Stop emulator dan start ulang
+2. **Cold Boot**: Di AVD Manager, pilih emulator > dropdown > "Cold Boot Now"
+3. **Wipe Data**: Di AVD Manager, pilih emulator > dropdown > "Wipe Data"
+4. **Gunakan Device Fisik**: Install APK hasil build langsung ke HP via USB
+
+File APK hasil build ada di: `android/app/build/intermediates/apk/debug/app-debug.apk`
+
+### Warning: "Using flatDir should be avoided..."
+Warning ini **TIDAK BERBAHAYA** dan bisa diabaikan selama build tetap berhasil.
+
+Warning ini muncul dari konfigurasi internal Capacitor untuk kompatibilitas plugin lama. Sudah dihapus dari konfigurasi utama project ini, tapi mungkin masih muncul dari dependency module lain.
+
+**Yang penting**: Selama build menghasilkan APK/Bundle, aplikasi akan berfungsi normal.
+
+### Error Build Lainnya
 - Jika terjadi error build, coba menu **File > Invalidate Caches / Restart**.
 - Pastikan Android SDK yang dibutuhkan sudah terinstall (biasanya Android Studio akan menawarkan install otomatis jika kurang).
+- Untuk masalah "Unable to delete directory", restart Android Studio atau hapus manual folder `android/app/build` via File Explorer.
