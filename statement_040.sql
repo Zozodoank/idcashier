@@ -1,1 +1,0 @@
-RAISE NOTICE '- Granted all permissions to authenticated users';

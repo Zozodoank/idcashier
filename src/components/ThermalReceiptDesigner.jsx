@@ -608,8 +608,8 @@ const ThermalReceiptDesigner = ({ paperSize, storeSettings, initialSettings, onS
           </div>
           
           {/* Main Content - Preview */}
-          <div className="transition-all duration-300 p-8 ml-96">
-            <div className="flex justify-center">
+          <div className="transition-all duration-300 p-8 ml-96 h-screen overflow-y-auto">
+            <div className="flex justify-center min-h-full pb-20">
               <div className={`bg-white shadow-2xl rounded-lg ${paperSize === '58mm' ? 'w-[220px]' : 'w-[302px]'}`} style={{ padding: '10px' }}>
                 <PrintReceipt 
                   key={JSON.stringify(designSettings)} // Force re-render when designSettings changes

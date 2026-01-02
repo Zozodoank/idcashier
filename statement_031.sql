@@ -1,1 +1,0 @@
-GRANT ALL ON app_settings TO authenticated;

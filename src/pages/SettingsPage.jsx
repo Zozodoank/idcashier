@@ -873,7 +873,7 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
                 <div className="space-y-2"><Label>{t('language')}</Label><Select value={language} onValueChange={setLanguage}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="en">English</SelectItem><SelectItem value="id">Indonesia</SelectItem><SelectItem value="zh">中文</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>{t('timezone')}</Label><Select value={generalSettings.timezone} onValueChange={v => setGeneralSettings({...generalSettings, timezone: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Asia/Jakarta">Asia/Jakarta (WIB)</SelectItem><SelectItem value="Asia/Makassar">Asia/Makassar (WITA)</SelectItem><SelectItem value="Asia/Jayapura">Asia/Jayapura (WIT)</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>{t('currency')}</Label><Select value={generalSettings.currency} onValueChange={v => setGeneralSettings({...generalSettings, currency: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="IDR">IDR (Rupiah)</SelectItem><SelectItem value="USD">USD (Dollar)</SelectItem><SelectItem value="CNY">CNY (Yuan)</SelectItem></SelectContent></Select></div>
-                <Button onClick={() => handleSaveSettings('general')}>{t('saveChanges')}</Button>
+                <Button onClick={() => handleSaveSettings('general', generalSettings)}>{t('saveChanges')}</Button>
               </CardContent>
             </Card>
           </TabsContent>

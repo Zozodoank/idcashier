@@ -1,1 +1,0 @@
-RAISE NOTICE 'Created sales access policy';

@@ -1,1 +1,0 @@
-DROP POLICY IF EXISTS "Allow system access on products" ON products;

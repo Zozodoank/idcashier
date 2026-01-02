@@ -1,1 +1,0 @@
-RAISE NOTICE '- Allow admin access to all data';

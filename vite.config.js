@@ -277,6 +277,11 @@ export default defineConfig({
 		cors: true,
 		headers: {
 			'Cross-Origin-Embedder-Policy': 'credentialless',
+			'X-Content-Type-Options': 'nosniff',
+			'X-Frame-Options': 'DENY',
+			'X-XSS-Protection': '1; mode=block',
+			'Referrer-Policy': 'strict-origin-when-cross-origin',
+			'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
 		},
 		allowedHosts: true
 		// Removed proxy configuration for static hosting
@@ -302,8 +307,9 @@ export default defineConfig({
 		minify: 'terser',
 		terserOptions: {
 			compress: {
-				drop_console: true, // Remove console.log in production
+				drop_console: false,
 				drop_debugger: true,
+				pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn'], // Remove logs but keep errors
 			},
 		},
 		// Satukan semua JS jadi satu bundle, dan semua CSS jadi satu file

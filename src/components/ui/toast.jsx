@@ -23,7 +23,8 @@ const toastVariants = cva(
 	{
 		variants: {
 			variant: {
-				default: 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100',
+				// Use design tokens so toast matches theme (no hardcoded white/gray)
+				default: 'bg-background text-foreground border-border',
 				destructive:
           'group destructive border-destructive bg-destructive text-destructive-foreground',
 				success:

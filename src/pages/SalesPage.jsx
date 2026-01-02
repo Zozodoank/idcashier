@@ -84,6 +84,8 @@ const SalesPage = () => {
   const [invoiceA4DesignSettings, setInvoiceA4DesignSettings] = useState({});
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [deliveryNoteTemplate, setDeliveryNoteTemplate] = useState('simple');
+  const [customerIdMode, setCustomerIdMode] = useState('auto');
+  const [manualCustomerId, setManualCustomerId] = useState('');
   
   // Receipt Settings
   const [receiptSettings, setReceiptSettings] = useState({
@@ -189,7 +191,9 @@ const SalesPage = () => {
       payment_amount: completedSaleData.paymentAmount,
       change_amount: completedSaleData.change,
       customer: completedSaleData.customer,
-      items: transformedItems
+      items: transformedItems,
+      receiver_name: receiverName,
+      sender_name: senderName
     };
     
     return sale;
@@ -907,6 +911,8 @@ const SalesPage = () => {
         user_id: authUser.id, // Add the user_id to link the sale to the current user
         customer_id: customerId,
         total_amount: total,
+        receiver_name: receiverName || null,
+        sender_name: senderName || null,
         discount: discount,  // Changed from discountAmount to discount (percentage)
         tax: tax,            // Changed from taxAmount to tax (percentage)
         payment_amount: paymentMethod === 'credit' ? 0 : paymentAmount,
@@ -1683,7 +1689,7 @@ const SalesPage = () => {
                   setReceiptType('thermal-80mm');
                 }
               }}>
-                <DialogContent className="max-w-3xl p-2 sm:p-6" aria-describedby="receipt-dialog-description">
+                <DialogContent className="max-w-3xl p-2 sm:p-6 max-h-[90vh] overflow-y-auto" aria-describedby="receipt-dialog-description">
                   <DialogHeader>
                     <DialogTitle>{t('receiptPreviewTitle')}</DialogTitle>
                   </DialogHeader>
@@ -1813,12 +1819,50 @@ const SalesPage = () => {
                             className="mt-1"
                           />
                         </div>
+
+                        {/* Customer ID Controls */}
+                        <div className="flex flex-col gap-2 pt-2 border-t border-gray-200">
+                          <Label className="text-xs font-semibold">Customer ID:</Label>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="radio" 
+                                id="custIdAutoSales" 
+                                name="custIdModeSales" 
+                                checked={customerIdMode === 'auto'} 
+                                onChange={() => setCustomerIdMode('auto')}
+                                className="h-4 w-4 text-primary"
+                              />
+                              <Label htmlFor="custIdAutoSales" className="text-xs cursor-pointer">Otomatis (Database)</Label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="radio" 
+                                id="custIdManualSales" 
+                                name="custIdModeSales" 
+                                checked={customerIdMode === 'manual'} 
+                                onChange={() => setCustomerIdMode('manual')}
+                                className="h-4 w-4 text-primary"
+                              />
+                              <Label htmlFor="custIdManualSales" className="text-xs cursor-pointer">Manual</Label>
+                            </div>
+                          </div>
+                          
+                          {customerIdMode === 'manual' && (
+                            <Input 
+                              placeholder="Masukkan ID Customer" 
+                              value={manualCustomerId}
+                              onChange={(e) => setManualCustomerId(e.target.value)}
+                              className="max-w-[250px] h-8 text-xs"
+                            />
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
                   
                   {/* Unified preview box */}
-                  <div className="border rounded-lg overflow-hidden bg-gray-50">
+                  <div className="border rounded-lg overflow-hidden bg-gray-50 mt-4">
                     {/* Print button at the top for Invoice A4 and Delivery Note */}
                     {(receiptType === 'invoice-a4' || receiptType === 'delivery-note') && (
                       <div className="bg-white border-b p-3 flex justify-between items-center">
@@ -1836,66 +1880,71 @@ const SalesPage = () => {
                       </div>
                     )}
                     
-                    <div className="p-0 max-h-[75vh] overflow-auto flex justify-center bg-gray-100 rounded-md border">
-                      {receiptType === 'invoice-a4' ? (
-                        <div className="py-4 overflow-auto" style={{ width: '480px', maxHeight: '70vh' }}>
-                          <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
-                            <div className="printable-invoice-area bg-white shadow-md">
-                              {transformedSale && (
-                                <InvoiceA4 
-                                  sale={transformedSale} 
-                                  companyInfo={{...receiptSettings, ...receiptSettingsA4}} 
-                                  designSettings={invoiceA4DesignSettings}
-                                  useTwoDecimals={useTwoDecimals}
-                                  context="sales"
-                                  userId={authUser?.id || authUser?.tenantId}
-                                />
-                              )}
+                    <div className="p-0 bg-gray-100 rounded-md border">
+                      <div className="flex justify-center min-h-full">
+                        {receiptType === 'invoice-a4' ? (
+                          <div className="py-4" style={{ width: '480px' }}>
+                            <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
+                              <div className="printable-invoice-area bg-white shadow-md">
+                                {transformedSale && (
+                                  <InvoiceA4 
+                                    sale={transformedSale} 
+                                    companyInfo={{...receiptSettings, ...receiptSettingsA4}} 
+                                    designSettings={invoiceA4DesignSettings}
+                                    useTwoDecimals={useTwoDecimals}
+                                    context="sales"
+                                    userId={authUser?.id || authUser?.tenantId}
+                                  />
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ) : receiptType === 'delivery-note' ? (
-                        <div className="py-4 overflow-auto" style={{ width: '480px', maxHeight: '70vh' }}>
-                          <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
-                            <div className="printable-invoice-area bg-white shadow-md">
-                              {transformedSale && (
-                                <DeliveryNoteSimple
-                                  sale={transformedSale}
-                                  companyInfo={{...receiptSettings, ...receiptSettingsDeliveryNote}}
-                                  vehicleNumber={vehicleNumber}
-                                  showPrice={deliveryNoteShowPrice}
-                                  receiverName={receiverName}
-                                  senderName={senderName}
-                                  showSignatureLine={deliveryNoteDesignSettings?.showSignatureLine !== false}
-                                  showNameDottedLine={deliveryNoteDesignSettings?.showNameDottedLine !== false}
-                                />
-                              )}
+                        ) : receiptType === 'delivery-note' ? (
+                          <div className="py-4" style={{ width: '480px' }}>
+                            <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
+                              <div className="printable-invoice-area bg-white shadow-md">
+                                {transformedSale && (
+                                  <DeliveryNoteSimple
+                                    sale={transformedSale}
+                                    companyInfo={{...receiptSettings, ...receiptSettingsDeliveryNote}}
+                                    vehicleNumber={vehicleNumber}
+                                    showPrice={deliveryNoteShowPrice}
+                                    useTwoDecimals={useTwoDecimals}
+                                    receiverName={transformedSale?.receiver_name || receiverName}
+                                    senderName={transformedSale?.sender_name || senderName}
+                                    showSignatureLine={deliveryNoteDesignSettings?.showSignatureLine !== false}
+                                    showNameDottedLine={deliveryNoteDesignSettings?.showNameDottedLine !== false}
+                                    customerIdMode={customerIdMode}
+                                    manualCustomerId={manualCustomerId}
+                                  />
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ) : (
-                      <div className="receipt-printable p-4">
-                          <ReceiptContent 
-                            cart={completedSaleData?.cart || cart} 
-                            subtotal={completedSaleData?.subtotal || subtotal} 
-                            discountAmount={completedSaleData?.discountAmount || discountAmount} 
-                            taxAmount={completedSaleData?.taxAmount || taxAmount} 
-                            total={completedSaleData?.total || total} 
-                            paymentAmount={completedSaleData?.paymentAmount || paymentAmount} 
-                            change={completedSaleData?.change || change} 
-                            customer={completedSaleData?.customer || customerForReceipt} 
-                            settings={
-                              receiptType === 'thermal-58mm'
-                                ? { ...receiptSettings, ...receiptSettings58mm }
-                                : { ...receiptSettings, ...receiptSettings80mm }
-                            }
-                            paperSize={receiptType.replace('thermal-', '')}
-                            useTwoDecimals={useTwoDecimals}
-                            showBarcode={showBarcode}
-                            t={t}
-                          />
-                        </div>
-                      )}
+                        ) : (
+                        <div className="receipt-printable p-4">
+                            <ReceiptContent 
+                              cart={completedSaleData?.cart || cart} 
+                              subtotal={completedSaleData?.subtotal || subtotal} 
+                              discountAmount={completedSaleData?.discountAmount || discountAmount} 
+                              taxAmount={completedSaleData?.taxAmount || taxAmount} 
+                              total={completedSaleData?.total || total} 
+                              paymentAmount={completedSaleData?.paymentAmount || paymentAmount} 
+                              change={completedSaleData?.change || change} 
+                              customer={completedSaleData?.customer || customerForReceipt} 
+                              settings={
+                                receiptType === 'thermal-58mm'
+                                  ? { ...receiptSettings, ...receiptSettings58mm }
+                                  : { ...receiptSettings, ...receiptSettings80mm }
+                              }
+                              paperSize={receiptType.replace('thermal-', '')}
+                              useTwoDecimals={useTwoDecimals}
+                              showBarcode={showBarcode}
+                              t={t}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
@@ -2358,7 +2407,7 @@ const SalesPage = () => {
 
       {/* Transaction Print Dialog */}
       <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
-        <DialogContent className="max-w-3xl" aria-describedby={undefined}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>{t('printReceipt')}</DialogTitle>
           </DialogHeader>
@@ -2443,104 +2492,110 @@ const SalesPage = () => {
 
             {/* Delivery Note Options - Only show when delivery-note is selected */}
             {receiptType === 'delivery-note' && (
-              <div className="flex flex-wrap gap-4 p-4 bg-muted rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm whitespace-nowrap">Template:</Label>
-                  <Select value={deliveryNoteTemplate || 'simple'} onValueChange={setDeliveryNoteTemplate}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="simple">Simple</SelectItem>
-                      <SelectItem value="advanced">{t('advanced') || 'Advanced'}</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="flex flex-col gap-4 p-4 bg-muted rounded-lg">
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm whitespace-nowrap">Template:</Label>
+                    <Select value={deliveryNoteTemplate || 'simple'} onValueChange={setDeliveryNoteTemplate}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="simple">Simple</SelectItem>
+                        <SelectItem value="advanced">{t('advanced') || 'Advanced'}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm whitespace-nowrap">{t('vehicleNo') || 'No. Kendaraan'}:</Label>
+                    <Input 
+                      value={vehicleNumber} 
+                      onChange={(e) => setVehicleNumber(e.target.value)}
+                      placeholder="B 1234 XYZ"
+                      className="w-[140px]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm whitespace-nowrap">{t('showPrice') || 'Tampilkan Harga'}:</Label>
+                    <Switch
+                      checked={deliveryNoteShowPrice}
+                      onCheckedChange={setDeliveryNoteShowPrice}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm whitespace-nowrap">{t('vehicleNo') || 'No. Kendaraan'}:</Label>
-                  <Input 
-                    value={vehicleNumber} 
-                    onChange={(e) => setVehicleNumber(e.target.value)}
-                    placeholder="B 1234 XYZ"
-                    className="w-[140px]"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm whitespace-nowrap">{t('showPrice') || 'Tampilkan Harga'}:</Label>
-                  <Switch
-                    checked={deliveryNoteShowPrice}
-                    onCheckedChange={setDeliveryNoteShowPrice}
-                  />
-                </div>
+
               </div>
             )}
 
             {/* Preview Area */}
-            <div className="border rounded-md p-0 bg-gray-100 max-h-[75vh] overflow-auto flex justify-center">
-               {receiptType === 'invoice-a4' ? (
-                 <div className="py-4 overflow-auto" style={{ width: '480px', maxHeight: '70vh' }}>
-                   <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
-                     <div className="printable-invoice-area bg-white shadow-md">
-                       {finalSaleData && (
-                         <InvoiceA4 
-                           sale={finalSaleData} 
-                           companyInfo={{...receiptSettings, ...receiptSettingsA4}} 
-                           designSettings={invoiceA4DesignSettings}
-                           useTwoDecimals={useTwoDecimals}
-                           context="sales"
-                           userId={authUser?.id || authUser?.tenantId}
-                         />
-                       )}
+            <div className="border rounded-md p-0 bg-gray-100 mt-4">
+               <div className="flex justify-center min-h-full">
+                 {receiptType === 'invoice-a4' ? (
+                   <div className="py-4" style={{ width: '480px' }}>
+                     <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
+                       <div className="printable-invoice-area bg-white shadow-md">
+                         {finalSaleData && (
+                           <InvoiceA4 
+                             sale={finalSaleData} 
+                             companyInfo={{...receiptSettings, ...receiptSettingsA4}} 
+                             designSettings={invoiceA4DesignSettings}
+                             useTwoDecimals={useTwoDecimals}
+                             context="sales"
+                             userId={authUser?.id || authUser?.tenantId}
+                           />
+                         )}
+                       </div>
                      </div>
                    </div>
-                 </div>
-               ) : receiptType === 'delivery-note' ? (
-                 <div className="py-4 overflow-auto" style={{ width: '480px', maxHeight: '70vh' }}>
-                   <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
-                     <div className="printable-invoice-area bg-white shadow-md">
-                       {finalSaleData && (
+                 ) : receiptType === 'delivery-note' ? (
+                   <div className="py-4" style={{ width: '480px' }}>
+                     <div style={{ width: '210mm', transform: 'scale(0.6)', transformOrigin: 'top left' }}>
+                       <div className="printable-invoice-area bg-white shadow-md">
+                         {finalSaleData && (
                          <DeliveryNoteSimple
                            sale={finalSaleData}
                            companyInfo={{...receiptSettings, ...receiptSettingsDeliveryNote}}
                            vehicleNumber={vehicleNumber}
                            showPrice={deliveryNoteShowPrice}
-                           receiverName={receiverName}
-                           senderName={senderName}
+                           useTwoDecimals={useTwoDecimals}
+                           receiverName={finalSaleData?.receiver_name}
+                           senderName={finalSaleData?.sender_name}
                            showSignatureLine={deliveryNoteDesignSettings?.showSignatureLine !== false}
                            showNameDottedLine={deliveryNoteDesignSettings?.showNameDottedLine !== false}
                          />
-                       )}
+                         )}
+                       </div>
                      </div>
                    </div>
-                 </div>
-               ) : (
-                 <div className="bg-white p-4 shadow-sm m-4">
-                     {selectedSaleForPrint && (
-                     <ReceiptContent 
-                       cart={selectedSaleForPrint.items.map(item => ({
-                         ...item,
-                         name: item.product_name || item.name
-                       }))} 
-                       subtotal={selectedSaleForPrint.subtotal} 
-                       discountAmount={selectedSaleForPrint.discount_amount} 
-                       taxAmount={selectedSaleForPrint.tax_amount} 
-                       total={selectedSaleForPrint.total_amount} 
-                       paymentAmount={selectedSaleForPrint.payment_amount} 
-                       change={selectedSaleForPrint.change_amount} 
-                       customer={selectedSaleForPrint.customer} 
-                       settings={
-                         receiptType === 'thermal-58mm'
-                           ? { ...receiptSettings, ...receiptSettings58mm }
-                           : { ...receiptSettings, ...receiptSettings80mm }
-                       }
-                       paperSize={receiptType.replace('thermal-', '')}
-                       useTwoDecimals={useTwoDecimals}
-                       showBarcode={showBarcode}
-                       t={t}
-                     />
-                   )}
-                 </div>
-               )}
+                 ) : (
+                   <div className="bg-white p-4 shadow-sm m-4">
+                       {selectedSaleForPrint && (
+                       <ReceiptContent 
+                         cart={selectedSaleForPrint.items.map(item => ({
+                           ...item,
+                           name: item.product_name || item.name
+                         }))} 
+                         subtotal={selectedSaleForPrint.subtotal} 
+                         discountAmount={selectedSaleForPrint.discount_amount} 
+                         taxAmount={selectedSaleForPrint.tax_amount} 
+                         total={selectedSaleForPrint.total_amount} 
+                         paymentAmount={selectedSaleForPrint.payment_amount} 
+                         change={selectedSaleForPrint.change_amount} 
+                         customer={selectedSaleForPrint.customer} 
+                         settings={
+                           receiptType === 'thermal-58mm'
+                             ? { ...receiptSettings, ...receiptSettings58mm }
+                             : { ...receiptSettings, ...receiptSettings80mm }
+                         }
+                         paperSize={receiptType.replace('thermal-', '')}
+                         useTwoDecimals={useTwoDecimals}
+                         showBarcode={showBarcode}
+                         t={t}
+                       />
+                     )}
+                   </div>
+                 )}
+               </div>
             </div>
           </div>
         </DialogContent>
@@ -2568,10 +2623,13 @@ const SalesPage = () => {
             companyInfo={{...receiptSettings, ...receiptSettingsDeliveryNote}}
             vehicleNumber={vehicleNumber}
             showPrice={deliveryNoteShowPrice}
+            useTwoDecimals={useTwoDecimals}
             receiverName={receiverName}
             senderName={senderName}
             showSignatureLine={deliveryNoteDesignSettings?.showSignatureLine !== false}
             showNameDottedLine={deliveryNoteDesignSettings?.showNameDottedLine !== false}
+            customerIdMode={isReceiptDialogOpen ? customerIdMode : 'auto'}
+            manualCustomerId={isReceiptDialogOpen ? manualCustomerId : ''}
           />
         )}
       </div>
@@ -2589,8 +2647,8 @@ const SalesPage = () => {
               change={completedSaleData.change} 
               customer={completedSaleData.customer} 
               settings={
-                receiptType === 'thermal-55mm'
-                  ? { ...receiptSettings, ...receiptSettings55mm }
+                receiptType === 'thermal-58mm'
+                  ? { ...receiptSettings, ...receiptSettings58mm }
                   : { ...receiptSettings, ...receiptSettings80mm }
               }
               paperSize={receiptType.replace('thermal-', '')}
@@ -2612,8 +2670,8 @@ const SalesPage = () => {
               change={selectedSaleForPrint.change_amount} 
               customer={selectedSaleForPrint.customer} 
               settings={
-                receiptType === 'thermal-55mm'
-                  ? { ...receiptSettings, ...receiptSettings55mm }
+                receiptType === 'thermal-58mm'
+                  ? { ...receiptSettings, ...receiptSettings58mm }
                   : { ...receiptSettings, ...receiptSettings80mm }
               }
               paperSize={receiptType.replace('thermal-', '')}

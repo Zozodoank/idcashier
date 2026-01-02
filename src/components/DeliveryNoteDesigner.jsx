@@ -29,7 +29,7 @@ const DeliveryNoteDesigner = ({ storeSettings, onSave }) => {
     // Header settings
     showLogo: true,
     showCompanyInfo: true,
-    showBorder: true,
+    showBorder: false,
     titleAlign: 'right',
     
     // Document settings
@@ -47,6 +47,7 @@ const DeliveryNoteDesigner = ({ storeSettings, onSave }) => {
     
     // Table columns
     colNumber: true,
+    colBarcode: true,
     colItem: true,
     colQty: true,
     colUnit: true,
@@ -213,13 +214,14 @@ const DeliveryNoteDesigner = ({ storeSettings, onSave }) => {
     id: 'SJ/2024/001234',
     created_at: new Date().toISOString(),
     customer: {
+      id: 'CUST-001',
       name: 'Pelanggan Contoh',
       address: 'Jl. Contoh No. 123',
       phone: '081234567890'
     },
     items: [
-      { name: 'Produk A', quantity: 10, unit: 'pcs', price: 50000, notes: 'Catatan produk A' },
-      { name: 'Produk B', quantity: 5, unit: 'box', price: 100000, notes: 'Catatan produk B' }
+      { name: 'Produk A', barcode: '8991001', quantity: 10, unit: 'pcs', price: 50000, notes: 'Catatan produk A' },
+      { name: 'Produk B', barcode: '8991002', quantity: 5, unit: 'box', price: 100000, notes: 'Catatan produk B' }
     ],
     notes: 'Catatan tambahan untuk surat jalan ini'
   };
@@ -373,6 +375,10 @@ const DeliveryNoteDesigner = ({ storeSettings, onSave }) => {
                   <label className="flex items-center justify-between">
                     <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{t('colNumber') || 'Kolom Nomor'}</span>
                     <Switch checked={designSettings.colNumber} onCheckedChange={(checked) => handleTableChange('colNumber', checked)} />
+                  </label>
+                  <label className="flex items-center justify-between">
+                    <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{t('colBarcode') || 'Kolom Barcode'}</span>
+                    <Switch checked={designSettings.colBarcode} onCheckedChange={(checked) => handleTableChange('colBarcode', checked)} />
                   </label>
                   <label className="flex items-center justify-between">
                     <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{t('colItem') || 'Kolom Nama Barang'}</span>

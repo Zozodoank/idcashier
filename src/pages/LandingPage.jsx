@@ -531,7 +531,7 @@ const LandingPage = () => {
                   <div className="text-3xl font-bold mt-4">
                     {pricing.currency}{plan.price.toLocaleString('id-ID')}
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      /{t('landingPerMonth')}
+                      {t('landingPerMonth')}
                     </span>
                   </div>
                 </CardHeader>

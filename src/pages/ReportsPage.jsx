@@ -906,8 +906,10 @@ const ReportsPage = () => {
           // Use hierarchy: hpp_total (with custom costs) > cost_snapshot > hpp
           const hpp = item.hpp_total || item.cost_snapshot || item.hpp || 0;
           
-          // Total cost = baseCost + HPP
-          const cost = baseCost + hpp;
+          // Total cost calculation
+          // FIX: Do not add baseCost + hpp because hpp/snapshot usually already contains the full cost (including baseCost)
+          // We prioritize the historical snapshot (hpp) if available, otherwise fallback to current baseCost
+          const cost = hpp > 0 ? hpp : baseCost;
 
           // Store individual HPP values for detailed reporting
           const hpp_base = item.hpp || ((item.product_id && productsMapData[item.product_id]) ? productsMapData[item.product_id].hpp : 0);

@@ -1,1 +1,0 @@
-RAISE NOTICE '- Allow demo user access to all data';

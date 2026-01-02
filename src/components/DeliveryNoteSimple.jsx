@@ -12,7 +12,10 @@ const DeliveryNoteSimple = forwardRef(({
   senderName = '',
   showSignatureLine = true,
   showNameDottedLine = true,
-  designSettings = {}
+  designSettings = {},
+  customerIdMode = 'auto',
+  manualCustomerId = '',
+  useTwoDecimals
 }, ref) => {
   const { t } = useLanguage();
   
@@ -32,6 +35,7 @@ const DeliveryNoteSimple = forwardRef(({
     showSender: true,
     showReceiver: true,
     colNumber: true,
+    colBarcode: true,
     colItem: true,
     colQty: true,
     colUnit: true,
@@ -60,9 +64,14 @@ const DeliveryNoteSimple = forwardRef(({
     currency: 'IDR',
     decimalSeparator: ',',
     thousandSeparator: '.',
-    decimalPlaces: 0,
+    decimalPlaces: typeof useTwoDecimals !== 'undefined' ? (useTwoDecimals ? 2 : 0) : 0,
     ...designSettings
   };
+
+  // Override decimalPlaces if useTwoDecimals prop is explicitly provided
+  if (typeof useTwoDecimals !== 'undefined') {
+    settings.decimalPlaces = useTwoDecimals ? 2 : 0;
+  }
   
   const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -101,11 +110,11 @@ const DeliveryNoteSimple = forwardRef(({
   // Count visible columns
   const visibleColumns = [
     settings.colNumber,
+    settings.colBarcode,
     settings.colItem,
     settings.colQty,
     settings.colUnit,
-    settings.colNotes,
-    showPrice && settings.colPrice,
+    showPrice, // Replaces colNotes/colPrice
     settings.colWeight
   ].filter(Boolean).length;
 
@@ -139,13 +148,13 @@ const DeliveryNoteSimple = forwardRef(({
             )}
             {settings.showCompanyInfo && (
               <>
-                <div style={{ fontWeight: 'bold', fontSize: `${settings.fontSize + 2}pt` }}>
+                <div style={{ fontWeight: 'bold', fontSize: `${settings.fontSize + 2}px` }}>
                   {companyInfo?.name || 'Nama Perusahaan'}
                 </div>
-                <div style={{ fontSize: `${settings.fontSize - 2}pt`, marginTop: '1mm' }}>
+                <div style={{ fontSize: `${settings.fontSize - 2}px`, marginTop: '1mm' }}>
                   {companyInfo?.address || ''}
                 </div>
-                <div style={{ fontSize: `${settings.fontSize - 2}pt` }}>
+                <div style={{ fontSize: `${settings.fontSize - 2}px` }}>
                   Telp: {companyInfo?.phone || ''}
                 </div>
               </>
@@ -154,18 +163,18 @@ const DeliveryNoteSimple = forwardRef(({
           <div style={{ textAlign: settings.titleAlign || 'right' }}>
             <div style={{ 
               fontWeight: 'bold', 
-              fontSize: `${settings.fontSize + 5}pt`, 
+              fontSize: `${settings.fontSize + 5}px`, 
               marginBottom: '2mm' 
             }}>
               {t('deliveryNoteTitle')}
             </div>
             {settings.showDocNumber && (
-              <div style={{ fontSize: `${settings.fontSize - 2}pt` }}>
+              <div style={{ fontSize: `${settings.fontSize - 2}px` }}>
                 {t('expenseNumber') || 'No'}: {sale?.invoice_number || settings.invoiceFormat || 'SJ/2024/001'}
               </div>
             )}
             {settings.showDate && (
-              <div style={{ fontSize: `${settings.fontSize - 2}pt` }}>
+              <div style={{ fontSize: `${settings.fontSize - 2}px` }}>
                 {t('dateLabel')}: {formatDate(sale?.created_at)}
               </div>
             )}
@@ -178,9 +187,15 @@ const DeliveryNoteSimple = forwardRef(({
         {settings.showReceiver && (
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 'bold', marginBottom: '1mm' }}>{t('to')}:</div>
-            <div>{sale?.customer?.name || 'Customer'}</div>
-            <div style={{ fontSize: `${settings.fontSize - 2}pt` }}>{sale?.customer?.address || ''}</div>
-            <div style={{ fontSize: `${settings.fontSize - 2}pt` }}>{sale?.customer?.phone || ''}</div>
+            <div style={{ fontSize: `${settings.fontSize + 4}px`, fontWeight: 'bold' }}>{sale?.customer?.name || 'Customer'}</div>
+            {/* Customer ID Display */}
+            {((customerIdMode === 'manual' && manualCustomerId) || (customerIdMode === 'auto' && (sale?.customer?.member_id || sale?.customer?.id))) && (
+               <div style={{ fontSize: `${settings.fontSize - 2}px`, fontWeight: 'normal' }}>
+                 ID Pelanggan: {customerIdMode === 'manual' ? manualCustomerId : (sale?.customer?.member_id || sale?.customer?.id)}
+               </div>
+            )}
+            <div style={{ fontSize: `${settings.fontSize - 2}px`, fontWeight: 'normal' }}>{sale?.customer?.address || ''}</div>
+            <div style={{ fontSize: `${settings.fontSize - 2}px`, fontWeight: 'normal' }}>{sale?.customer?.phone || ''}</div>
           </div>
         )}
         {settings.showDriver && vehicleNumber && (
@@ -210,6 +225,14 @@ const DeliveryNoteSimple = forwardRef(({
                 width: '8%' 
               }}>{t('expenseNumber') || 'No'}</th>
             )}
+            {settings.colBarcode && (
+              <th style={{ 
+                border: `1px solid ${settings.tableBorderColor}`, 
+                padding: '2mm', 
+                textAlign: 'center',
+                width: '15%'
+              }}>{t('barcode') || 'Barcode'}</th>
+            )}
             {settings.colItem && (
               <th style={{ 
                 border: `1px solid ${settings.tableBorderColor}`, 
@@ -233,15 +256,8 @@ const DeliveryNoteSimple = forwardRef(({
                 width: '10%' 
               }}>{t('unit')}</th>
             )}
-            {settings.colNotes && (
-              <th style={{ 
-                border: `1px solid ${settings.tableBorderColor}`, 
-                padding: '2mm', 
-                textAlign: 'left', 
-                width: '15%' 
-              }}>{t('notes')}</th>
-            )}
-            {showPrice && settings.colPrice && (
+            {/* Notes column replaced by Price/Total as requested */}
+            {showPrice && (
               <th style={{ 
                 border: `1px solid ${settings.tableBorderColor}`, 
                 padding: '2mm', 
@@ -269,6 +285,13 @@ const DeliveryNoteSimple = forwardRef(({
                   textAlign: 'center' 
                 }}>{index + 1}</td>
               )}
+              {settings.colBarcode && (
+                <td style={{ 
+                  border: `1px solid ${settings.tableBorderColor}`, 
+                  padding: '2mm', 
+                  textAlign: 'center'
+                }}>{item.barcode || item.product?.barcode || '-'}</td>
+              )}
               {settings.colItem && (
                 <td style={{ 
                   border: `1px solid ${settings.tableBorderColor}`, 
@@ -289,18 +312,12 @@ const DeliveryNoteSimple = forwardRef(({
                   textAlign: 'center' 
                 }}>{item.unit || 'pcs'}</td>
               )}
-              {settings.colNotes && (
-                <td style={{ 
-                  border: `1px solid ${settings.tableBorderColor}`, 
-                  padding: '2mm' 
-                }}>{item.notes || '-'}</td>
-              )}
-              {showPrice && settings.colPrice && (
+              {showPrice && (
                 <td style={{ 
                   border: `1px solid ${settings.tableBorderColor}`, 
                   padding: '2mm', 
                   textAlign: 'right' 
-                }}>{formatCurrency(item.price)}</td>
+                }}>{formatCurrency(item.price * item.quantity)}</td>
               )}
               {settings.colWeight && (
                 <td style={{ 
@@ -326,7 +343,7 @@ const DeliveryNoteSimple = forwardRef(({
             </tr>
           )}
         </tbody>
-        {showPrice && settings.colPrice && sale?.items?.length > 0 && (
+        {showPrice && sale?.items?.length > 0 && (
           <tfoot>
             <tr style={{ fontWeight: 'bold' }}>
               <td 
@@ -351,7 +368,7 @@ const DeliveryNoteSimple = forwardRef(({
 
       {/* Notes */}
       {settings.showNotes && sale?.notes && (
-        <div style={{ marginBottom: '5mm', fontSize: `${settings.fontSize - 2}pt` }}>
+        <div style={{ marginBottom: '5mm', fontSize: `${settings.fontSize - 2}px` }}>
           <strong>{t('notes')}:</strong> {sale.notes}
         </div>
       )}
@@ -376,11 +393,10 @@ const DeliveryNoteSimple = forwardRef(({
                 maxWidth: '120px',
                 margin: '0 auto'
               }}>
-                {showNameDottedLine && (
-                  null
-                )}
-                {!showNameDottedLine && senderName && (
-                  <p style={{ margin: 0, fontWeight: 'bold' }}>( {senderName} )</p>
+                {senderName ? (
+                  <p style={{ margin: 0, fontWeight: 'bold' }}>{senderName}</p>
+                ) : (
+                  <p style={{ margin: 0 }}>                                    </p>
                 )}
               </div>
             </div>
@@ -398,11 +414,10 @@ const DeliveryNoteSimple = forwardRef(({
                 maxWidth: '120px',
                 margin: '0 auto'
               }}>
-                {showNameDottedLine && (
-                  null
-                )}
-                {!showNameDottedLine && receiverName && (
-                  <p style={{ margin: 0, fontWeight: 'bold' }}>( {receiverName} )</p>
+                {receiverName ? (
+                  <p style={{ margin: 0, fontWeight: 'bold' }}>{receiverName}</p>
+                ) : (
+                  <p style={{ margin: 0 }}>                                    </p>
                 )}
               </div>
             </div>
@@ -424,7 +439,7 @@ const DeliveryNoteSimple = forwardRef(({
                   null
                 )}
                 {!showNameDottedLine && (
-                  <p style={{ margin: 0 }}>( )</p>
+                  <p style={{ margin: 0 }}></p>
                 )}
               </div>
             </div>

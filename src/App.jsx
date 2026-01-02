@@ -23,6 +23,7 @@ import { PaymentProvider } from '@/contexts/PaymentContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDisableNumberInputScroll } from '@/hooks/useDisableNumberInputScroll';
 import Toaster from '@/components/Toaster';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 // ProtectedRoute component to handle authentication
 const ProtectedRoute = ({ children }) => {
@@ -53,32 +54,34 @@ function App() {
           <PaymentProvider>
             <AuthProvider>
               <HPPProvider>
-                <Router future={{
-                  v7_startTransition: true,
-                  v7_relativeSplatPath: true
-                }}>
-                  <Helmet>
-                    <title>idCashier - Point of Sale System</title>
-                    <meta name="description" content="Modern multi-tenant Point of Sale system for your business" />
-                  </Helmet>
-                  <Toaster />
-                  <Routes>
-                    <Route path="/" element={<LandingPage />} />
-                    <Route path="/login" element={<LoginPage />} />
-                    <Route path="/verify-email" element={<EmailVerificationHandler />} />
-                    <Route path="/reset-password" element={<ResetPasswordPage />} />
-                    <Route path="/register" element={<RegisterPage />} />
-                    <Route path="/renewal" element={<RenewalPage />} />
-                    <Route path="/payment-callback" element={<PaymentCallbackPage />} />
-                    <Route path="/auth/callback" element={<AuthCallbackPage />} />
-                    <Route path="/privacy" element={<PrivacyPolicyPage />} />
-                    <Route path="/terms" element={<TermsPage />} />
-                    <Route path="/about" element={<AboutPage />} />
-                    <Route path="/store-setup" element={<ProtectedRoute><StoreSetupPage /></ProtectedRoute>} />
-                    <Route path="/dashboard/*" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>} />
-                    <Route path="*" element={<Navigate to="/" />} />
-                  </Routes>
-                </Router>
+                <ErrorBoundary>
+                  <Router future={{
+                    v7_startTransition: true,
+                    v7_relativeSplatPath: true
+                  }}>
+                    <Helmet>
+                      <title>idCashier - Point of Sale System</title>
+                      <meta name="description" content="Modern multi-tenant Point of Sale system for your business" />
+                    </Helmet>
+                    <Toaster />
+                    <Routes>
+                      <Route path="/" element={<LandingPage />} />
+                      <Route path="/login" element={<LoginPage />} />
+                      <Route path="/verify-email" element={<EmailVerificationHandler />} />
+                      <Route path="/reset-password" element={<ResetPasswordPage />} />
+                      <Route path="/register" element={<RegisterPage />} />
+                      <Route path="/renewal" element={<RenewalPage />} />
+                      <Route path="/payment-callback" element={<PaymentCallbackPage />} />
+                      <Route path="/auth/callback" element={<AuthCallbackPage />} />
+                      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                      <Route path="/terms" element={<TermsPage />} />
+                      <Route path="/about" element={<AboutPage />} />
+                      <Route path="/store-setup" element={<ProtectedRoute><StoreSetupPage /></ProtectedRoute>} />
+                      <Route path="/dashboard/*" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>} />
+                      <Route path="*" element={<Navigate to="/" />} />
+                    </Routes>
+                  </Router>
+                </ErrorBoundary>
               </HPPProvider>
             </AuthProvider>
           </PaymentProvider>

@@ -242,37 +242,26 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
       
       {/* Barcode Section - Only for thermal receipts */}
       {shouldShowBarcode && paperSize !== 'A4' && (() => {
-        const itemsWithBarcode = cart.filter(item => item.barcode && item.barcode.toString().trim().length > 0);
-        
-        if (itemsWithBarcode.length === 0) {
-          return null; // No items with barcode, don't show section
-        }
+        // Display single barcode for transaction ID (or temporary ID)
+        // This replaces the item-level barcode list to ensure accumulation/single barcode per receipt
+        const barcodeValue = transactionId || `INV/${new Date().getTime()}`;
         
         return (
           <>
             <hr className="border-dashed border-black my-2" />
-            <div className="text-center space-y-2">
-              {itemsWithBarcode.map((item, index) => {
-                // Prepare barcode value - use as-is for CODE128
-                const barcodeValue = item.barcode.toString().trim();
-                
-                return (
-                  <div key={`${item.id}-${index}`} className="mb-3">
-                    <div style={{ display: 'inline-block' }}>
-                      <Barcode 
-                        value={barcodeValue}
-                        format="CODE128"
-                        width={paperSize === '58mm' ? 1.2 : 1.5}
-                        height={paperSize === '58mm' ? 35 : 45}
-                        displayValue={true}
-                        fontSize={10}
-                        margin={5}
-                        background="#ffffff"
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="text-center mb-3">
+              <div style={{ display: 'inline-block' }}>
+                <Barcode 
+                  value={barcodeValue}
+                  format="CODE128"
+                  width={paperSize === '58mm' ? 1.2 : 1.5}
+                  height={paperSize === '58mm' ? 35 : 45}
+                  displayValue={true}
+                  fontSize={10}
+                  margin={5}
+                  background="#ffffff"
+                />
+              </div>
             </div>
           </>
         );

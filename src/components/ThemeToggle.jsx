@@ -13,6 +13,7 @@ const ThemeToggle = () => {
       size="icon"
       onClick={toggleTheme}
       className="relative overflow-hidden"
+      aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
     >
       <motion.div
         initial={false}

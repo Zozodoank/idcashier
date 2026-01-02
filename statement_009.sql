@@ -1,1 +1,0 @@
-RAISE NOTICE 'Created products access policy';

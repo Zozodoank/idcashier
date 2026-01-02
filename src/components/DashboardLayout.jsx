@@ -16,6 +16,7 @@ import ProductsPage from '@/pages/ProductsPage';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import SubscriptionPage from '@/pages/SubscriptionPage';
+import HelpPage from '@/pages/HelpPage';
 import DeveloperPage from '@/pages/DeveloperPage';
 import EmployeesPage from '@/pages/EmployeesPage';
 import ExpensesPage from '@/pages/ExpensesPage';
@@ -33,6 +34,7 @@ import {
   Users,
   CalendarClock,
   Receipt,
+  HelpCircle,
 } from 'lucide-react';
 
 // Safe storage wrapper
@@ -222,6 +224,7 @@ const DashboardLayout = () => {
       { id: 'reports', label: t?.('reports') || 'Reports', icon: BarChart, role: ['owner', 'cashier'] },
       { id: 'settings', label: t?.('settings') || 'Settings', icon: Settings, role: ['owner'] },
       { id: 'subscription', label: t?.('subscription') || 'Langganan', icon: CreditCard, role: ['owner'] },
+      { id: 'help', label: t?.('help') || 'Bantuan', icon: HelpCircle, role: ['owner', 'cashier'] },
     ];
 
     if (user.email === 'jho.j80@gmail.com' && role === 'owner') {
@@ -312,6 +315,7 @@ const DashboardLayout = () => {
       case 'reports': return <ReportsPage user={user} />;
       case 'settings': return <SettingsPage user={user} onUserUpdate={updateUser} />;
       case 'subscription': return <SubscriptionPage />;
+      case 'help': return <HelpPage />;
       case 'developer': return user.email === 'jho.j80@gmail.com' ? <DeveloperPage /> : <DashboardPage />;
       default: 
         handleNavigate('dashboard');
@@ -354,6 +358,9 @@ const DashboardLayout = () => {
               size="icon"
               className="md:inline-flex"
               onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label={sidebarOpen ? (t?.('closeMenu') || 'Close menu') : (t?.('openMenu') || 'Open menu')}
+              aria-expanded={sidebarOpen}
+              aria-controls="dashboard-sidebar"
             >
               {sidebarOpen ? <X /> : <Menu />}
             </Button>
@@ -366,7 +373,11 @@ const DashboardLayout = () => {
           <div className="flex items-center gap-4">
             <LanguageSelector />
             <ThemeToggle />
-            <Button variant="ghost" size="icon" onClick={async () => {
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t?.('logout') || 'Logout'}
+              onClick={async () => {
               // Clean logout: Let AuthContext handle all cleanup
               try {
                 await logout();
@@ -444,6 +455,7 @@ const DashboardLayout = () => {
 
       <div className="flex">
         <aside
+          id="dashboard-sidebar"
           className={`fixed md:sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 border-r bg-card transform transition-transform ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           } md:translate-x-0`}
