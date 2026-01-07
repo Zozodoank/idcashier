@@ -18,7 +18,7 @@ Secrets are used to store sensitive information like API keys, service role keys
 | Secret Name                 | Purpose                                           | Where to Get Value                                     | Required For                  |
 | --------------------------- | ------------------------------------------------- | ------------------------------------------------------ | ----------------------------- |
 | `SUPABASE_SERVICE_ROLE_KEY` | Allows Edge Functions to bypass RLS policies.     | Supabase Dashboard > Project Settings > API            | All internal auth functions   |
-| `ALLOWED_ORIGINS`           | Configures CORS for Edge Functions.               | Your frontend domain(s) (e.g., `https://idcashier.my.id`) | All public-facing functions |
+| `ALLOWED_ORIGINS`           | Configures CORS for Edge Functions.               | Your frontend domain(s) (e.g., `https://idcashier.com`) | All public-facing functions |
 | `FRONTEND_URL`              | Backward compatibility for certain functions.     | Your primary frontend URL                              | Legacy functions              |
 | `JWT_SECRET`                | Used for signing JWTs.                            | Supabase Dashboard > Project Settings > API            | Auth operations               |
 | `CRONJOB_SECRET`            | Secures scheduled cron job functions.             | Generate a secure random string                        | Scheduled functions           |

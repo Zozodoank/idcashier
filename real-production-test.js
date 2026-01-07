@@ -85,7 +85,7 @@ async function testProductionModeStepByStep() {
     const { data: demoUser, error } = await supabase
       .from('users')
       .select('id, email, role')
-      .eq('email', 'demo@idcashier.my.id')
+      .eq('email', 'demo@idcashier.com')
       .single();
     
     if (error) {

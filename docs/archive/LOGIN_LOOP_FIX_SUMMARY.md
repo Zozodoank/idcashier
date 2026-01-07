@@ -27,4 +27,4 @@
 ## Next Steps for User
 -   **Redeploy Frontend**: These changes are in the frontend code. You must redeploy your frontend application (e.g., to Vercel, Netlify, or your hosting provider) for the fixes to take effect.
 -   **Test Payment Flow**: Perform a test payment registration. The auto-login should now work correctly without redirecting to login loop.
--   **Test Verification**: If verification links still fail, ensure your `redirectUrl` in Supabase (or `auth-register` function) matches your deployed domain (e.g. `https://idcashier.my.id/login`).
+-   **Test Verification**: If verification links still fail, ensure your `redirectUrl` in Supabase (or `auth-register` function) matches your deployed domain (e.g. `https://idcashier.com/login`).

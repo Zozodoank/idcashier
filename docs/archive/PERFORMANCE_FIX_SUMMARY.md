@@ -106,7 +106,7 @@ Or deploy via Supabase Dashboard:
 3. Update with new code from `supabase/functions/auth-login-final/index.ts`
 
 ### Step 3: Upload Frontend Build
-Upload all files from `dist/` folder to your hosting (idcashier.my.id)
+Upload all files from `dist/` folder to your hosting (idcashier.com)
 
 ### Step 4: Clear Caches
 - Browser: Ctrl+Shift+Delete
@@ -134,7 +134,7 @@ Upload all files from `dist/` folder to your hosting (idcashier.my.id)
    ```
 
 ### Test with Tool
-Access: `https://idcashier.my.id/test-pages-connection.html`
+Access: `https://idcashier.com/test-pages-connection.html`
 
 ---
 

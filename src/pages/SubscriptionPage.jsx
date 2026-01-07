@@ -22,7 +22,7 @@ const SubscriptionPage = () => {
   const [subscriptionData, setSubscriptionData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const isDemoAccount = user?.email === 'demo@idcashier.my.id';
+  const isDemoAccount = user?.email === 'demo@idcashier.com';
 
   useEffect(() => {
     const checkSubscription = async () => {

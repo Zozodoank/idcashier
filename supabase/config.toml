@@ -120,9 +120,9 @@ file_size_limit = "50MiB"
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "https://idcashier.my.id"
+site_url = "https://idcashier.com"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://idcashier.my.id/reset-password", "https://idcashier.my.id", "https://idcashier.my.id/login", "https://idcashier.my.id/auth/callback", "http://localhost:3000", "http://localhost:3000/login", "http://localhost:3000/auth/callback", "http://127.0.0.1:3000", "http://127.0.0.1:3000/auth/callback"]
+additional_redirect_urls = ["https://idcashier.com/reset-password", "https://idcashier.com", "https://idcashier.com/login", "https://idcashier.com/auth/callback", "http://localhost:3000", "http://localhost:3000/login", "http://localhost:3000/auth/callback", "http://127.0.0.1:3000", "http://127.0.0.1:3000/auth/callback"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 604800
 # Path to JWT signing key. DO NOT commit your signing keys file to git.
@@ -196,7 +196,7 @@ otp_expiry = 86400
 # port = 587
 # user = "your-email@gmail.com"
 # pass = "env(GMAIL_APP_PASSWORD)"  # Use App Password, not your regular password
-# admin_email = "noreply@idcashier.my.id"
+# admin_email = "noreply@idcashier.com"
 # sender_name = "idCashier"
 # 
 # To get Gmail App Password:
@@ -212,7 +212,7 @@ otp_expiry = 86400
 # port = 587
 # user = "apikey"
 # pass = "env(SENDGRID_API_KEY)"
-# admin_email = "noreply@idcashier.my.id"
+# admin_email = "noreply@idcashier.com"
 # sender_name = "idCashier"
 #
 # 3. Mailgun:
@@ -222,7 +222,7 @@ otp_expiry = 86400
 # port = 587
 # user = "postmaster@your-domain.mailgun.org"
 # pass = "env(MAILGUN_SMTP_PASSWORD)"
-# admin_email = "noreply@idcashier.my.id"
+# admin_email = "noreply@idcashier.com"
 # sender_name = "idCashier"
 #
 # 4. AWS SES:
@@ -232,17 +232,17 @@ otp_expiry = 86400
 # port = 587
 # user = "env(AWS_SES_USER)"
 # pass = "env(AWS_SES_PASSWORD)"
-# admin_email = "noreply@idcashier.my.id"
+# admin_email = "noreply@idcashier.com"
 # sender_name = "idCashier"
 
 # ACTIVE SMTP Configuration - idCashier Mail Server
 [auth.email.smtp]
 enabled = true
-host = "mail.idcashier.my.id"
+host = "mail.idcashier.com"
 port = 465
-user = "support@idcashier.my.id"
+user = "support@idcashier.com"
 pass = "env(EMAIL_PASSWORD)"
-admin_email = "support@idcashier.my.id"
+admin_email = "support@idcashier.com"
 sender_name = "idCashier"
 
 # Uncomment to customize email templates for a branded experience

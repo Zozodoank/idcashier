@@ -111,7 +111,7 @@ ON CONFLICT (owner_id) DO UPDATE SET header_text = EXCLUDED.header_text;
 ### **3. Test on Production**
 ```
 1. Clear browser cache (Ctrl+Shift+Delete)
-2. Login to https://idcashier.my.id
+2. Login to https://idcashier.com
 3. Check dashboard - should show 4 products now
 4. Verify data loads correctly
 ```

@@ -82,7 +82,7 @@ This will start the frontend development server on port 3000.
 - The application no longer requires a backend server as all API calls are made directly to Supabase
 - All data is stored in Supabase database
 - Authentication is handled by Supabase Auth
-- The application is designed to work with the idcashier.my.id domain
+- The application is designed to work with the idcashier.com domain
 - Make sure to configure CORS settings in Supabase to allow requests from your domain
 
 ## Troubleshooting

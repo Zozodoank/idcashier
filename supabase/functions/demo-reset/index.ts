@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
 
 		// Demo owner email (can be overridden via secret)
 		// Force using the correct email address
-		const demoEmail = 'demo@idcashier.my.id' // Deno.env.get('DEMO_EMAIL') || 'demo@idcashier.my.id'
+		const demoEmail = 'demo@idcashier.com' // Deno.env.get('DEMO_EMAIL') || 'demo@idcashier.com'
 
 		// Find demo owner user
 		const { data: demoOwner, error: ownerError } = await supabase

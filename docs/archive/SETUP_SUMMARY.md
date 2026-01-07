@@ -15,13 +15,13 @@
 
 ## User Accounts
 ✅ **Initial Owner User**: Created successfully
-- Email: test-owner@idcashier.my.id
+- Email: test-owner@idcashier.com
 - Password: TestOwner2025
 - Role: owner
 - Tenant ID: Self-referencing (same as user ID)
 
 ✅ **Test Cashier User**: Created successfully
-- Email: test-cashier@idcashier.my.id
+- Email: test-cashier@idcashier.com
 - Password: TestCashier2025
 - Role: cashier
 - Tenant ID: References owner's ID (multi-tenancy working)

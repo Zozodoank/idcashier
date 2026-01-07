@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
     }
 
         // Special handling for test account - should always be treated as expired
-    if (userWithEmail.email === 'testing@idcashier.my.id') {
+    if (userWithEmail.email === 'testing@idcashier.com') {
       // Return expired subscription for test account
       const expiredDate = new Date();
       expiredDate.setDate(expiredDate.getDate() - 7); // 7 days ago
@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
         created_at: expiredDate.toISOString(),
         updated_at: expiredDate.toISOString()
       });
-    } else if (userWithEmail.email === 'demo@idcashier.my.id' || userWithEmail.email === 'jho.j80@gmail.com') {
+    } else if (userWithEmail.email === 'demo@idcashier.com' || userWithEmail.email === 'jho.j80@gmail.com') {
       // Always return active subscription for demo and dev accounts
       const futureDate = new Date();
       futureDate.setFullYear(futureDate.getFullYear() + 1);

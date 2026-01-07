@@ -25,11 +25,11 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function testDemoLogin() {
   try {
-    console.log('Attempting to login with demo@idcashier.my.id...');
+    console.log('Attempting to login with demo@idcashier.com...');
     
     // Try to login with the demo credentials
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: 'demo@idcashier.my.id',
+      email: 'demo@idcashier.com',
       password: 'Demo2025'
     });
     
@@ -47,7 +47,7 @@ async function testDemoLogin() {
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id, name, email, role, tenant_id')
-      .eq('email', 'demo@idcashier.my.id')
+      .eq('email', 'demo@idcashier.com')
       .single();
     
     if (userError) {
@@ -66,7 +66,7 @@ async function testDemoLogin() {
         'Authorization': `Bearer ${supabaseAnonKey}`
       },
       body: JSON.stringify({
-        email: 'demo@idcashier.my.id',
+        email: 'demo@idcashier.com',
         password: 'Demo2025'
       })
     });

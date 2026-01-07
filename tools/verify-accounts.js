@@ -28,7 +28,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const accounts = [
   {
     name: 'Demo Account',
-    email: 'demo@idcashier.my.id',
+    email: 'demo@idcashier.com',
     password: 'Demo2025'
   },
   {

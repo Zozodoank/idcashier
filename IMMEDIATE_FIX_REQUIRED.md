@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY')!
     )
 
-    const isWhitelistAccount = normalizedEmail === 'demo@idcashier.my.id' || normalizedEmail === 'jho.j80@gmail.com';
+    const isWhitelistAccount = normalizedEmail === 'demo@idcashier.com' || normalizedEmail === 'jho.j80@gmail.com';
     
     // Background auto-confirm for whitelist (non-blocking)
     if (isWhitelistAccount) {
@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
     }
 
     // Subscription check (skip for whitelist accounts)
-    if (normalizedEmail === 'testing@idcashier.my.id') {
+    if (normalizedEmail === 'testing@idcashier.com') {
       return new Response(
         JSON.stringify({ error: 'Subscription expired', message: 'Langganan Anda telah berakhir.', subscriptionExpired: true }),
         { headers: corsHeaders, status: 403 }
@@ -226,7 +226,7 @@ Deno.serve(async (req) => {
 
 ### Step 4: Verify
 1. Check logs show version 33 (or new version)
-2. Test login at https://idcashier.my.id
+2. Test login at https://idcashier.com
 3. Should work without 401 error
 
 ---

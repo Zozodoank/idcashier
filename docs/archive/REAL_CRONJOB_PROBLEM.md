@@ -13,7 +13,7 @@
 {
   "success": true,
   "message": "Demo data reset completed",
-  "email": "demo@idcashier.my.id",
+  "email": "demo@idcashier.com",
   "dryRun": false,
   "summary": {
     "employees": 0,
@@ -70,7 +70,7 @@
 
 1. **Actual demo user data:**
    ```sql
-   SELECT * FROM users WHERE email = 'demo@idcashier.my.id';
+   SELECT * FROM users WHERE email = 'demo@idcashier.com';
    ```
 
 2. **Check what data exists for demo user:**
@@ -96,7 +96,7 @@
 
 4. **Check if demo user exists in auth.users:**
    ```sql
-   SELECT id, email FROM auth.users WHERE email = 'demo@idcashier.my.id';
+   SELECT id, email FROM auth.users WHERE email = 'demo@idcashier.com';
    ```
 
 ---
@@ -117,7 +117,7 @@
 
 ## 🔍 CRITICAL QUESTIONS TO ANSWER
 
-1. **Does demo@idcashier.my.id user exist?**
+1. **Does demo@idcashier.com user exist?**
 2. **What is demo user's ID?**
 3. **Is there any data assigned to demo user's ID?**
 4. **Are columns user_id vs tenant_id being used correctly?**

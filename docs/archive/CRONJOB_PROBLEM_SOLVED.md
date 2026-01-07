@@ -19,7 +19,7 @@ https://eypfeiqtvfxxiimhtycc.functions.supabase.co/demo-reset?secret=e3452f961b0
 {
   "success": true,
   "message": "Dry run completed (no changes applied)",
-  "email": "demo@idcashier.my.id",
+  "email": "demo@idcashier.com",
   "dryRun": true,
   "summary": {
     "employees": 0,
@@ -113,7 +113,7 @@ curl -X POST "https://eypfeiqtvfxxiimhtycc.functions.supabase.co/demo-reset?secr
 - ✅ App settings dan HPP data
 
 **Yang TIDAK akan di hapus:**
-- ❌ Demo owner account (demo@idcashier.my.id)
+- ❌ Demo owner account (demo@idcashier.com)
 - ❌ Protected user accounts
 - ❌ Demo owner transactional data
 

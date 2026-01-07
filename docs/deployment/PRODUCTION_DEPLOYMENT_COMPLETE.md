@@ -7,7 +7,7 @@
 
 ## 🎯 **MASALAH YANG DIPERBAIKI**
 
-User melaporkan error di production (https://idcashier.my.id):
+User melaporkan error di production (https://idcashier.com):
 ```
 Dashboard data fetch errors: FunctionsHttpError: Edge Function returned a non-2xx status code
 ```
@@ -94,7 +94,7 @@ Production database already has these migrations:
 
 #### **1. Clear Browser Cache**
 ```
-1. Buka https://idcashier.my.id
+1. Buka https://idcashier.com
 2. Tekan Ctrl + Shift + R (hard refresh)
    ATAU
    Tekan F12 > Network tab > Disable cache checkbox > Refresh

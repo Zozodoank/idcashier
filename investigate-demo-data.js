@@ -53,7 +53,7 @@ async function investigateDemoData() {
   
   // Step 1: Find demo user
   console.log('\n📋 STEP 1: Finding demo user');
-  const demoUsers = await queryDatabase('users', '&email=eq.demo@idcashier.my.id');
+  const demoUsers = await queryDatabase('users', '&email=eq.demo@idcashier.com');
   
   if (demoUsers.length === 0) {
     console.log('❌ Demo user NOT FOUND in users table');

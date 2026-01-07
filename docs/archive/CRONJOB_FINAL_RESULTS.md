@@ -16,7 +16,7 @@ Status: ✅ 200 OK
 Response: {
   "success": true,
   "message": "Dry run completed (no changes applied)",
-  "email": "demo@idcashier.my.id",
+  "email": "demo@idcashier.com",
   "dryRun": true,
   "summary": {
     "employees": 0,

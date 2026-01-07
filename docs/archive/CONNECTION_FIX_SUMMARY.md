@@ -2,7 +2,7 @@
 
 ## 🎯 **Problem Statement**
 
-Data tidak ditampilkan dengan benar di halaman production (`idcashier.my.id`):
+Data tidak ditampilkan dengan benar di halaman production (`idcashier.com`):
 - Products: Hanya 1 item (seharusnya lebih banyak)
 - Company settings: null
 - Session timeout warnings
@@ -42,7 +42,7 @@ File: `public/diagnostic.html`
 **Usage:**
 ```bash
 # After building
-# Access: https://idcashier.my.id/diagnostic.html
+# Access: https://idcashier.com/diagnostic.html
 
 # Or locally:
 # http://localhost:3000/diagnostic.html
@@ -118,7 +118,7 @@ npm run build
 # - CDN: Purge cache if using Cloudflare
 
 # 4. Test
-# Open https://idcashier.my.id in incognito mode
+# Open https://idcashier.com in incognito mode
 ```
 
 ---
@@ -127,7 +127,7 @@ npm run build
 
 ```bash
 # Access diagnostic page
-https://idcashier.my.id/diagnostic.html
+https://idcashier.com/diagnostic.html
 
 # Run tests:
 1. Check configuration ✓
@@ -197,7 +197,7 @@ Supabase Dashboard > Settings > API:
 
 **Allowed Origins:**
 ```
-https://idcashier.my.id
+https://idcashier.com
 http://localhost:3000
 ```
 
@@ -257,7 +257,7 @@ Company settings: {name: "Toko Saya", ...}
 
 2. **Run Diagnostic Page**
    ```
-   https://idcashier.my.id/diagnostic.html
+   https://idcashier.com/diagnostic.html
    ```
 
 3. **Check Supabase Logs**

@@ -6,7 +6,7 @@
 
 ### 1. Updated Demo User Email
 - **File**: [tools/create-demo-user.js](file:///c:/xampp/htdocs/idcashier/tools/create-demo-user.js)
-- **Change**: Updated demo user email from `demo@idcashier.com` to `demo@idcashier.my.id`
+- **Change**: Updated demo user email from `demo@idcashier.com` to `demo@idcashier.com`
 - **Reason**: Ensures consistency with the login attempt in LoginPage.jsx
 
 ### 2. Added New npm Scripts

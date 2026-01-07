@@ -51,11 +51,11 @@ async function checkRequiredUsers() {
     const { data: demoUser, error: demoError } = await supabase
       .from('users')
       .select('id, email, name')
-      .eq('email', 'demo@idcashier.my.id')
+      .eq('email', 'demo@idcashier.com')
       .single();
     
     if (demoError || !demoUser) {
-      console.log('⚠️  Demo user (demo@idcashier.my.id) not found');
+      console.log('⚠️  Demo user (demo@idcashier.com) not found');
       console.log('   Run "node tools/create-demo-user.js" to create it');
     } else {
       console.log('✅ Demo user found:', demoUser.name, '(', demoUser.email, ')');
@@ -113,7 +113,7 @@ import('../src/lib/api.js')
           console.log('2. Access the application at: http://localhost:3000');
           console.log('3. Login with default credentials:');
           console.log('   - Developer: jho.j80@gmail.com / @Se06070786');
-          console.log('   - Demo: demo@idcashier.my.id / Demo2025');
+          console.log('   - Demo: demo@idcashier.com / Demo2025');
         } else {
           console.log('⚠️  Setup is incomplete - missing users');
           console.log('   Run "npm run db:seed" to create initial users');

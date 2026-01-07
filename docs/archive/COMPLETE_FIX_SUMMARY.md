@@ -205,7 +205,7 @@
 
 ### Test 3: Using Test Tool
 ```
-1. Navigate to: https://idcashier.my.id/test-pages-connection.html
+1. Navigate to: https://idcashier.com/test-pages-connection.html
 2. Enter credentials
 3. Click "Run All Tests"
 4. All tests should show ✅ Success

@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
 
         // Subscription check for new user (though unlikely to have subscription)
         // Special handling for test account - should always be treated as expired
-        if (normalizedEmail === 'testing@idcashier.my.id') {
+        if (normalizedEmail === 'testing@idcashier.com') {
           return new Response(
             JSON.stringify({ error: 'Subscription expired', message: 'Langganan Anda telah berakhir. Silakan perpanjang untuk melanjutkan.', subscriptionExpired: true }),
             {
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
               status: 403
             }
           );
-        } else if (normalizedEmail !== 'demo@idcashier.my.id' && normalizedEmail !== 'jho.j80@gmail.com') {
+        } else if (normalizedEmail !== 'demo@idcashier.com' && normalizedEmail !== 'jho.j80@gmail.com') {
           let effectiveUserId = newUserData.id;
           if (newUserData.role === 'cashier') {
             effectiveUserId = newUserData.tenant_id;
@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
 
     // Subscription check
     // Special handling for test account - should always be treated as expired
-    if (normalizedEmail === 'testing@idcashier.my.id') {
+    if (normalizedEmail === 'testing@idcashier.com') {
       return new Response(
         JSON.stringify({ error: 'Subscription expired', message: 'Langganan Anda telah berakhir. Silakan perpanjang untuk melanjutkan.', subscriptionExpired: true }),
         {
@@ -207,7 +207,7 @@ Deno.serve(async (req) => {
           status: 403
         }
       );
-    } else if (normalizedEmail !== 'demo@idcashier.my.id' && normalizedEmail !== 'jho.j80@gmail.com') {
+    } else if (normalizedEmail !== 'demo@idcashier.com' && normalizedEmail !== 'jho.j80@gmail.com') {
       let effectiveUserId = userData.id;
       if (userData.role === 'cashier') {
         effectiveUserId = userData.tenant_id;

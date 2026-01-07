@@ -92,7 +92,7 @@ const HPPSettings = () => {
 
   const handleActivateHPP = () => {
     // Check if user is demo or developer (whitelisted accounts)
-    const isWhitelistedAccount = user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com';
+    const isWhitelistedAccount = user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com';
     
     if (isWhitelistedAccount) {
       toast({
@@ -255,7 +255,7 @@ const HPPSettings = () => {
                   
                   if (isTrialActive) return 'Aktif (Gratis 7 Hari)';
                   
-                  const isWhitelistedAccount = user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com';
+                  const isWhitelistedAccount = user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com';
                   return isWhitelistedAccount ? 'Aktif' : 'Sudah aktif';
                 })()}
               </p>
@@ -269,7 +269,7 @@ const HPPSettings = () => {
             {hppEnabled ? (
               <>
                 <CheckCircle className="w-4 h-4 mr-2" />
-                {(user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com') ? 'Whitelist' : 
+                {(user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com') ? 'Whitelist' : 
                  (isTrialActive ? 'Trial Aktif' : 'Aktif')}
               </>
             ) : (

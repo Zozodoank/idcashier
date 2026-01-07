@@ -21,7 +21,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // User credentials
 const testUser = {
-  email: 'testing@idcashier.my.id',
+  email: 'testing@idcashier.com',
   password: 'Tesajakalobisa',
   name: 'testing',
   role: 'owner'

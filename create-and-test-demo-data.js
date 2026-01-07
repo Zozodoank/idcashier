@@ -17,7 +17,7 @@ async function createDemoData() {
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify({
-        email: 'demo@idcashier.my.id',
+        email: 'demo@idcashier.com',
         password: 'Demo2025'
       })
     });

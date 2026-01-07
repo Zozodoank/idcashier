@@ -118,7 +118,7 @@ Data demo memang ada di database (terkonfirmasi via direct MCP access):
 5. ✅ **Isolated**: Each user only sees their data (correct)
 
 ### **For Demo Account Testing:**
-- Login dengan `demo@idcashier.my.id` 
+- Login dengan `demo@idcashier.com` 
 - Will see exactly 1 product, 1 category, 1 supplier
 - Can perform sales transactions successfully
 - No infinite loading issues

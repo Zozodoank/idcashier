@@ -60,7 +60,7 @@ Production secrets must be set in the Supabase Dashboard, not in `.env` files.
 
 - **Required Secrets:**
   - `SUPABASE_SERVICE_ROLE_KEY`
-  - `ALLOWED_ORIGINS` (e.g., `https://idcashier.my.id,http://localhost:3000`)
+  - `ALLOWED_ORIGINS` (e.g., `https://idcashier.com,http://localhost:3000`)
   - `FRONTEND_URL`
   - `JWT_SECRET`
   - `CRONJOB_SECRET`
@@ -88,7 +88,7 @@ Production secrets must be set in the Supabase Dashboard, not in `.env` files.
     curl -X POST https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/auth-login \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer <ANON_KEY>" \
-    -d '{"email":"demo@idcashier.my.id","password":"password"}'
+    -d '{"email":"demo@idcashier.com","password":"password"}'
     ```
 - **Check Logs:** Monitor logs in the Supabase Dashboard under **Edge Functions > Logs**.
 - **Browser Verification:**

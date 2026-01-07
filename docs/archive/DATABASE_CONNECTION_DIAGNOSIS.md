@@ -358,7 +358,7 @@ npm run build
 ### **Step 3: Test**
 ```
 1. Clear browser cache
-2. Login to https://idcashier.my.id
+2. Login to https://idcashier.com
 3. Check dashboard - should show 4 products
 4. Check settings - should show company info
 ```

@@ -51,7 +51,7 @@ BEGIN
             OR
             -- Allow access for demo/owner
             user_id = (
-                SELECT id FROM users WHERE email = 'demo@idcashier.my.id'
+                SELECT id FROM users WHERE email = 'demo@idcashier.com'
             )
             OR
             -- Allow access for admin users
@@ -66,7 +66,7 @@ BEGIN
             )
             OR
             user_id = (
-                SELECT id FROM users WHERE email = 'demo@idcashier.my.id'
+                SELECT id FROM users WHERE email = 'demo@idcashier.com'
             )
         );
     
@@ -89,7 +89,7 @@ BEGIN
             )
             OR
             user_id = (
-                SELECT id FROM users WHERE email = 'demo@idcashier.my.id'
+                SELECT id FROM users WHERE email = 'demo@idcashier.com'
             )
             OR
             email IN ('jho.j80@gmail.com')
@@ -102,7 +102,7 @@ BEGIN
             )
             OR
             user_id = (
-                SELECT id FROM users WHERE email = 'demo@idcashier.my.id'
+                SELECT id FROM users WHERE email = 'demo@idcashier.com'
             )
         );
     
@@ -123,11 +123,11 @@ BEGIN
             user_id = auth.uid()
             OR
             tenant_id = (
-                SELECT id FROM users WHERE email = 'demo@idcashier.my.id'
+                SELECT id FROM users WHERE email = 'demo@idcashier.com'
             )
             OR
             user_id = (
-                SELECT id FROM users WHERE email = 'demo@idcashier.my.id'
+                SELECT id FROM users WHERE email = 'demo@idcashier.com'
             )
             OR
             auth.uid() IN (
@@ -140,11 +140,11 @@ BEGIN
             user_id = auth.uid()
             OR
             tenant_id = (
-                SELECT id FROM users WHERE email = 'demo@idcashier.my.id'
+                SELECT id FROM users WHERE email = 'demo@idcashier.com'
             )
             OR
             user_id = (
-                SELECT id FROM users WHERE email = 'demo@idcashier.my.id'
+                SELECT id FROM users WHERE email = 'demo@idcashier.com'
             )
         );
     
@@ -158,27 +158,27 @@ BEGIN
     -- Customers
     DROP POLICY IF EXISTS "Allow tenant access on customers" ON customers;
     CREATE POLICY "Allow tenant access on customers" ON customers
-        FOR ALL USING (user_id = auth.uid() OR user_id IN (SELECT id FROM users WHERE tenant_id = auth.uid()) OR user_id = (SELECT id FROM users WHERE email = 'demo@idcashier.my.id')) WITH CHECK (user_id = auth.uid());
+        FOR ALL USING (user_id = auth.uid() OR user_id IN (SELECT id FROM users WHERE tenant_id = auth.uid()) OR user_id = (SELECT id FROM users WHERE email = 'demo@idcashier.com')) WITH CHECK (user_id = auth.uid());
     
     -- Suppliers
     DROP POLICY IF EXISTS "Allow tenant access on suppliers" ON suppliers;
     CREATE POLICY "Allow tenant access on suppliers" ON suppliers
-        FOR ALL USING (user_id = auth.uid() OR user_id IN (SELECT id FROM users WHERE tenant_id = auth.uid()) OR user_id = (SELECT id FROM users WHERE email = 'demo@idcashier.my.id')) WITH CHECK (user_id = auth.uid());
+        FOR ALL USING (user_id = auth.uid() OR user_id IN (SELECT id FROM users WHERE tenant_id = auth.uid()) OR user_id = (SELECT id FROM users WHERE email = 'demo@idcashier.com')) WITH CHECK (user_id = auth.uid());
     
     -- Categories
     DROP POLICY IF EXISTS "Allow tenant access on categories" ON categories;
     CREATE POLICY "Allow tenant access on categories" ON categories
-        FOR ALL USING (user_id = auth.uid() OR user_id IN (SELECT id FROM users WHERE tenant_id = auth.uid()) OR user_id = (SELECT id FROM users WHERE email = 'demo@idcashier.my.id')) WITH CHECK (user_id = auth.uid());
+        FOR ALL USING (user_id = auth.uid() OR user_id IN (SELECT id FROM users WHERE tenant_id = auth.uid()) OR user_id = (SELECT id FROM users WHERE email = 'demo@idcashier.com')) WITH CHECK (user_id = auth.uid());
     
     -- Expenses
     DROP POLICY IF EXISTS "Allow tenant access on expenses" ON expenses;
     CREATE POLICY "Allow tenant access on expenses" ON expenses
-        FOR ALL USING (tenant_id = auth.uid() OR tenant_id = (SELECT id FROM users WHERE email = 'demo@idcashier.my.id')) WITH CHECK (tenant_id = auth.uid());
+        FOR ALL USING (tenant_id = auth.uid() OR tenant_id = (SELECT id FROM users WHERE email = 'demo@idcashier.com')) WITH CHECK (tenant_id = auth.uid());
     
     -- Returns
     DROP POLICY IF EXISTS "Allow tenant access on returns" ON returns;
     CREATE POLICY "Allow tenant access on returns" ON returns
-        FOR ALL USING (user_id = auth.uid() OR user_id IN (SELECT id FROM users WHERE tenant_id = auth.uid()) OR user_id = (SELECT id FROM users WHERE email = 'demo@idcashier.my.id')) WITH CHECK (user_id = auth.uid());
+        FOR ALL USING (user_id = auth.uid() OR user_id IN (SELECT id FROM users WHERE tenant_id = auth.uid()) OR user_id = (SELECT id FROM users WHERE email = 'demo@idcashier.com')) WITH CHECK (user_id = auth.uid());
     
     RAISE NOTICE 'Created policies for all related tables';
 END

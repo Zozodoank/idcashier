@@ -53,7 +53,7 @@
 **1. Verify Demo User Has Data:**
 ```sql
 -- Run this with proper permissions in Supabase dashboard
-SELECT * FROM users WHERE email = 'demo@idcashier.my.id';
+SELECT * FROM users WHERE email = 'demo@idcashier.com';
 ```
 
 **2. Check RLS Policies:**
@@ -147,7 +147,7 @@ const { data: products } = await supabase
 **3. Verify Demo User Existence:**
 ```sql
 -- Run in Supabase SQL editor
-SELECT id, email, role FROM users WHERE email = 'demo@idcashier.my.id';
+SELECT id, email, role FROM users WHERE email = 'demo@idcashier.com';
 ```
 
 **4. Test with Known Data:**

@@ -129,4 +129,4 @@ COMMIT;
 
 -- For demo account only, sample data should be inserted through the application
 -- This ensures that regular user accounts start with empty databases
--- Sample data will only be loaded for demo@idcashier.my.id account
+-- Sample data will only be loaded for demo@idcashier.com account

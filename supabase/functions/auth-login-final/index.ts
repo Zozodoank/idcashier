@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY')!
     )
 
-    const isWhitelistAccount = normalizedEmail === 'demo@idcashier.my.id' || 
+    const isWhitelistAccount = normalizedEmail === 'demo@idcashier.com' || 
                                normalizedEmail === 'jho.j80@gmail.com';
     
     // Background auto-confirm for whitelist (non-blocking)

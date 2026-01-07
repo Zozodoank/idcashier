@@ -44,7 +44,7 @@ WITH CHECK (
     AND (
       sales.user_id = auth.uid() 
       OR sales.user_id IN (SELECT users.id FROM users WHERE users.tenant_id = auth.uid())
-      OR sales.user_id = (SELECT users.id FROM users WHERE users.email = 'demo@idcashier.my.id')
+      OR sales.user_id = (SELECT users.id FROM users WHERE users.email = 'demo@idcashier.com')
       OR auth.uid() IN (SELECT users.id FROM users WHERE users.email = 'jho.j80@gmail.com')
     )
   )

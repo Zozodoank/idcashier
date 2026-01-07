@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     });
     
     // Get site URL from environment or use default
-    const siteUrl = Deno.env.get('SITE_URL') || 'https://idcashier.my.id'
+    const siteUrl = Deno.env.get('SITE_URL') || 'https://idcashier.com'
     
     // Check if this is an OAuth user (password is null)
     const isOAuthUser = password === null || password === undefined || oauthProvider !== undefined

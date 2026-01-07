@@ -43,7 +43,7 @@ token_verifications = 100     # Increased from 30
 #### 3. **Dynamic Email Redirect URLs**
 ```typescript
 // File: supabase/functions/auth-register/index.ts
-const siteUrl = Deno.env.get('SITE_URL') || 'https://idcashier.my.id'
+const siteUrl = Deno.env.get('SITE_URL') || 'https://idcashier.com'
 
 // Dinamis untuk semua email operations
 emailRedirectTo: `${siteUrl}/login`
@@ -225,11 +225,11 @@ async function checkSubscription(supabase: SupabaseClient, user: any, authUser: 
 # ACTIVE SMTP Configuration - idCashier Mail Server
 [auth.email.smtp]
 enabled = true
-host = "mail.idcashier.my.id"
+host = "mail.idcashier.com"
 port = 465
-user = "support@idcashier.my.id"
+user = "support@idcashier.com"
 pass = "env(EMAIL_PASSWORD)"
-admin_email = "support@idcashier.my.id"
+admin_email = "support@idcashier.com"
 sender_name = "idCashier"
 ```
 
@@ -252,7 +252,7 @@ sender_name = "idCashier"
 - **Token verifications**: 30 → 100 per 5 menit
 
 ### 4. **Site URL Configuration**
-- **Previously**: Hardcoded ke 'https://idcashier.my.id'
+- **Previously**: Hardcoded ke 'https://idcashier.com'
 - **Now**: Dynamic menggunakan environment variable `SITE_URL`
 - **Benefits**: Fleksibel untuk development dan production environment
 
@@ -308,7 +308,7 @@ sender_name = "idCashier"
 
 ### Environment Variables Required:
 ```bash
-SITE_URL=https://idcashier.my.id
+SITE_URL=https://idcashier.com
 EMAIL_PASSWORD=your-email-password
 ```
 
@@ -335,7 +335,7 @@ EMAIL_PASSWORD=your-email-password
 4. **Setup store redirect issue**: Verify auth state preservation
 
 ### Contact:
-- Technical Support: support@idcashier.my.id
+- Technical Support: support@idcashier.com
 - Documentation: This file and related docs
 - Emergency: Check Supabase dashboard for function logs
 

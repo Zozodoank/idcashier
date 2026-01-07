@@ -58,7 +58,7 @@ DUITKU_SIGNATURE_ALGO=md5
 
 **Optional:** Custom URLs (jika perlu):
 ```
-RETURN_URL=https://idcashier.my.id/payment/finish
+RETURN_URL=https://idcashier.com/payment/finish
 CALLBACK_URL=https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/duitku-callback
 ```
 
@@ -263,7 +263,7 @@ Jika masih ada masalah setelah mengikuti panduan ini:
 | `DUITKU_MERCHANT_CODE` | **Yes** | - | Merchant code dari Duitku |
 | `DUITKU_MERCHANT_KEY` | **Yes** | - | API key dari Duitku |
 | `DUITKU_SIGNATURE_ALGO` | No | `sha256` | Signature algorithm (md5/sha256) |
-| `RETURN_URL` | No | `https://idcashier.my.id/payment/finish` | URL redirect setelah pembayaran |
+| `RETURN_URL` | No | `https://idcashier.com/payment/finish` | URL redirect setelah pembayaran |
 | `CALLBACK_URL` | No | `${SUPABASE_URL}/functions/v1/duitku-callback` | URL untuk payment callback |
 
 ### Useful Commands

@@ -56,7 +56,7 @@ export const HPPProvider = ({ children }) => {
     
     try {
       // For demo account, always enable HPP
-      if (user.email === 'demo@idcashier.my.id') {
+      if (user.email === 'demo@idcashier.com') {
         console.log('🔄 [HPPContext] Demo account detected, enabling HPP');
         setHppEnabled(true);
         setHppStatus({

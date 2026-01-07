@@ -22,7 +22,7 @@ async function testUserIsolation() {
     
     // Login as demo user untuk test
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: 'demo@idcashier.my.id',
+      email: 'demo@idcashier.com',
       password: 'demo123'
     });
     

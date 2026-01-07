@@ -1,7 +1,7 @@
 Error: Cannot coerce the result to a single JSON object
     at Object.single (supabase-js/src/SupabaseClient.ts:xxx)
     at authAPI.login (src/lib/api.js:92)
-POST https://your-project.supabase.co/rest/v1/users?select=*&email=eq.demo%40idcashier.my.id 406
+POST https://your-project.supabase.co/rest/v1/users?select=*&email=eq.demo%40idcashier.com 406
 ```
 
 ## Quick Diagnosis
@@ -55,13 +55,13 @@ ORDER BY tablename, policyname;
 **Test with Anon Key (RLS Applied)**:
 ```sql
 -- This should fail if RLS blocks access
-SELECT * FROM users WHERE email = 'demo@idcashier.my.id';
+SELECT * FROM users WHERE email = 'demo@idcashier.com';
 ```
 
 **Test with Service Role Key (RLS Bypassed)**:
 ```sql
 -- This should succeed if data exists
-SELECT * FROM users WHERE email = 'demo@idcashier.my.id';
+SELECT * FROM users WHERE email = 'demo@idcashier.com';
 ```
 
 **Diagnosis**:
@@ -156,7 +156,7 @@ SELECT * FROM users WHERE email = 'demo@idcashier.my.id';
 ## Verification Steps
 
 1. **Test Login with Demo Account**:
-   - Attempt login with `demo@idcashier.my.id`
+   - Attempt login with `demo@idcashier.com`
    - Check browser console for 406 errors
    - Verify successful authentication and redirect to dashboard
 

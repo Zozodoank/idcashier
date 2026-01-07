@@ -28,13 +28,13 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
 
 # Site URL
-VITE_SITE_URL=https://idcashier.my.id
-SITE_URL=https://idcashier.my.id
+VITE_SITE_URL=https://idcashier.com
+SITE_URL=https://idcashier.com
 
 # Email Configuration (for SMTP)
-EMAIL_HOST=mail.idcashier.my.id
+EMAIL_HOST=mail.idcashier.com
 EMAIL_PORT=465
-EMAIL_USER=support@idcashier.my.id
+EMAIL_USER=support@idcashier.com
 EMAIL_PASSWORD=your_email_password
 ```
 
@@ -188,33 +188,33 @@ The application uses Supabase Auth's built-in SMTP integration for sending email
 **Configuration Steps:**
 
 1. **SMTP is Pre-configured in `supabase/config.toml`:**
-   - Host: `mail.idcashier.my.id`
+   - Host: `mail.idcashier.com`
    - Port: `465` (SSL/TLS)
-   - User: `support@idcashier.my.id`
+   - User: `support@idcashier.com`
    - Password: Retrieved from `EMAIL_PASSWORD` environment variable
 
 2. **Set Environment Variables in Supabase:**
    - Go to Supabase Dashboard > Settings > Secrets
    - Add secret: `EMAIL_PASSWORD` = `your_email_password`
-   - Add secret: `SITE_URL` = `https://idcashier.my.id`
+   - Add secret: `SITE_URL` = `https://idcashier.com`
 
 3. **Verify SMTP Configuration:**
    - SMTP section should be enabled in `supabase/config.toml`:
      ```toml
      [auth.email.smtp]
      enabled = true
-     host = "mail.idcashier.my.id"
+     host = "mail.idcashier.com"
      port = 465
-     user = "support@idcashier.my.id"
+     user = "support@idcashier.com"
      pass = "env(EMAIL_PASSWORD)"
-     admin_email = "support@idcashier.my.id"
+     admin_email = "support@idcashier.com"
      sender_name = "idCashier"
      ```
 
 4. **Test Email Sending:**
    - Register a new user to test welcome email (if confirmations enabled)
    - Request password reset to test reset email
-   - Check inbox (and spam folder) for emails from support@idcashier.my.id
+   - Check inbox (and spam folder) for emails from support@idcashier.com
 
 **Troubleshooting SMTP:**
 - **Emails not sent**: Check Supabase logs for SMTP errors
@@ -223,7 +223,7 @@ The application uses Supabase Auth's built-in SMTP integration for sending email
 - **Emails in spam**: Configure SPF, DKIM, DMARC for domain
 
 **Alternative SMTP Providers:**
-If mail.idcashier.my.id is not available, you can configure alternative providers in `supabase/config.toml`:
+If mail.idcashier.com is not available, you can configure alternative providers in `supabase/config.toml`:
 - Gmail (with App Password)
 - SendGrid
 - Mailgun
@@ -273,7 +273,7 @@ Edge Functions (auth-register, auth-login, etc.) require certain environment var
 2. **Add the following secrets:**
    - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key (for admin operations)
    - `EMAIL_PASSWORD` - SMTP password for email sending
-   - `SITE_URL` - Your site URL for redirect links (https://idcashier.my.id)
+   - `SITE_URL` - Your site URL for redirect links (https://idcashier.com)
 
 3. **Verify Secrets:**
    - Secrets are automatically available as environment variables in Edge Functions
@@ -370,7 +370,7 @@ This will start the frontend development server on port 3000 (or the configured 
 
 - **Authentication**: Fully integrated with Supabase Auth (no custom password handling)
 - **Password Security**: All passwords hashed and stored in auth.users table
-- **Email Sending**: Configured with mail.idcashier.my.id SMTP server
+- **Email Sending**: Configured with mail.idcashier.com SMTP server
 - **Schema**: Password field removed from public.users table
 - **RLS**: Can now be enabled since auth.uid() works with Supabase Auth
 - **Multi-tenant**: User IDs synchronized between auth.users and public.users

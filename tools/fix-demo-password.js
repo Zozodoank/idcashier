@@ -27,7 +27,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Demo account information
 const demoAccount = {
-  email: 'demo@idcashier.my.id',
+  email: 'demo@idcashier.com',
   password: 'Demo2025'
 };
 

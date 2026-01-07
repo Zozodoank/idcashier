@@ -158,7 +158,7 @@ const DashboardLayout = () => {
     const fetchSub = async () => {
       try {
         // Determine whitelist based on environment variable (demo/dev accounts)
-        const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.my.id,jho.j80@gmail.com')
+        const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.com,jho.j80@gmail.com')
           .split(',')
           .map(e => String(e || '').trim().toLowerCase())
           .filter(Boolean);
@@ -398,7 +398,7 @@ const DashboardLayout = () => {
 
       {/* Email Verification Warning Banner */}
       {(() => {
-        const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.my.id,jho.j80@gmail.com')
+        const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.com,jho.j80@gmail.com')
           .split(',')
           .map(e => String(e || '').trim().toLowerCase())
           .filter(Boolean);
@@ -414,7 +414,7 @@ const DashboardLayout = () => {
 
       {/* Subscription Expired Warning Banner */}
       {(() => {
-        const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.my.id,jho.j80@gmail.com')
+        const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.com,jho.j80@gmail.com')
           .split(',')
           .map(e => String(e || '').trim().toLowerCase())
           .filter(Boolean);
@@ -488,7 +488,7 @@ const DashboardLayout = () => {
             transition={{ duration: 0.3, ease: 'easeInOut' }}
           >
             {(() => {
-              const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.my.id,jho.j80@gmail.com')
+              const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.com,jho.j80@gmail.com')
                 .split(',')
                 .map(e => String(e || '').trim().toLowerCase())
                 .filter(Boolean);

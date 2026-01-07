@@ -12,7 +12,7 @@ async function test() {
   // Test login
   console.log('1. Testing login...');
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: 'testing@idcashier.my.id',
+    email: 'testing@idcashier.com',
     password: 'Tesajakalobisa'
   });
   

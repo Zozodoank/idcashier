@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
   const merchantCode = Deno.env.get("DUITKU_MERCHANT_CODE") || "";
   const apiKey = Deno.env.get("DUITKU_API_KEY")?.trim() || Deno.env.get("DUITKU_MERCHANT_KEY")?.trim() || "";
   const callbackUrl = Deno.env.get("CALLBACK_URL") || "https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/duitku-callback";
-  const defaultReturnUrl = Deno.env.get("RETURN_URL") || "https://idcashier.my.id/payment-callback";
+  const defaultReturnUrl = Deno.env.get("RETURN_URL") || "https://idcashier.com/payment-callback";
 
   try {
     const {

@@ -43,7 +43,7 @@ Pastikan redirect URLs berikut sudah dikonfigurasi:
 **Di Supabase Dashboard:**
 1. Pergi ke **Authentication** > **URL Configuration**
 2. Tambahkan redirect URLs berikut:
-   - `https://idcashier.my.id/auth/callback`
+   - `https://idcashier.com/auth/callback`
    - `http://localhost:3000/auth/callback` (untuk development)
 
 **Di Google Cloud Console:**
@@ -53,7 +53,7 @@ Pastikan redirect URLs berikut sudah dikonfigurasi:
 4. Edit OAuth 2.0 Client ID Anda
 5. Tambahkan **Authorized redirect URIs**:
    - `https://eypfeiqtvfxxiimhtycc.supabase.co/auth/v1/callback`
-   - `https://idcashier.my.id/auth/callback`
+   - `https://idcashier.com/auth/callback`
 
 ### Langkah 6: Verifikasi Konfigurasi
 Setelah konfigurasi selesai, coba login dengan Google OAuth lagi. Error seharusnya sudah hilang.

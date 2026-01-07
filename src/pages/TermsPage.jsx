@@ -49,7 +49,7 @@ export default function TermsPage() {
         },
         {
           title: '7. Hubungi Kami',
-          content: 'Jika Anda memiliki pertanyaan tentang syarat dan ketentuan ini, silakan hubungi kami di support@idcashier.my.id.'
+          content: 'Jika Anda memiliki pertanyaan tentang syarat dan ketentuan ini, silakan hubungi kami di support@idcashier.com.'
         }
       ]
     },
@@ -92,7 +92,7 @@ export default function TermsPage() {
         },
         {
           title: '7. Contact Us',
-          content: 'If you have any questions about these terms and conditions, please contact us at support@idcashier.my.id.'
+          content: 'If you have any questions about these terms and conditions, please contact us at support@idcashier.com.'
         }
       ]
     },
@@ -135,7 +135,7 @@ export default function TermsPage() {
         },
         {
           title: '7. 联系我们',
-          content: '如果您对这些条款和条件有任何疑问，请通过 support@idcashier.my.id 与我们联系。'
+          content: '如果您对这些条款和条件有任何疑问，请通过 support@idcashier.com 与我们联系。'
         }
       ]
     }

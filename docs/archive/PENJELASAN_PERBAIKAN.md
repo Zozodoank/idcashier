@@ -22,7 +22,7 @@ Open your `.env` file and ensure it contains:
 ```env
 VITE_SUPABASE_URL=https://eypfeiqtvfxxiimhtycc.supabase.co
 VITE_SUPABASE_ANON_KEY=your_actual_anon_key_here
-VITE_SITE_URL=https://idcashier.my.id
+VITE_SITE_URL=https://idcashier.com
 ```
 
 **Important Notes:**

@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     )
 
     // Use Supabase Auth to send password reset email
-    const siteUrl = Deno.env.get('SITE_URL') || Deno.env.get('VITE_SITE_URL') || 'https://idcashier.my.id'
+    const siteUrl = Deno.env.get('SITE_URL') || Deno.env.get('VITE_SITE_URL') || 'https://idcashier.com'
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo: `${siteUrl}/reset-password`
     })

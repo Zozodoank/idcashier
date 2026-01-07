@@ -264,7 +264,7 @@ const DeveloperPage = () => {
                               variant="outline" 
                               className="text-orange-500 border-orange-200 hover:bg-orange-50"
                               onClick={() => handleOperation(user, 'ban')}
-                              disabled={user.email === 'demo@idcashier.my.id' || user.email === 'jho.j80@gmail.com'}
+                              disabled={user.email === 'demo@idcashier.com' || user.email === 'jho.j80@gmail.com'}
                             >
                               <Ban className="w-4 h-4 mr-2" /> 
                               {t('block') || 'Block'}
@@ -275,7 +275,7 @@ const DeveloperPage = () => {
                             size="sm" 
                             variant="destructive" 
                             onClick={() => handleOperation(user, 'delete')}
-                            disabled={user.email === 'demo@idcashier.my.id' || user.email === 'jho.j80@gmail.com'}
+                            disabled={user.email === 'demo@idcashier.com' || user.email === 'jho.j80@gmail.com'}
                           >
                             <Trash2 className="w-4 h-4 mr-2" /> 
                             {t('delete')}

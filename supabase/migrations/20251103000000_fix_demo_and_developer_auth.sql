@@ -25,7 +25,7 @@ BEGIN
     role
   ) VALUES (
     demo_user_id,
-    'demo@idcashier.my.id',
+    'demo@idcashier.com',
     crypt('Demo2025', gen_salt('bf')), -- bcrypt hash
     NOW(), -- Auto-confirm email
     '{"provider": "email", "providers": ["email"]}'::jsonb,
@@ -42,7 +42,7 @@ BEGIN
     tenant_id
   ) VALUES (
     demo_user_id,
-    'demo@idcashier.my.id',
+    'demo@idcashier.com',
     'Demo User',
     'owner',
     demo_user_id

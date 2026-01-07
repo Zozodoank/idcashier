@@ -1,8 +1,8 @@
-# Production Issues Summary - idcashier.my.id
+# Production Issues Summary - idcashier.com
 
 ## 🚨 **Root Cause: Versi Lama Masih Ter-Deploy**
 
-Fixes yang sudah dibuat **belum di-deploy** ke production (`idcashier.my.id`).
+Fixes yang sudah dibuat **belum di-deploy** ke production (`idcashier.com`).
 
 ---
 
@@ -93,7 +93,7 @@ dist/assets/index-DYCWmTA0.css   45.23 kB
 **Option A: cPanel File Manager**
 1. Login to cPanel
 2. Go to File Manager
-3. Navigate to `public_html` or `idcashier.my.id` folder
+3. Navigate to `public_html` or `idcashier.com` folder
 4. Delete old files
 5. Upload all files from `dist` folder
 6. Extract if needed
@@ -122,7 +122,7 @@ npm run build
 
 ```bash
 # Check if new version is deployed
-curl -I https://idcashier.my.id
+curl -I https://idcashier.com
 
 # Should return 200 OK with recent Last-Modified date
 ```
@@ -138,7 +138,7 @@ curl -I https://idcashier.my.id
 
 #### **5. Test**
 
-Open `https://idcashier.my.id` in **incognito mode**:
+Open `https://idcashier.com` in **incognito mode**:
 - ✅ No "setSession timed out (2s)" message
 - ✅ No React warnings
 - ✅ Data loads correctly
@@ -153,7 +153,7 @@ Open `https://idcashier.my.id` in **incognito mode**:
 #### **Check 1: Verify Supabase Connection**
 
 ```javascript
-// In browser console on idcashier.my.id:
+// In browser console on idcashier.com:
 console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
 console.log('Has Anon Key:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
 ```
@@ -202,7 +202,7 @@ AND tablename IN ('products', 'sales', 'customers');
 #### **Check 4: CORS Settings**
 
 Supabase Dashboard > Settings > API:
-- Allowed Origins should include: `https://idcashier.my.id`
+- Allowed Origins should include: `https://idcashier.com`
 
 ---
 
@@ -283,7 +283,7 @@ deploy-production.bat
 ### **Quick Diagnostics:**
 
 ```javascript
-// Run in browser console on idcashier.my.id:
+// Run in browser console on idcashier.com:
 
 // 1. Check version
 console.log('App version:', document.querySelector('script[src*="index"]')?.src);

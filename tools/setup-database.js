@@ -173,7 +173,7 @@ async function verifyUsers(supabase) {
     const { data: demoUser, error: demoError } = await supabase
       .from('users')
       .select('id, email, name, role')
-      .eq('email', 'demo@idcashier.my.id')
+      .eq('email', 'demo@idcashier.com')
       .single();
     
     if (demoError || !demoUser) {
@@ -217,7 +217,7 @@ function printSummary() {
   console.log('  Role: Owner (Full access)');
   
   console.log('\nDemo User:');
-  console.log('  Email: demo@idcashier.my.id');
+  console.log('  Email: demo@idcashier.com');
   console.log('  Password: Demo2025');
   console.log('  Role: Owner (Demo access)');
   

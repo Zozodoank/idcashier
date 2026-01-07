@@ -143,7 +143,7 @@ Interactive testing tool untuk memverifikasi koneksi database:
 **Usage:**
 ```bash
 # After deployment, access:
-https://idcashier.my.id/test-pages-connection.html
+https://idcashier.com/test-pages-connection.html
 
 # Or locally:
 http://localhost:5173/test-pages-connection.html
@@ -212,7 +212,7 @@ dir dist
 # - Hard refresh: Ctrl+F5
 
 # 5. Test with tool
-# Access: https://idcashier.my.id/test-pages-connection.html
+# Access: https://idcashier.com/test-pages-connection.html
 ```
 
 ### **After Deployment:**

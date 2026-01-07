@@ -31,13 +31,13 @@ jwt_expiry = 604800                 # 7 hari (168 jam)
 otp_expiry = 86400                  # 24 jam
 
 # Environment URLs
-site_url = "https://idcashier.my.id"
+site_url = "https://idcashier.com"
 ```
 
 **B. Environment Variables (.env.duitku)**
 ```env
 # Added missing SITE_URL
-SITE_URL=https://idcashier.my.id
+SITE_URL=https://idcashier.com
 ```
 
 **C. Frontend Authentication (src/contexts/AuthContext.jsx)**

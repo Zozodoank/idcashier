@@ -31,7 +31,7 @@ Version 31 (yang working) perlu di-restore.
 
 4. **Verify:**
    - Check logs show version 31 is active
-   - Test login at https://idcashier.my.id
+   - Test login at https://idcashier.com
 
 ### Option 2: Via Supabase CLI
 
@@ -121,7 +121,7 @@ After login:
 ## 🔄 Rollback Steps Summary
 
 1. **URGENT:** Rollback edge function to version 31 via Dashboard
-2. **Test:** Verify login works at idcashier.my.id
+2. **Test:** Verify login works at idcashier.com
 3. **Deploy:** Upload new frontend build (dist/) to hosting
 4. **Optional:** Deploy optimized edge function later
 5. **Verify:** Test complete flow

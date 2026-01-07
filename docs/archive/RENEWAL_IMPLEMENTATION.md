@@ -32,7 +32,7 @@ Implementasi fitur perpanjangan subscription untuk user yang sudah terdaftar den
 ## Environment Variables Required
 ```
 DUITKU_SIGNATURE_ALGO=sha-256
-FRONTEND_URL=https://idcashier.my.id
+FRONTEND_URL=https://idcashier.com
 ```
 
 ## Database Schema

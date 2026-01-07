@@ -155,7 +155,7 @@ This was resolved by:
 
 This was fixed by:
 1. Removing demo data from the database schema
-2. Keeping demo data only in the demo@idcashier.my.id account
+2. Keeping demo data only in the demo@idcashier.com account
 3. Implementing proper role-based access control
 4. Ensuring demo data is only loaded through the application interface for demo users
 
@@ -193,7 +193,7 @@ This is a common issue during development that can have several root causes. Her
      - Verify you're using the correct password for the user
      - Check the default credentials:
        - Developer: jho.j80@gmail.com / @Se06070786
-       - Demo: demo@idcashier.my.id / Demo2025
+       - Demo: demo@idcashier.com / Demo2025
    - **Solution**:
      - Use the correct default passwords
      - If you've changed passwords, make sure you're using the updated ones
@@ -202,7 +202,7 @@ This is a common issue during development that can have several root causes. Her
    - **Error Message**: "Email atau password salah" in the browser console
    - **Diagnostic Steps**:
      - Check that the demo user email matches exactly what's used in LoginPage.jsx
-     - The correct email is: demo@idcashier.my.id
+     - The correct email is: demo@idcashier.com
    - **Solution**:
      - Ensure the demo user was created with the correct email
      - Recreate the demo user if needed:
@@ -354,8 +354,8 @@ The reset password feature uses Supabase Auth and has two distinct modes:
 **Solutions**:
 1. Verify the redirect URLs in `supabase/config.toml`:
    ```toml
-   site_url = "https://idcashier.my.id"
-   additional_redirect_urls = ["https://idcashier.my.id/reset-password", "http://localhost:3000", "http://127.0.0.1:3000"]
+   site_url = "https://idcashier.com"
+   additional_redirect_urls = ["https://idcashier.com/reset-password", "http://localhost:3000", "http://127.0.0.1:3000"]
    ```
 
 2. For production deployment:
@@ -376,7 +376,7 @@ The reset password feature uses Supabase Auth and has two distinct modes:
 
 2. **Request password reset**:
    - Navigate to http://localhost:3000/reset-password
-   - Enter a valid user email (e.g., demo@idcashier.my.id)
+   - Enter a valid user email (e.g., demo@idcashier.com)
    - Click "Send Reset Link"
 
 3. **Check Inbucket for the email**:

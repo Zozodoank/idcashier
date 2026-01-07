@@ -10,9 +10,9 @@ const HelpPage = () => {
   const contactInfo = {
     whatsapp: '6289525082117',
     phone: '+62 895-2508-2117',
-    email: 'support@idcashier.my.id',
+    email: 'support@idcashier.com',
     address: 'Jl. Buaran PLN Cikokol No.112, Kota Tangerang, Banten, Indonesia',
-    website: 'https://idcashier.my.id'
+    website: 'https://idcashier.com'
   };
 
   const handleWhatsAppClick = () => {

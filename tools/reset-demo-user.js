@@ -16,7 +16,7 @@ async function resetDemoUser() {
     const { data: users, error: fetchError } = await supabase
       .from('users')
       .select('id, email, name')
-      .eq('email', 'demo@idcashier.my.id');
+      .eq('email', 'demo@idcashier.com');
     
     if (fetchError) {
       console.error('Error fetching user:', fetchError.message);
@@ -35,7 +35,7 @@ async function resetDemoUser() {
     
     // For now, let's just verify that the frontend credentials work
     console.log('Testing frontend credentials...');
-    console.log('Email: demo@idcashier.my.id');
+    console.log('Email: demo@idcashier.com');
     console.log('Password: Demo2025');
     console.log('Try logging in through the frontend with these credentials.');
     

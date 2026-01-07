@@ -8,7 +8,7 @@ async function testLogin() {
   const loginUrl = `${SUPABASE_URL}/functions/v1/auth-login-final`;
   
   console.log('Testing login against:', loginUrl);
-  console.log('User: testing@idcashier.my.id');
+  console.log('User: testing@idcashier.com');
   
   try {
     const response = await fetch(loginUrl, {
@@ -19,7 +19,7 @@ async function testLogin() {
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
       },
       body: JSON.stringify({
-        email: 'testing@idcashier.my.id',
+        email: 'testing@idcashier.com',
         password: 'Tesajakalobisa'
       })
     });

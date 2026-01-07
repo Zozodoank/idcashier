@@ -32,8 +32,8 @@ All fixed files are ready in `temp_upload` folder:
 
 1. **Upload Files**: Upload all contents of `temp_upload` folder to hosting
 2. **SFTP Details**:
-   - Host: `ftp.idcashier.my.id`
-   - Username: `abc@idcashier.my.id`
+   - Host: `ftp.idcashier.com`
+   - Username: `abc@idcashier.com`
    - Password: `@Se06070786`
    - Remote Path: `/public_html`
 

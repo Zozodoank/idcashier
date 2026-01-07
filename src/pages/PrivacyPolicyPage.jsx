@@ -60,7 +60,7 @@ export default function PrivacyPolicyPage() {
         },
         {
           title: '8. Hubungi Kami',
-          content: 'Jika Anda memiliki pertanyaan tentang kebijakan ini, silakan hubungi kami di support@idcashier.my.id.'
+          content: 'Jika Anda memiliki pertanyaan tentang kebijakan ini, silakan hubungi kami di support@idcashier.com.'
         }
       ]
     },
@@ -114,7 +114,7 @@ export default function PrivacyPolicyPage() {
         },
         {
           title: '8. Contact Us',
-          content: 'If you have any questions about this policy, please contact us at support@idcashier.my.id.'
+          content: 'If you have any questions about this policy, please contact us at support@idcashier.com.'
         }
       ]
     },
@@ -168,7 +168,7 @@ export default function PrivacyPolicyPage() {
         },
         {
           title: '8. 联系我们',
-          content: '如果您对本政策有任何疑问，请通过 support@idcashier.my.id 联系我们。'
+          content: '如果您对本政策有任何疑问，请通过 support@idcashier.com 联系我们。'
         }
       ]
     }

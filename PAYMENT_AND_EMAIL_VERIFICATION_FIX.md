@@ -27,14 +27,14 @@
 **Problem:** Users who registered with trial received email verification links that were invalid or expired, causing a login loop.
 
 **Root Cause:**
-- Email verification redirect URL was too simple: `https://idcashier.my.id/login`
+- Email verification redirect URL was too simple: `https://idcashier.com/login`
 - The URL needed proper Supabase auth verification flow structure
 - Missing proper redirect chain for email confirmation
 
 **Solution:**
 - Updated `emailRedirectTo` to use Supabase's verification endpoint:
   ```typescript
-  emailRedirectTo: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify?redirect_to=https://idcashier.my.id/login`
+  emailRedirectTo: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify?redirect_to=https://idcashier.com/login`
   ```
 - This ensures proper verification flow: Email → Supabase Verify → App Login
 - Added error handling for resend verification email failures
@@ -110,7 +110,7 @@ npx supabase functions deploy auth-register --project-ref eypfeiqtvfxxiimhtycc
 ### Email Verification Flow
 1. User registers with trial → auth-register creates unconfirmed user
 2. Supabase sends verification email with link:
-   - Format: `{SUPABASE_URL}/auth/v1/verify?token={TOKEN}&type=signup&redirect_to=https://idcashier.my.id/login`
+   - Format: `{SUPABASE_URL}/auth/v1/verify?token={TOKEN}&type=signup&redirect_to=https://idcashier.com/login`
 3. User clicks link → Supabase verifies token
 4. Supabase redirects to login page
 5. User logs in → auth confirmed, normal flow proceeds
@@ -121,9 +121,9 @@ npx supabase functions deploy auth-register --project-ref eypfeiqtvfxxiimhtycc
 Ensure the following redirect URLs are whitelisted in Supabase:
 1. Go to Authentication → URL Configuration
 2. Add to Redirect URLs:
-   - `https://idcashier.my.id/login`
-   - `https://idcashier.my.id/store-setup`
-   - `https://idcashier.my.id/dashboard`
+   - `https://idcashier.com/login`
+   - `https://idcashier.com/store-setup`
+   - `https://idcashier.com/dashboard`
 
 ### Environment Variables
 Required in Edge Function:

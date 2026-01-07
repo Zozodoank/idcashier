@@ -4,7 +4,7 @@
 **Waktu**: 00:01 WIB  
 **Project**: idCashier POS System  
 **Database**: Supabase PostgreSQL  
-**Authentication**: Demo Account (demo@idcashier.my.id)
+**Authentication**: Demo Account (demo@idcashier.com)
 
 ---
 
@@ -162,7 +162,7 @@ column of 'employees' in the schema cache
 
 ```javascript
 // Demo Account Test Results:
-✅ Login: BERHASIL (demo@idcashier.my.id / Demo2025)
+✅ Login: BERHASIL (demo@idcashier.com / Demo2025)
 ✅ User Profile: BERHASIL
 ✅ Token Generation: BERHASIL  
 ✅ RLS Bypass: BERFUNGSI
@@ -321,7 +321,7 @@ node test-final-crud-complete.js
 ### **Authentication Success**
 ```javascript
 // Demo Account Credentials (Confirmed Working):
-Email: demo@idcashier.my.id
+Email: demo@idcashier.com
 Password: Demo2025
 Status: ✅ Login berhasil 100%
 ```

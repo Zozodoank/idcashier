@@ -1,8 +1,8 @@
-# Production Deployment Fix - idcashier.my.id
+# Production Deployment Fix - idcashier.com
 
 ## 🚨 Issues Detected
 
-Berdasarkan console logs dari `idcashier.my.id`:
+Berdasarkan console logs dari `idcashier.com`:
 
 ### 1. **Versi Lama Masih Ter-Deploy**
 ```
@@ -60,7 +60,7 @@ tar -czf dist.tar.gz dist/
 
 # 2. Upload dist.tar.gz ke server
 # 3. Extract di server:
-cd /path/to/idcashier.my.id
+cd /path/to/idcashier.com
 tar -xzf dist.tar.gz
 mv dist/* .
 ```
@@ -74,7 +74,7 @@ git commit -m "Fix: Session timeout and React warnings"
 git push origin main
 
 # 2. Di server, pull changes
-ssh user@idcashier.my.id
+ssh user@idcashier.com
 cd /path/to/app
 git pull
 npm install
@@ -136,7 +136,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 # Go to: Settings > API
 # Allowed Origins should include:
-# - https://idcashier.my.id
+# - https://idcashier.com
 # - http://localhost:3000 (for development)
 ```
 
@@ -277,11 +277,11 @@ git commit -m "Deploy fixes"
 git push origin main
 
 # 3. Verify
-curl -I https://idcashier.my.id
+curl -I https://idcashier.com
 # Should return 200 OK
 
 # 4. Test
-# Open https://idcashier.my.id in incognito mode
+# Open https://idcashier.com in incognito mode
 # Check console - should be clean
 ```
 
@@ -382,7 +382,7 @@ Jika masih ada masalah setelah deployment:
 
 3. **Test API directly:**
    ```bash
-   curl https://idcashier.my.id/assets/index-*.js | head -n 20
+   curl https://idcashier.com/assets/index-*.js | head -n 20
    # Should show minified JS code
    ```
 

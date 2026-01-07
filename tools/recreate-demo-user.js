@@ -24,12 +24,12 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function recreateDemoUser() {
   try {
-    console.log('Attempting to recreate demo user with email: demo@idcashier.my.id');
+    console.log('Attempting to recreate demo user with email: demo@idcashier.com');
     
     // First, let's try to sign up the user (this will fail if the user already exists)
     console.log('Trying to sign up demo user...');
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email: 'demo@idcashier.my.id',
+      email: 'demo@idcashier.com',
       password: 'Demo2025',
       options: {
         data: {
@@ -53,7 +53,7 @@ async function recreateDemoUser() {
         .from('users')
         .upsert({
           id: signUpData.user.id,
-          email: 'demo@idcashier.my.id',
+          email: 'demo@idcashier.com',
           name: 'Demo User',
           role: 'owner',
           tenant_id: signUpData.user.id
@@ -69,7 +69,7 @@ async function recreateDemoUser() {
     }
     
     console.log('\nTo fully fix the demo user issue, you may need to:');
-    console.log('1. Reset the password in the Supabase Dashboard for demo@idcashier.my.id to "Demo2025"');
+    console.log('1. Reset the password in the Supabase Dashboard for demo@idcashier.com to "Demo2025"');
     console.log('2. Or get the correct service role key and use the admin API');
     
   } catch (error) {

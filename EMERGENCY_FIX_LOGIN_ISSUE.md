@@ -18,7 +18,7 @@ The investigation concluded that the issue was not caused by a bug in the applic
 
 1.  **Incorrect Edge Function Deployment:** The `auth-login` Edge Function was deployed with the default `verify_jwt = true` setting. This requires a valid JWT to be sent with the request, which is impossible for a user who is not yet logged in.
 2.  **Missing Environment Variables (Secrets):** Critical secrets, particularly `SUPABASE_SERVICE_ROLE_KEY` and `ALLOWED_ORIGINS`, were not set in the Supabase Project Dashboard. The Edge Function relies on these secrets to execute properly and handle CORS.
-3.  **CORS Misconfiguration:** The `ALLOWED_ORIGINS` secret was not correctly configured to include the production frontend URL (`https://idcashier.my.id`), causing browsers to block requests from the frontend to the Edge Function.
+3.  **CORS Misconfiguration:** The `ALLOWED_ORIGINS` secret was not correctly configured to include the production frontend URL (`https://idcashier.com`), causing browsers to block requests from the frontend to the Edge Function.
 
 ---
 
@@ -49,7 +49,7 @@ Set the required secrets for the production environment.
 2.  Navigate to **Project Settings > Environment Variables**.
 3.  Add the following secrets:
     - `SUPABASE_SERVICE_ROLE_KEY`: Get this from **Project Settings > API > Project API keys**.
-    - `ALLOWED_ORIGINS`: Set this to `https://idcashier.my.id,http://localhost:3000` (or your specific frontend URLs).
+    - `ALLOWED_ORIGINS`: Set this to `https://idcashier.com,http://localhost:3000` (or your specific frontend URLs).
     - `JWT_SECRET`: Get this from **Project Settings > API > JWT Settings**.
 4.  Refer to `SUPABASE_SECRETS_SETUP.md` for a complete list and detailed instructions.
 
@@ -62,7 +62,7 @@ Test the endpoint directly to ensure it's working, bypassing any potential brows
   curl -i -X POST https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/auth-login \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <YOUR_ANON_KEY>" \
-  -d '{"email":"demo@idcashier.my.id","password":"password"}'
+  -d '{"email":"demo@idcashier.com","password":"password"}'
   ```
   *(Replace `<YOUR_ANON_KEY>` with the `anon` key from your Supabase project's API settings)*
 
@@ -71,7 +71,7 @@ Test the endpoint directly to ensure it's working, bypassing any potential brows
 #### **✅ Step 4: Test from Browser**
 
 1.  Clear your browser cache.
-2.  Navigate to `https://idcashier.my.id/login`.
+2.  Navigate to `https://idcashier.com/login`.
 3.  Attempt to log in with valid credentials.
 4.  Monitor the browser's Network tab to ensure the request to `auth-login` succeeds with a `200` status.
 

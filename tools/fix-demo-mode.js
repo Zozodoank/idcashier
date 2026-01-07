@@ -27,7 +27,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // Demo user credentials (matching frontend implementation)
 const demoUsers = [
   {
-    email: 'demo@idcashier.my.id',  // Used by frontend
+    email: 'demo@idcashier.com',  // Used by frontend
     password: 'Demo2025',
     name: 'Demo User',
     role: 'owner'
@@ -137,7 +137,7 @@ async function fixDemoUsers() {
     }
     
     console.log('\nDemo mode fix completed!');
-    console.log('Frontend demo mode should now work with email: demo@idcashier.my.id and password: Demo2025');
+    console.log('Frontend demo mode should now work with email: demo@idcashier.com and password: Demo2025');
     
   } catch (error) {
     console.error('Unexpected error:', error.message);

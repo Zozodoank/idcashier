@@ -26,7 +26,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Demo user credentials (using a standard email format)
 const demoUser = {
-  email: 'demo@idcashier.my.id',
+  email: 'demo@idcashier.com',
   password: 'Demo2025',
   name: 'Demo User',
   role: 'owner'

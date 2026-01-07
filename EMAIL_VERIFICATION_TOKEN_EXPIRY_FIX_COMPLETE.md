@@ -34,11 +34,11 @@ otp_expiry = 86400                  # 24 jam
 
 #### 3. **Environment Configuration**
 ```toml
-site_url = "https://idcashier.my.id"
+site_url = "https://idcashier.com"
 additional_redirect_urls = [
-  "https://idcashier.my.id/reset-password",
-  "https://idcashier.my.id",
-  "https://idcashier.my.id/login"
+  "https://idcashier.com/reset-password",
+  "https://idcashier.com",
+  "https://idcashier.com/login"
 ]
 ```
 
@@ -47,8 +47,8 @@ additional_redirect_urls = [
 #### 1. **Tambahan SITE_URL**
 ```env
 SUPABASE_URL=https://eypfeiqtvfxxiimhtycc.supabase.co
-FRONTEND_URL=https://idcashier.my.id
-SITE_URL=https://idcashier.my.id  # ← DITAMBAHKAN
+FRONTEND_URL=https://idcashier.com
+SITE_URL=https://idcashier.com  # ← DITAMBAHKAN
 ```
 
 ### C. **Frontend Improvements (src/contexts/AuthContext.jsx)**
@@ -184,12 +184,12 @@ if (!email && token) {
 - [ ] Test login setelah verifikasi email
 - [ ] Monitor auto-refresh token setiap 2 menit
 - [ ] Test resend verification email
-- [ ] Verify redirect URLs mengarah ke https://idcashier.my.id
+- [ ] Verify redirect URLs mengarah ke https://idcashier.com
 - [ ] Test scenario "user belum verifikasi" vs "user sudah verifikasi"
 
 ## 🔗 **USEFUL LINKS**
 - **Supabase Dashboard**: https://supabase.com/dashboard
-- **Email Testing**: https://idcashier.my.id/
+- **Email Testing**: https://idcashier.com/
 - **Browser DevTools**: F12 → Application → Local Storage → idcashier_token
 - **Network Tab**: Monitor API calls dan response times
 

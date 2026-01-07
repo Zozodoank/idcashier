@@ -128,7 +128,7 @@ const createDuitkuPayment = async (
       return { success: false, errorMessage: 'Duitku configuration missing' };
     }
     
-    const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://idcashier.my.id';
+    const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://idcashier.com';
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
     
     const duitkuRequestData: any = {

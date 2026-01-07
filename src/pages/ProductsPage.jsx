@@ -47,7 +47,7 @@ const ProductsPage = ({ user }) => {
   const [currentCategory, setCurrentCategory] = useState(null);
   const [currentSupplier, setCurrentSupplier] = useState(null);
 
-  const isDemoAccount = user.email === 'demo@idcashier.my.id';
+  const isDemoAccount = user.email === 'demo@idcashier.com';
   
   // HPP feature state - removed local state, using context instead
   const canViewHPP = user?.permissions?.canViewHPP || false;

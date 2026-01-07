@@ -69,7 +69,7 @@ async function applyMigration() {
                 )
                 OR
                 user_id = (
-                    SELECT id FROM users WHERE email = 'demo@idcashier.my.id'
+                    SELECT id FROM users WHERE email = 'demo@idcashier.com'
                 )
             );
         
@@ -85,7 +85,7 @@ async function applyMigration() {
                 )
                 OR
                 user_id = (
-                    SELECT id FROM users WHERE email = 'demo@idcashier.my.id'
+                    SELECT id FROM users WHERE email = 'demo@idcashier.com'
                 )
             );
       \`

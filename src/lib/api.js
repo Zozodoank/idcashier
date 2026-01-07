@@ -446,7 +446,7 @@ export const authAPI = {
       // Use current origin for development, configured URL for production
       const redirectUrl = isDevelopment 
         ? `${window.location.origin}/reset-password`
-        : (import.meta.env.VITE_SITE_URL || 'https://idcashier.my.id') + '/reset-password';
+        : (import.meta.env.VITE_SITE_URL || 'https://idcashier.com') + '/reset-password';
       
       console.log('Environment:', isDevelopment ? 'Development' : 'Production');
       console.log('Using redirect URL:', redirectUrl);
@@ -699,7 +699,7 @@ export const authAPI = {
         type: 'signup',
         email: normalizedEmail,
         options: {
-          emailRedirectTo: `${import.meta.env.VITE_SITE_URL || 'https://idcashier.my.id'}/login`
+          emailRedirectTo: `${import.meta.env.VITE_SITE_URL || 'https://idcashier.com'}/login`
         }
       });
       

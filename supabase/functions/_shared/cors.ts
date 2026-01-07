@@ -20,10 +20,10 @@ export function handleOptions(req: Request) {
 
   // Reflect the requested origin
   const origin = req.headers.get('origin');
-  if (origin && (origin.startsWith('http://localhost:') || origin === 'https://idcashier.my.id')) {
+  if (origin && (origin.startsWith('http://localhost:') || origin === 'https://idcashier.com')) {
     headers.set('Access-Control-Allow-Origin', origin);
   } else {
-    headers.set('Access-Control-Allow-Origin', 'https://idcashier.my.id');
+    headers.set('Access-Control-Allow-Origin', 'https://idcashier.com');
   }
 
   return new Response(null, {

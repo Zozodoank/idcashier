@@ -141,7 +141,7 @@ ON CONFLICT (owner_id) DO NOTHING;
 
 ### **Step 1: Check Database Connection**
 
-Run this in browser console on `idcashier.my.id`:
+Run this in browser console on `idcashier.com`:
 
 ```javascript
 // Test Supabase connection
@@ -237,7 +237,7 @@ WHERE u.email = 'jho.j80@gmail.com';
 Supabase Dashboard > Settings > API:
 
 **Allowed Origins should include:**
-- `https://idcashier.my.id`
+- `https://idcashier.com`
 - `http://localhost:3000` (for development)
 - `*` (for testing, not recommended for production)
 

@@ -121,7 +121,7 @@ setTimeout(() => {
 const handleResendVerification = async () => {
   setResendLoading(true);
   try {
-    const siteUrl = import.meta.env.VITE_SITE_URL || 'https://idcashier.my.id';
+    const siteUrl = import.meta.env.VITE_SITE_URL || 'https://idcashier.com';
     
     const { error } = await supabase.auth.resend({
       type: 'signup',
@@ -214,7 +214,7 @@ const handleResendVerification = async () => {
 Set di Supabase Dashboard → Settings → Secrets:
 ```
 EMAIL_PASSWORD=your_smtp_password
-SITE_URL=https://idcashier.my.id
+SITE_URL=https://idcashier.com
 ```
 
 ### **2. Configuration Updates**
@@ -234,11 +234,11 @@ Ensure SMTP credentials are correct:
 ```toml
 [auth.email.smtp]
 enabled = true
-host = "mail.idcashier.my.id"
+host = "mail.idcashier.com"
 port = 465
-user = "support@idcashier.my.id"
+user = "support@idcashier.com"
 pass = "env(EMAIL_PASSWORD)"
-admin_email = "support@idcashier.my.id"
+admin_email = "support@idcashier.com"
 sender_name = "idCashier"
 ```
 

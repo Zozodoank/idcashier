@@ -61,7 +61,7 @@ Menggunakan MCP Supabase, saya telah memverifikasi:
 
 **Evidence:**
 ```
-Console log di idcashier.my.id:
+Console log di idcashier.com:
 "⚠️ setSession timed out (2s)"  ← Masih versi lama!
 ```
 
@@ -160,7 +160,7 @@ dir dist
 ```bash
 # 1. Copy to public folder (already done)
 # 2. After deployment, access:
-https://idcashier.my.id/test-pages-connection.html
+https://idcashier.com/test-pages-connection.html
 
 # 3. Run tests:
 - Click "Login & Get Token"

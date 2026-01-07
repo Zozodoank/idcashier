@@ -29,7 +29,7 @@ async function checkSubscription(supabase: SupabaseClient, user: any, authUser: 
   }
   
   // Accounts that bypass subscription checks
-  const bypassEmails = ['demo@idcashier.my.id', 'jho.j80@gmail.com'];
+  const bypassEmails = ['demo@idcashier.com', 'jho.j80@gmail.com'];
   if (bypassEmails.includes(email)) {
     return {
       data: {

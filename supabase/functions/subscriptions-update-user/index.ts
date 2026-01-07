@@ -101,7 +101,7 @@ Deno.serve(async (req: Request) => {
           .single()
         
         // Prevent deleting protected users
-        if (targetUserData && (targetUserData.email === 'demo@idcashier.my.id' || targetUserData.email === 'jho.j80@gmail.com')) {
+        if (targetUserData && (targetUserData.email === 'demo@idcashier.com' || targetUserData.email === 'jho.j80@gmail.com')) {
           return new Response(
             JSON.stringify({ error: 'Cannot delete protected user' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }

@@ -26,7 +26,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Demo user credentials (matching frontend implementation)
 const demoUser = {
-  email: 'demo@idcashier.my.id',  // Correct email to match frontend
+  email: 'demo@idcashier.com',  // Correct email to match frontend
   password: 'Demo2025',
   name: 'Demo User',
   role: 'owner'

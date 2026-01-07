@@ -4,7 +4,7 @@
 
 1. ✅ **Migration SQL diterapkan**: `setup_testing_expired_user`
    - Membersihkan user lama `testing@tes.com`
-   - Membuat record di `public.users` untuk `testing@idcashier.my.id` (jika auth user ada)
+   - Membuat record di `public.users` untuk `testing@idcashier.com` (jika auth user ada)
    - Membuat subscription expired (7 hari yang lalu)
 
 ## 📋 Langkah yang Perlu Dilakukan
@@ -20,7 +20,7 @@ User **harus dibuat di Supabase Auth terlebih dahulu** karena tidak bisa dibuat 
 3. Klik **Authentication** → **Users**
 4. Klik **Add user** (atau **Invite user**)
 5. Isi form:
-   - **Email**: `testing@idcashier.my.id`
+   - **Email**: `testing@idcashier.com`
    - **Password**: `Tesajakalobisa`
    - ✅ **Auto Confirm User** (check box ini)
 6. Klik **Create user**
@@ -47,18 +47,18 @@ Setelah user dibuat di auth, migration akan otomatis:
 **Verify via SQL:**
 ```sql
 -- Check user
-SELECT * FROM users WHERE email = 'testing@idcashier.my.id';
+SELECT * FROM users WHERE email = 'testing@idcashier.com';
 
 -- Check subscription
 SELECT * FROM subscriptions 
-WHERE user_id = (SELECT id FROM users WHERE email = 'testing@idcashier.my.id');
+WHERE user_id = (SELECT id FROM users WHERE email = 'testing@idcashier.com');
 ```
 
 ### Step 3: Test Login
 
 1. Buka aplikasi
 2. Login dengan:
-   - **Email**: `testing@idcashier.my.id`
+   - **Email**: `testing@idcashier.com`
    - **Password**: `Tesajakalobisa`
 3. Harus muncul **warning subscription expired** atau redirect ke renewal page
 
@@ -73,7 +73,7 @@ Kepada Tim Duitku,
 
 Berikut adalah test account untuk testing fitur subscription warning di dashboard:
 
-Email: testing@idcashier.my.id
+Email: testing@idcashier.com
 Password: Tesajakalobisa
 
 Purpose: 
@@ -100,7 +100,7 @@ Terima kasih.
 ### User tidak bisa login
 - **Check**: Apakah user sudah dibuat di `auth.users`?
   ```sql
-  SELECT * FROM auth.users WHERE email = 'testing@idcashier.my.id';
+  SELECT * FROM auth.users WHERE email = 'testing@idcashier.com';
   ```
 - **Fix**: Buat user via Dashboard (Step 1)
 
@@ -108,7 +108,7 @@ Terima kasih.
 - **Check**: Apakah subscription sudah dibuat?
   ```sql
   SELECT * FROM subscriptions 
-  WHERE user_id = (SELECT id FROM users WHERE email = 'testing@idcashier.my.id');
+  WHERE user_id = (SELECT id FROM users WHERE email = 'testing@idcashier.com');
   ```
 - **Fix**: Jalankan migration lagi atau create manual:
   ```sql
@@ -119,7 +119,7 @@ Terima kasih.
     (CURRENT_DATE - INTERVAL '7 days')::date,
     NOW(),
     NOW()
-  FROM users WHERE email = 'testing@idcashier.my.id';
+  FROM users WHERE email = 'testing@idcashier.com';
   ```
 
 ### Warning tidak muncul di dashboard
@@ -132,7 +132,7 @@ Terima kasih.
 
 ## ✅ Checklist
 
-- [ ] User dibuat di Supabase Auth (`testing@idcashier.my.id`)
+- [ ] User dibuat di Supabase Auth (`testing@idcashier.com`)
 - [ ] User ada di `public.users`
 - [ ] Subscription expired sudah dibuat (7 hari yang lalu)
 - [ ] Login berhasil dengan credentials

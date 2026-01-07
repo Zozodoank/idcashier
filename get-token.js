@@ -7,7 +7,7 @@ async function getToken() {
   );
 
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: 'testing@idcashier.my.id',
+    email: 'testing@idcashier.com',
     password: 'Tesajakalobisa'
   });
 

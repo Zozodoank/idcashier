@@ -411,7 +411,7 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
       return;
     }
 
-    if (user.email === 'demo@idcashier.my.id') {
+    if (user.email === 'demo@idcashier.com') {
       toast({ title: t('accessDenied'), description: t('passwordChangeFail'), variant: "destructive" });
       return;
     }
@@ -540,12 +540,12 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
       <div className="space-y-6">
         <div><h1 className="text-3xl font-bold">{t('settings')}</h1><p className="text-muted-foreground">{t('settingsSubtitle')}</p></div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full grid-cols-2 gap-1 ${(hppEnabled || user?.permissions?.canViewHPP || user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com') ? 'sm:grid-cols-6' : 'sm:grid-cols-5'}`}>
+          <TabsList className={`grid w-full grid-cols-2 gap-1 ${(hppEnabled || user?.permissions?.canViewHPP || user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com') ? 'sm:grid-cols-6' : 'sm:grid-cols-5'}`}>
             <TabsTrigger value="toko" className="text-xs sm:text-sm"><Store className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />{t('store')}</TabsTrigger>
             <TabsTrigger value="akun" className="text-xs sm:text-sm"><Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />{t('account')}</TabsTrigger>
             <TabsTrigger value="pelanggan" className="text-xs sm:text-sm"><Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />{t('customers')}</TabsTrigger>
             <TabsTrigger value="struk" className="text-xs sm:text-sm"><Printer className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />{t('printSetting')}</TabsTrigger>
-            {(user?.permissions?.canViewHPP || user?.role === 'owner' || user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com') && (
+            {(user?.permissions?.canViewHPP || user?.role === 'owner' || user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com') && (
               <TabsTrigger value="hpp" className="text-xs sm:text-sm"><DollarSign className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />{t('hpp')}</TabsTrigger>
             )}
             <TabsTrigger value="umum" className="text-xs sm:text-sm"><SettingsIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />{t('general')}</TabsTrigger>
@@ -592,7 +592,7 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
                   )}
 
                   {(() => {
-                    const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.my.id,jho.j80@gmail.com')
+                    const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.com,jho.j80@gmail.com')
                       .split(',')
                       .map(e => String(e || '').trim().toLowerCase())
                       .filter(Boolean);
@@ -610,11 +610,11 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
                         id="owner-email" 
                         value={email} 
                         onChange={(e) => setEmail(e.target.value)} 
-                        disabled={user.email === 'demo@idcashier.my.id'} 
+                        disabled={user.email === 'demo@idcashier.com'} 
                       />
                       <Button 
                         onClick={handleUpdateEmail} 
-                        disabled={user.email === 'demo@idcashier.my.id' || email === authUser.email}
+                        disabled={user.email === 'demo@idcashier.com' || email === authUser.email}
                         variant="outline"
                       >
                         {t('update')}
@@ -631,7 +631,7 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
                         placeholder={t('enterNewPassword')}
                         value={newPassword} 
                         onChange={(e) => setNewPassword(e.target.value)} 
-                        disabled={user.email === 'demo@idcashier.my.id'} 
+                        disabled={user.email === 'demo@idcashier.com'} 
                         className="pr-10"
                       />
                       <button
@@ -643,7 +643,7 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
                       </button>
                     </div>
                   </div>
-                  <Button className="mt-4" onClick={handleChangePassword} disabled={user.email === 'demo@idcashier.my.id'}><KeyRound className="w-4 h-4 mr-2" /> {t('changePassword')}</Button>
+                  <Button className="mt-4" onClick={handleChangePassword} disabled={user.email === 'demo@idcashier.com'}><KeyRound className="w-4 h-4 mr-2" /> {t('changePassword')}</Button>
                 </div>
               </CardContent>
             </Card>
@@ -857,7 +857,7 @@ const SettingsPage = ({ user, onUserUpdate, navigationParams }) => {
             </Card>
           </TabsContent>
 
-          {(user?.permissions?.canViewHPP || user?.role === 'owner' || user?.email === 'demo@idcashier.my.id' || user?.email === 'jho.j80@gmail.com') && (
+          {(user?.permissions?.canViewHPP || user?.role === 'owner' || user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com') && (
             <TabsContent value="hpp">
               <div className="mt-4">
                 <HPPSettings />

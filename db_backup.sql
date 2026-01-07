@@ -20,7 +20,7 @@ INSERT INTO users (id, name, email, role, tenant_id, created_at, updated_at, per
 ('37db092c-140e-41a0-af9d-bd3b87a83b9a', 'zozo', 'megakomindo@gmail.com', 'owner', '37db092c-140e-41a0-af9d-bd3b87a83b9a', '2025-10-22 17:38:38.984697', '2025-10-22 17:38:38.984697', '{"canEditHPP": true, "canViewHPP": true, "canAddCustomCosts": true}'),
 ('eae32873-5ef8-4251-9764-a5ec92888e46', 'titis', 'projectmandiri10@gmail.com', 'cashier', '21da4acf-6008-4b4c-9bde-4dc2efaef287', '2025-10-22 17:50:38.890201', '2025-10-22 17:50:38.890201', '{"sales": true, "reports": true, "products": true, "canEditHPP": false, "canViewHPP": false, "canApplyTax": false, "canAddProduct": false, "canAddCustomer": true, "canAddSupplier": false, "canEditProduct": false, "canApplyDiscount": false, "canDeleteProduct": false, "canExportReports": true, "canImportProduct": true, "canAddCustomCosts": false, "canDeleteTransaction": false}'),
 ('db573d3c-acc4-4d8e-a37a-13653d1e70b8', 'demo', 'demo@gmail.com', 'owner', 'db573d3c-acc4-4d8e-a37a-13653d1e70b8', '2025-10-31 17:57:53.659', '2025-10-31 17:57:53.659', '{"canEditHPP": true, "canViewHPP": true, "canAddCustomCosts": true}'),
-('ecf0741d-e4ae-4de3-bee0-f43d27411366', 'testing', 'testing@idcashier.my.id', 'owner', 'ecf0741d-e4ae-4de3-bee0-f43d27411366', '2025-11-01 09:13:00.331012', '2025-11-01 09:13:00.331012', NULL);
+('ecf0741d-e4ae-4de3-bee0-f43d27411366', 'testing', 'testing@idcashier.com', 'owner', 'ecf0741d-e4ae-4de3-bee0-f43d27411366', '2025-11-01 09:13:00.331012', '2025-11-01 09:13:00.331012', NULL);
 
 -- Table: customers
 CREATE TABLE IF NOT EXISTS customers (
@@ -481,7 +481,7 @@ INSERT INTO users (id, name, email, role, tenant_id, created_at, updated_at, per
 ('37db092c-140e-41a0-af9d-bd3b87a83b9a', 'zozo', 'megakomindo@gmail.com', 'owner', '37db092c-140e-41a0-af9d-bd3b87a83b9a', '2025-10-22 17:38:38.984697', '2025-10-22 17:38:38.984697', '{"canEditHPP": true, "canViewHPP": true, "canAddCustomCosts": true}'),
 ('eae32873-5ef8-4251-9764-a5ec92888e46', 'titis', 'projectmandiri10@gmail.com', 'cashier', '21da4acf-6008-4b4c-9bde-4dc2efaef287', '2025-10-22 17:50:38.890201', '2025-10-22 17:50:38.890201', '{"sales": true, "reports": true, "products": true, "canEditHPP": false, "canViewHPP": false, "canApplyTax": false, "canAddProduct": false, "canAddCustomer": true, "canAddSupplier": false, "canEditProduct": false, "canApplyDiscount": false, "canDeleteProduct": false, "canExportReports": true, "canImportProduct": true, "canAddCustomCosts": false, "canDeleteTransaction": false}'),
 ('db573d3c-acc4-4d8e-a37a-13653d1e70b8', 'demo', 'demo@gmail.com', 'owner', 'db573d3c-acc4-4d8e-a37a-13653d1e70b8', '2025-10-31 17:57:53.659', '2025-10-31 17:57:53.659', '{"canEditHPP": true, "canViewHPP": true, "canAddCustomCosts": true}'),
-('ecf0741d-e4ae-4de3-bee0-f43d27411366', 'testing', 'testing@idcashier.my.id', 'owner', 'ecf0741d-e4ae-4de3-bee0-f43d27411366', '2025-11-01 09:13:00.331012', '2025-11-01 09:13:00.331012', NULL);
+('ecf0741d-e4ae-4de3-bee0-f43d27411366', 'testing', 'testing@idcashier.com', 'owner', 'ecf0741d-e4ae-4de3-bee0-f43d27411366', '2025-11-01 09:13:00.331012', '2025-11-01 09:13:00.331012', NULL);
 
 -- Table: customers
 CREATE TABLE IF NOT EXISTS customers (

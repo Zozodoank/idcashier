@@ -222,7 +222,7 @@ const LoginPage = () => {
     setResendLoading(true);
     try {
       // Get the current site URL from environment or use default
-      const siteUrl = import.meta.env.VITE_SITE_URL || 'https://idcashier.my.id';
+      const siteUrl = import.meta.env.VITE_SITE_URL || 'https://idcashier.com';
       
       console.log('Attempting to resend verification for:', normalizedEmail);
       
@@ -282,7 +282,7 @@ const LoginPage = () => {
     setIsLoading(true);
     try {
       // Normalize demo email on client side
-      const demoEmail = 'demo@idcashier.my.id';
+      const demoEmail = 'demo@idcashier.com';
       const normalizedDemoEmail = demoEmail.trim().toLowerCase();
       
       const result = await login(normalizedDemoEmail, 'Demo2025');

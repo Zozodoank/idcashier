@@ -6,4 +6,4 @@ SELECT
     role,
     permissions
 FROM users
-WHERE email = 'demo@idcashier.my.id';
+WHERE email = 'demo@idcashier.com';
