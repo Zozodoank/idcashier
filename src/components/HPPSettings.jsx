@@ -22,9 +22,9 @@ const HPPSettings = () => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('3_months');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('ALL');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [subscriptionData, setSubscriptionData] = useState(null);
-  const [isTrialActive, setIsTrialActive] = useState(false);
+  const [isSubscriptionActive, setIsSubscriptionActive] = useState(false);
   const [employeeStats, setEmployeeStats] = useState({
     totalActive: 0,
     totalBaseSalary: 0
@@ -57,7 +57,7 @@ const HPPSettings = () => {
         const endDate = new Date(subscription.end_date);
         const now = new Date();
         const isActive = endDate > now;
-        setIsTrialActive(isActive);
+        setIsSubscriptionActive(isActive);
       }
     } catch (error) {
       console.error('Error checking subscription status:', error);
@@ -93,7 +93,7 @@ const HPPSettings = () => {
   const handleActivateHPP = () => {
     // Check if user is demo or developer (whitelisted accounts)
     const isWhitelistedAccount = user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com';
-    
+
     if (isWhitelistedAccount) {
       toast({
         title: 'Info',
@@ -101,12 +101,12 @@ const HPPSettings = () => {
       });
       return;
     }
-    
+
     if (hppEnabled) {
-      if (isTrialActive) {
+      if (isSubscriptionActive) {
         toast({
           title: 'Info',
-          description: 'Fitur HPP aktif selama masa trial Anda.'
+          description: `Fitur HPP aktif hingga ${new Date(subscriptionData?.end_date).toLocaleDateString('id-ID')}.`
         });
       } else {
         toast({
@@ -120,6 +120,15 @@ const HPPSettings = () => {
   };
 
   const handlePayment = async () => {
+    if (!paymentMethod) {
+      toast({
+        title: t('paymentMethodRequired') || 'Metode Pembayaran Diperlukan',
+        description: t('pleaseSelectPaymentMethod') || 'Silakan pilih metode pembayaran terlebih dahulu.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setIsProcessing(true);
     try {
       // Use same pricing as RenewalPage
@@ -129,22 +138,22 @@ const HPPSettings = () => {
         '6_months': { months: 6, price: 250000, name: '6 Bulan', popular: true, discount: '17%' },
         '12_months': { months: 12, price: 500000, name: '12 Bulan', discount: '17%' }
       };
-      
+
       const plan = plans[selectedPlan];
       if (!plan) {
         throw new Error('Invalid plan selected');
       }
-      
+
       // Use renew-subscription-payment edge function (same as RenewalPage)
       const { invokeFn } = await import('@/lib/invokeFn');
       const requestBody = {
         plan_id: selectedPlan,
         email: user.email,
-        paymentMethod: paymentMethod === 'ALL' ? undefined : paymentMethod, // Don't send 'ALL' as it might confuse backend
+        paymentMethod: paymentMethod, // Removed ALL check since we removed the option
         hppActivation: true, // Flag for HPP activation
         returnUrl: `${window.location.origin}/payment-callback?renewal=1&hpp=1`
       };
-      
+
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
       const result = await invokeFn('renew-subscription-payment', requestBody, {
         method: 'POST',
@@ -212,7 +221,7 @@ const HPPSettings = () => {
               </h3>
               <div className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
                 <p>
-                  <strong>HPP</strong> adalah total biaya yang dikeluarkan untuk memproduksi atau memperoleh barang yang dijual. 
+                  <strong>HPP</strong> adalah total biaya yang dikeluarkan untuk memproduksi atau memperoleh barang yang dijual.
                   Fitur ini membantu Anda:
                 </p>
                 <ul className="list-disc list-inside space-y-1 ml-2">
@@ -223,7 +232,7 @@ const HPPSettings = () => {
                   <li>Mengelola biaya karyawan dan operasional</li>
                 </ul>
                 <p className="mt-3">
-                  <strong>Contoh:</strong> Jika Anda menjual kopi seharga Rp 15.000 dengan HPP Rp 8.000, 
+                  <strong>Contoh:</strong> Jika Anda menjual kopi seharga Rp 15.000 dengan HPP Rp 8.000,
                   maka profit Anda adalah Rp 7.000 (46.7% margin).
                 </p>
               </div>
@@ -246,22 +255,24 @@ const HPPSettings = () => {
               <p className="text-sm text-muted-foreground">
                 {(() => {
                   if (!hppEnabled) return 'Belum aktif';
-                  
+
                   if (hppStatus?.isTrial) {
-                    return hppStatus.trialEndDate ? 
+                    return hppStatus.trialEndDate ?
                       `Aktif (Trial hingga ${new Date(hppStatus.trialEndDate).toLocaleDateString('id-ID')})` :
                       'Aktif (Trial)';
                   }
-                  
-                  if (isTrialActive) return 'Aktif (Gratis 7 Hari)';
-                  
+
+                  if (isSubscriptionActive && subscriptionData?.end_date) {
+                    return `Aktif (Berlaku hingga ${new Date(subscriptionData.end_date).toLocaleDateString('id-ID')})`;
+                  }
+
                   const isWhitelistedAccount = user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com';
                   return isWhitelistedAccount ? 'Aktif' : 'Sudah aktif';
                 })()}
               </p>
             </div>
           </div>
-          <Button 
+          <Button
             onClick={handleActivateHPP}
             disabled={hppEnabled}
             className={hppEnabled ? 'bg-green-500 hover:bg-green-600' : ''}
@@ -269,8 +280,8 @@ const HPPSettings = () => {
             {hppEnabled ? (
               <>
                 <CheckCircle className="w-4 h-4 mr-2" />
-                {(user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com') ? 'Whitelist' : 
-                 (isTrialActive ? 'Trial Aktif' : 'Aktif')}
+                {(user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com') ? 'Whitelist' :
+                  (isSubscriptionActive ? 'Langganan Aktif' : 'Aktif')}
               </>
             ) : (
               <>
@@ -282,7 +293,7 @@ const HPPSettings = () => {
         </div>
 
         {/* Trial Information - Removed as HPP is now paid-only add-on */}
-        
+
         {hppEnabled && (
           <>
             <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
@@ -341,7 +352,7 @@ const HPPSettings = () => {
           </>
         )}
       </CardContent>
-      
+
       {/* Payment Dialog */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
         <DialogContent className="max-w-md">
@@ -351,7 +362,7 @@ const HPPSettings = () => {
               {t('selectSubscriptionPackageToActivate') || 'Select a subscription package to activate HPP feature'}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Plan Selection - Same as RenewalPage */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -364,11 +375,10 @@ const HPPSettings = () => {
                 <div
                   key={plan.id}
                   onClick={() => setSelectedPlan(plan.id)}
-                  className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                    selectedPlan === plan.id
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  } ${plan.popular ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}
+                  className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedPlan === plan.id
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    } ${plan.popular ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}
                 >
                   {plan.popular && (
                     <span className="absolute -top-2 left-4 bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
@@ -399,16 +409,15 @@ const HPPSettings = () => {
                 </div>
               ))}
             </div>
-            
+
             {/* Payment Method Selector */}
             <div className="space-y-2">
               <Label>{t('paymentMethod') || 'Metode Pembayaran'}</Label>
               <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder={t('selectPaymentMethod') || "Pilih Metode Pembayaran"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">{t('allPaymentMethods') || 'Semua Metode'}</SelectItem>
                   <SelectItem value="VC">{t('creditCard') || 'Kartu Kredit (Visa/Master/JCB)'}</SelectItem>
                   <SelectItem value="BC">BCA Virtual Account</SelectItem>
                   <SelectItem value="M2">Mandiri Virtual Account</SelectItem>
@@ -420,10 +429,10 @@ const HPPSettings = () => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                {isTrialActive ? (
+                {isSubscriptionActive ? (
                   <>💡 {t('extendHPPAccessAfterTrial') || 'Extend HPP access after trial ends to continue using:'}</>
                 ) : (
                   <>💡 {t('afterPaymentHPPActive') || 'After successful payment, HPP feature will be active and you can access:'}</>
@@ -437,16 +446,16 @@ const HPPSettings = () => {
               </ul>
             </div>
           </div>
-          
+
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setIsPaymentDialogOpen(false)}
               disabled={isProcessing}
             >
               {t('cancel') || 'Cancel'}
             </Button>
-            <Button 
+            <Button
               onClick={handlePayment}
               disabled={isProcessing}
             >

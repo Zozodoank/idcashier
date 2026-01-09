@@ -123,7 +123,7 @@ const DashboardLayout = () => {
     const hppRefreshed = urlParams.get('hpp_refreshed') === 'true';
     const pageParam = urlParams.get('page');
     const tabParam = urlParams.get('tab');
-    
+
     if (forceRefresh) {
       // Remove the query parameter
       window.history.replaceState({}, '', window.location.pathname);
@@ -131,7 +131,7 @@ const DashboardLayout = () => {
       localStorage.removeItem('idcashier_subscription_cache');
       sessionStorage.removeItem('idcashier_subscription_cache');
     }
-    
+
     // Handle HPP refresh flag
     if (hppRefreshed || localStorage.getItem('idcashier_hpp_refresh_needed') === 'true') {
       // Remove the flag
@@ -148,7 +148,7 @@ const DashboardLayout = () => {
         refreshHPPSetting();
       }
     }
-    
+
     // Handle page and tab parameters (e.g., from store setup redirect)
     if (pageParam === 'settings') {
       handleNavigate('settings');
@@ -177,7 +177,7 @@ const DashboardLayout = () => {
             const cacheBuster = forceRefresh ? `&_t=${Date.now()}` : '';
             sub = await subscriptionAPI.getCurrentUserSubscription(token);
           }
-        } catch (_) {}
+        } catch (_) { }
 
         if (sub && sub.end_date) {
           const today = new Date();
@@ -187,10 +187,10 @@ const DashboardLayout = () => {
           const isActive = endDate >= today;
           setSubscriptionInactive(!isActive);
           setSubscriptionData(sub);
-          console.log('📊 Subscription status updated:', { 
-            endDate: sub.end_date, 
-            isActive, 
-            isInactive: !isActive 
+          console.log('📊 Subscription status updated:', {
+            endDate: sub.end_date,
+            isActive,
+            isInactive: !isActive
           });
         } else {
           setSubscriptionInactive(true);
@@ -201,7 +201,7 @@ const DashboardLayout = () => {
         setSubscriptionInactive(false);
       }
     };
-    
+
     // Call fetchSub
     fetchSub();
   }, [user?.email, token]); // Only depend on email and token
@@ -209,7 +209,7 @@ const DashboardLayout = () => {
   // Effect 2: Generate Menu Items
   useEffect(() => {
     if (!user) return;
-    
+
     const role = resolveRole(user.role);
 
     const allMenuItems = [
@@ -252,31 +252,31 @@ const DashboardLayout = () => {
     }
 
     setMenuItems(filtered);
-  // Use primitive dependencies to avoid object reference loops
+    // Use primitive dependencies to avoid object reference loops
   }, [t, language, hppEnabled, user?.role, user?.email, JSON.stringify(user?.permissions)]);
 
   // Calculate optimistic renewal status at top level
   // This allows it to be used in both the banner and the specific page blocking logic
   const renewalPendingTimestamp = typeof window !== 'undefined' ? localStorage.getItem('idcashier_renewal_pending') : null;
   const isRenewalPending = React.useMemo(() => {
-     if (!renewalPendingTimestamp) return false;
-     const ts = parseInt(renewalPendingTimestamp, 10);
-     return !isNaN(ts) && (Date.now() - ts < 300000); // 5 minutes validity
+    if (!renewalPendingTimestamp) return false;
+    const ts = parseInt(renewalPendingTimestamp, 10);
+    return !isNaN(ts) && (Date.now() - ts < 300000); // 5 minutes validity
   }, [renewalPendingTimestamp]);
 
   // Clean up flag if subscription becomes active OR if expired
   useEffect(() => {
     if (!subscriptionInactive && isRenewalPending) {
-        localStorage.removeItem('idcashier_renewal_pending');
+      localStorage.removeItem('idcashier_renewal_pending');
     }
     // Also auto-expire the flag after 5 minutes to prevent permanent bypass
     if (isRenewalPending) {
-        const timeout = setTimeout(() => {
-             localStorage.removeItem('idcashier_renewal_pending');
-             // Trigger re-render might be needed, but local storage change won't trigger it automatically
-             // User will just see expired again on next reload if server not updated.
-        }, 300000);
-        return () => clearTimeout(timeout);
+      const timeout = setTimeout(() => {
+        localStorage.removeItem('idcashier_renewal_pending');
+        // Trigger re-render might be needed, but local storage change won't trigger it automatically
+        // User will just see expired again on next reload if server not updated.
+      }, 300000);
+      return () => clearTimeout(timeout);
     }
   }, [subscriptionInactive, isRenewalPending]);
 
@@ -317,7 +317,7 @@ const DashboardLayout = () => {
       case 'subscription': return <SubscriptionPage />;
       case 'help': return <HelpPage />;
       case 'developer': return user.email === 'jho.j80@gmail.com' ? <DeveloperPage /> : <DashboardPage />;
-      default: 
+      default:
         handleNavigate('dashboard');
         return <DashboardPage />;
     }
@@ -378,18 +378,18 @@ const DashboardLayout = () => {
               size="icon"
               aria-label={t?.('logout') || 'Logout'}
               onClick={async () => {
-              // Clean logout: Let AuthContext handle all cleanup
-              try {
-                await logout();
-                // AuthContext will handle the redirect
-              } catch (e) {
-                console.error('Logout error:', e);
-                // Fallback: force redirect if logout fails
-                if (window.location.pathname !== '/login') {
-                  window.location.replace('/login');
+                // Clean logout: Let AuthContext handle all cleanup
+                try {
+                  await logout();
+                  // AuthContext will handle the redirect
+                } catch (e) {
+                  console.error('Logout error:', e);
+                  // Fallback: force redirect if logout fails
+                  if (window.location.pathname !== '/login') {
+                    window.location.replace('/login');
+                  }
                 }
-              }
-            }}>
+              }}>
               <LogOut className="w-5 h-5" />
             </Button>
           </div>
@@ -403,10 +403,10 @@ const DashboardLayout = () => {
           .map(e => String(e || '').trim().toLowerCase())
           .filter(Boolean);
         const isWhitelisted = whitelist.includes(String(user?.email || '').toLowerCase());
-        
+
         // Check if user is paid user (payment completed)
         const isPaidUser = user?.user_metadata?.payment_completed;
-        
+
         // Email verification banner is disabled for all users - all users are auto-verified
         // No email verification required for trial or paid users
         return null;
@@ -422,14 +422,14 @@ const DashboardLayout = () => {
 
         // Check if user is paid user
         const isPaidUser = user?.user_metadata?.payment_completed;
-        
+
         // Only show subscription expired if:
         // 1. User is not whitelisted
         // 2. User is not a paid user
         // 3. Subscription is inactive
         // 4. User is verified (email confirmed)
         const isEmailVerified = user?.email_confirmed_at && !user?.user_metadata?.manual_verification_required;
-        
+
         // Hide banner if renewal is pending (optimistic mode)
         if (!isWhitelisted && !isPaidUser && subscriptionInactive && isEmailVerified && !isRenewalPending) {
           return (
@@ -456,9 +456,8 @@ const DashboardLayout = () => {
       <div className="flex">
         <aside
           id="dashboard-sidebar"
-          className={`fixed md:sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 border-r bg-card transform transition-transform ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } md:translate-x-0`}
+          className={`fixed md:sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 border-r bg-card transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            } md:translate-x-0`}
         >
           <div className="flex flex-col h-full">
             <nav className="flex-1 space-y-2 p-4">
@@ -473,8 +472,8 @@ const DashboardLayout = () => {
             </nav>
             <div className="p-4 border-t">
               <div className="p-4 rounded-lg bg-muted text-center">
-                  <p className="text-sm font-semibold">{user.name || user.email}</p>
-                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                <p className="text-sm font-semibold">{user.name || user.email}</p>
+                <p className="text-xs text-muted-foreground">{user.email}</p>
               </div>
             </div>
           </div>
@@ -494,10 +493,10 @@ const DashboardLayout = () => {
                 .filter(Boolean);
               const isWhitelisted = whitelist.includes(String(user?.email || '').toLowerCase());
               const isPaidUser = user?.user_metadata?.payment_completed;
-              
+
               // Use top-level optimistic renewal state
               const bypass = isWhitelisted || currentPage === 'subscription' || currentPage === 'developer' || isRenewalPending;
-              
+
               // Block access if:
               // 1. Not whitelisted
               // 2. Not a paid user
@@ -507,20 +506,20 @@ const DashboardLayout = () => {
                 return (
                   <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
                     <div className="max-w-md w-full p-8 rounded-xl border bg-card shadow-lg">
-                       <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                         <CreditCard className="w-8 h-8 text-red-600" />
-                       </div>
-                       <h2 className="text-2xl font-bold mb-3">{t('subscriptionExpired') || 'Masa Langganan Habis'}</h2>
-                       <p className="mb-8 text-muted-foreground leading-relaxed">
-                         {t('subscriptionInactiveMessage') || 'Maaf, masa aktif layanan Anda telah berakhir. Akses ke fitur dibatasi hingga Anda melakukan perpanjangan.'}
-                       </p>
-                       <Button 
-                        size="lg" 
-                        className="w-full text-lg h-12" 
+                      <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <CreditCard className="w-8 h-8 text-red-600" />
+                      </div>
+                      <h2 className="text-2xl font-bold mb-3">{t('subscriptionExpired') || 'Masa Langganan Habis'}</h2>
+                      <p className="mb-8 text-muted-foreground leading-relaxed">
+                        {t('subscriptionInactiveMessage') || 'Maaf, masa aktif layanan Anda telah berakhir. Akses ke fitur dibatasi hingga Anda melakukan perpanjangan.'}
+                      </p>
+                      <Button
+                        size="lg"
+                        className="w-full text-lg h-12"
                         onClick={() => handleMenuClick('subscription')}
-                       >
-                         {t('renewNow') || 'Perpanjang Sekarang'}
-                       </Button>
+                      >
+                        {t('renewNow') || 'Perpanjang Sekarang'}
+                      </Button>
                     </div>
                   </div>
                 );

@@ -72,16 +72,16 @@ function generateSignature(data: string): string {
     }
     return wordToHexValue;
   };
-  
+
   let x = convertToWordArray(data);
   let k, AA, BB, CC, DD, a, b, c, d;
   let S11 = 7, S12 = 12, S13 = 17, S14 = 22;
   let S21 = 5, S22 = 9, S23 = 14, S24 = 20;
   let S31 = 4, S32 = 11, S33 = 16, S34 = 23;
   let S41 = 6, S42 = 10, S43 = 15, S44 = 21;
-  
+
   a = 0x67452301; b = 0xEFCDAB89; c = 0x98BADCFE; d = 0x10325476;
-  
+
   for (k = 0; k < x.length; k += 16) {
     AA = a; BB = b; CC = c; DD = d;
     a = funcFF(a, b, c, d, x[k + 0], S11, 0xD76AA478);
@@ -174,10 +174,10 @@ const logger = {
 
 // Plan mapping
 const PLAN_MAPPING: Record<string, PlanData> = {
-  '1_month':  { duration: 1,  amount: 50000,  productDetails: 'Perpanjangan Langganan 1 Bulan' },
-  '3_months': { duration: 3,  amount: 150000, productDetails: 'Perpanjangan Langganan 3 Bulan' },
-  '6_months': { duration: 6,  amount: 270000, productDetails: 'Perpanjangan Langganan 6 Bulan' },
-  '12_months':{ duration: 12, amount: 500000, productDetails: 'Perpanjangan Langganan 12 Bulan' }
+  '1_month': { duration: 1, amount: 50000, productDetails: 'Perpanjangan Langganan 1 Bulan' },
+  '3_months': { duration: 3, amount: 150000, productDetails: 'Perpanjangan Langganan 3 Bulan' },
+  '6_months': { duration: 6, amount: 270000, productDetails: 'Perpanjangan Langganan 6 Bulan' },
+  '12_months': { duration: 12, amount: 500000, productDetails: 'Perpanjangan Langganan 12 Bulan' }
 };
 
 Deno.serve(async (req: Request) => {
@@ -229,7 +229,7 @@ Deno.serve(async (req: Request) => {
     // Shorten Order ID to avoid length limits (max 50 chars usually).
     const shortUserId = userData.id.substring(0, 8);
     const merchantOrderId = `RENEWAL-${shortUserId}-${Date.now()}`;
-    
+
     // Modify productDetails if this is HPP activation
     let productDetails = planData.productDetails;
     if (hppActivation) {
@@ -239,7 +239,7 @@ Deno.serve(async (req: Request) => {
     // 4) Konfigurasi Duitku dari ENV
     const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'sandbox').toLowerCase();
     const DUITKU_MERCHANT_CODE = Deno.env.get('DUITKU_MERCHANT_CODE')?.trim() || '';
-    
+
     // Pakai DUITKU_API_KEY (fallback ke DUITKU_MERCHANT_KEY untuk kompatibilitas lama)
     const DUITKU_API_KEY =
       Deno.env.get('DUITKU_API_KEY')?.trim() ||
@@ -260,12 +260,12 @@ Deno.serve(async (req: Request) => {
     // Use client-provided returnUrl if valid, otherwise fallback to env
     const clientReturnUrl = body?.returnUrl;
     const defaultReturnUrl = `${Deno.env.get('FRONTEND_URL')}/payment-callback?renewal=1`;
-    
+
     // Validate client URL (basic protection)
-    const returnUrl = (clientReturnUrl && (clientReturnUrl.startsWith('http://') || clientReturnUrl.startsWith('https://'))) 
-      ? clientReturnUrl 
+    const returnUrl = (clientReturnUrl && (clientReturnUrl.startsWith('http://') || clientReturnUrl.startsWith('https://')))
+      ? clientReturnUrl
       : defaultReturnUrl;
-      
+
     logger.info('Using Return URL:', { returnUrl, fromClient: !!clientReturnUrl });
 
     const itemDetails = [
@@ -347,7 +347,7 @@ Deno.serve(async (req: Request) => {
 
     if (!success) {
       const code = duitkuData?.statusCode ?? duitkuData?.StatusCode ?? duitkuResponse.status;
-      const msg  = duitkuData?.statusMessage ?? duitkuData?.StatusMessage ?? duitkuResponse.statusText;
+      const msg = duitkuData?.statusMessage ?? duitkuData?.StatusMessage ?? duitkuResponse.statusText;
       logger.error('Duitku API Error', {
         httpStatus: duitkuResponse.status,
         statusText: duitkuResponse.statusText,
