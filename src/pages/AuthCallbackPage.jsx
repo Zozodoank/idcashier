@@ -60,8 +60,8 @@ const AuthCallbackPage = () => {
         // Save pending registration data for callback
         const duration = plan.planDuration ? parseInt(plan.planDuration, 10) : 1;
         localStorage.setItem('pendingRegistration', JSON.stringify({
-          name: user.user_metadata?.name || '',
-          email: user.email,
+          name: userProfile.user_metadata?.name || userProfile.name || '',
+          email: userProfile.email,
           password: null, // OAuth - no password
           planDuration: duration,
           merchantOrderId: paymentData.merchantOrderId,
