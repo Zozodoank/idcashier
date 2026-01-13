@@ -2,25 +2,8 @@
 /// <reference path="../deno-stubs.d.ts" />
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from '@supabase/supabase-js'
-
-// Inlined from ../_shared/cors.ts
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, baggage, sb-request-id',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Credentials': 'true',
-  'Access-Control-Max-Age': '86400',
-  'Vary': 'Origin'
-};
-
-// Inlined from ../_shared/auth.ts
-export function createSupabaseClient() {
-  return createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  )
-}
-
+import { corsHeaders } from '../_shared/cors.ts'
+import { createSupabaseClient, getUserEmailFromToken } from '../_shared/auth.ts'
 
 Deno.serve(async (req) => {
   // Handle preflight request
@@ -44,7 +27,9 @@ Deno.serve(async (req) => {
       trialDays,
       isPriceCardRegistration,
       isPriceCardUser,
-      email
+      email,
+      oauthProvider,
+      oauthUserId
     });
 
     // Get site URL from environment or use default
@@ -173,8 +158,10 @@ Deno.serve(async (req) => {
       // Determine if email verification is needed:
       // - Paid users (paymentCompleted): no verification needed
       // - OAuth users (password is null): no verification needed (already verified by OAuth provider)
+      // - Whitelist users: no verification needed
       // - Trial users: need email verification
-      const needsEmailVerification = !paymentCompleted && !isOAuthUser;
+      const isWhitelistAccount = email === 'demo@idcashier.com' || email === 'jho.j80@gmail.com';
+      const needsEmailVerification = !paymentCompleted && !isOAuthUser && !isWhitelistAccount;
 
       // For OAuth users, we need to check if user already exists in auth.users
       // OAuth users are created by Supabase OAuth flow BEFORE this function is called
@@ -184,11 +171,14 @@ Deno.serve(async (req) => {
       if (isOAuthUser) {
         // For OAuth, try to find the user in auth.users
         try {
-          // 1. Try by ID if provided
+          // 1. Try by ID if provided (This is the most reliable method)
           if (oauthUserId) {
-            const { data: authUserData } = await supabase.auth.admin.getUserById(oauthUserId)
-            if (authUserData?.user) {
+            const { data: authUserData, error: idError } = await supabase.auth.admin.getUserById(oauthUserId)
+            if (!idError && authUserData?.user) {
               existingAuthUserId = authUserData.user.id
+              console.log(`✅ Found OAuth user by ID: ${existingAuthUserId}`);
+            } else {
+              console.warn(`⚠️ Could not find OAuth user by ID ${oauthUserId}:`, idError?.message);
             }
           }
 
@@ -196,10 +186,17 @@ Deno.serve(async (req) => {
           if (!existingAuthUserId) {
             console.log(`🔍 Searching OAuth user by email: ${email}`)
             // Note: listUsers is not efficient for large user bases but okay for this scale
-            const { data: listData } = await supabase.auth.admin.listUsers()
+            // Attempt to fetch more users to avoid pagination issues (limit MAX is often 1000)
+            const { data: listData, error: listError } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+
+            if (listError) {
+              console.error('Error listing users:', listError);
+            }
+
             const foundUser = listData?.users.find(u => u.email?.toLowerCase() === email.toLowerCase())
             if (foundUser) {
               existingAuthUserId = foundUser.id
+              console.log(`✅ Found OAuth user by email scan: ${existingAuthUserId}`);
             }
           }
         } catch (e) {
@@ -220,16 +217,21 @@ Deno.serve(async (req) => {
             }
           })
         } else {
-          // Should ideally not happen for OAuth flow unless session data is stale
-          // But if it does, we can't really "create" an OAuth user manually without the provider token
-          // We will try to create a standard user as fallback, but this might fail login without password
-          console.warn(`⚠️ OAuth user not found in auth system for ${email}`)
+          // Fallback: If we have oauthUserId passed from client, assume it is valid and use it
+          // This allows public.users creation to proceed even if Admin API didn't find the user (e.g. race condition)
+          if (oauthUserId) {
+            console.warn(`⚠️ Assuming oauthUserId ${oauthUserId} is valid despite lookup failure.`);
+            userId = oauthUserId;
+          } else {
+            console.warn(`⚠️ OAuth user not found in auth system for ${email}`);
+          }
         }
       }
 
-      // If we found an existing OAuth user, we skip the create block
+      // If we found an existing OAuth user (or used fallback), we skip the create block
       if (!userId) {
         // Create new user (standard flow)
+        console.log(`Creating new standard user for ${email}`);
         const createUserParams: any = {
           email,
           email_confirm: !needsEmailVerification, // Only trial users need verification
@@ -252,20 +254,23 @@ Deno.serve(async (req) => {
         if (createAuthError) {
           // If user exists, try to recover
           if (createAuthError.message?.includes("already registered") || createAuthError.status === 422) {
-            console.log(`User ${email} exists. Recovering ID.`)
+            console.log(`User ${email} exists (already registered). Recovering ID.`)
             // Find the existing user to get their ID
-            const { data: listData } = await supabase.auth.admin.listUsers()
+            const { data: listData } = await supabase.auth.admin.listUsers({ perPage: 1000 })
             const foundUser = listData?.users.find(u => u.email?.toLowerCase() === email.toLowerCase())
             if (foundUser) {
               userId = foundUser.id
+              console.log(`✅ Recovered ID from existing user: ${userId}`);
             } else {
               // Should not happen if "already registered"
+              console.error(`❌ User exists but could not be retrieved from list (checked 1000).`);
               return new Response(
-                JSON.stringify({ error: 'User exists but could not be retrieved.' }),
+                JSON.stringify({ error: 'User exists but could not be retrieved. Please try logging in.' }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
               )
             }
           } else {
+            console.error('Error creating user:', createAuthError);
             throw createAuthError
           }
         } else if (authData?.user) {
@@ -276,8 +281,7 @@ Deno.serve(async (req) => {
 
     // Safety check for userId
     if (!userId && oauthUserId && isOAuthUser) {
-      // Fallback: Use the provided OAuth ID even if we couldn't confirm it in auth.users
-      // This allows public.users creation to proceed
+      // Final Fallback: Use the provided OAuth ID
       userId = oauthUserId
     }
 

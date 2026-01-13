@@ -37,20 +37,43 @@ Deno.serve(async (req) => {
     const isWhitelistAccount = normalizedEmail === 'demo@idcashier.com' || 
                                normalizedEmail === 'jho.j80@gmail.com';
     
-    // Background auto-confirm for whitelist (non-blocking)
+    // Background auto-confirm for whitelist (non-blocking) - improved with better error handling
     if (isWhitelistAccount) {
-      supabaseAdmin.from('users').select('id').eq('email', normalizedEmail).maybeSingle()
-        .then(async ({ data: publicUser }) => {
+      (async () => {
+        try {
+          const { data: publicUser, error: selectError } = await supabaseAdmin
+            .from('users')
+            .select('id')
+            .eq('email', normalizedEmail)
+            .maybeSingle();
+            
+          if (selectError) {
+            console.error('Error fetching whitelist user:', selectError);
+            return;
+          }
           if (publicUser?.id) {
-            const { data: authUserResult } = await supabaseAdmin.auth.admin.getUserById(publicUser.id);
-            if (authUserResult?.user && !authUserResult.user.email_confirmed_at) {
-              await supabaseAdmin.auth.admin.updateUserById(publicUser.id, {
-                email_confirm: true,
-                user_metadata: { ...authUserResult.user.user_metadata, email_verified: true }
-              });
+            try {
+              const { data: authUserResult } = await supabaseAdmin.auth.admin.getUserById(publicUser.id);
+              if (authUserResult?.user) {
+                // Always confirm email for whitelist accounts
+                await supabaseAdmin.auth.admin.updateUserById(publicUser.id, {
+                  email_confirm: true,
+                  user_metadata: { 
+                    ...authUserResult.user.user_metadata, 
+                    email_verified: true,
+                    whitelisted: true
+                  }
+                });
+                console.log(`✅ Whitelist account ${normalizedEmail} auto-confirmed`);
+              }
+            } catch (updateError) {
+              console.error('Error confirming whitelist user:', updateError);
             }
           }
-        }).catch(e => console.error('Auto-confirm error:', e));
+        } catch (e) {
+          console.error('Auto-confirm error:', e);
+        }
+      })();
     }
 
     // Parallelize Auth and User Profile Fetch to improve speed

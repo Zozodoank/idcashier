@@ -83,9 +83,9 @@ Deno.serve(async (req) => {
     // Ensure paymentAmount is integer
     const amountInt = parseInt(String(paymentAmount));
 
-    // If paymentMethod is ALL or missing, default to "GQ" (QRIS) which is more commonly available
-    // Ideally frontend should send specific code.
-    const methodToSend = (!paymentMethod || paymentMethod === 'ALL') ? "GQ" : paymentMethod;
+    // Default to "VC" (Credit Card) - matches idcashiertest working config
+    // Frontend should send specific code for best UX
+    const methodToSend = (!paymentMethod || paymentMethod === 'ALL') ? "VC" : paymentMethod;
     console.log(`Payment Method: Original=${paymentMethod}, ToSend=${methodToSend}`);
 
     // Append register=1 to returnUrl if isRegistration is true
@@ -125,9 +125,7 @@ Deno.serve(async (req) => {
 
     // Duitku Endpoint Configuration
     const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
-    const DUITKU_BASE_URL = ENV === 'sandbox'
-      ? 'https://sandbox.duitku.com'
-      : 'https://passport.duitku.com';
+    const DUITKU_BASE_URL = 'https://passport.duitku.com';
 
     const duitkuApiUrl = `${DUITKU_BASE_URL}/webapi/api/merchant/v2/inquiry`;
 

@@ -352,7 +352,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('idcashier_current_page');
 
         console.log('✅ AuthContext: Login complete, returning success');
-        return { success: true, user: userWithTenantId };
+        return { success: true, user: userWithTenantId, token: result.token };
       } else {
         console.error('❌ Invalid response from server:', result);
         throw new Error('Invalid response from server');
@@ -385,27 +385,46 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Enhanced logout with cleanup
-  const logout = useCallback(async () => {
+  // Enhanced logout with cleanup - stable reference
+  const logoutRef = React.useRef(null);
+
+  // Create stable logout function
+  const logout = React.useCallback(async () => {
     try {
       console.log('Logging out...');
 
+      // Clear state first (synchronous)
       setToken(null);
       setUser(null);
+
+      // Clear localStorage
       localStorage.removeItem('idcashier_token');
       localStorage.removeItem('idcashier_refresh_token');
-      localStorage.removeItem('sb-eypfeiqtvfxxiimhtycc-auth-token');
       localStorage.removeItem('idcashier_current_page');
 
-      // Sign out from Supabase
-      await supabase.auth.signOut();
+      // Clear project-specific storage
+      const projectRef = import.meta.env.VITE_SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+      if (projectRef) {
+        localStorage.removeItem(`sb-${projectRef}-auth-token`);
+        localStorage.removeItem(`sb-${projectRef}-auth-token-expires-at`);
+        localStorage.removeItem(`sb-${projectRef}-refresh-token`);
+      }
+
+      // Sign out from Supabase (fire and forget, don't wait)
+      supabase.auth.signOut().then(({ error }) => {
+        if (error) {
+          console.warn('Supabase signOut error:', error.message);
+        } else {
+          console.log('Supabase signed out successfully');
+        }
+      });
+
+      console.log('✅ Logout completed');
     } catch (error) {
-      console.error('Logout error:', error);
-      // Ensure local state is cleared even if Supabase errors
+      console.error('Logout critical error:', error);
+      // Force clear state even on error
       setToken(null);
       setUser(null);
-      localStorage.removeItem('idcashier_token');
-      localStorage.removeItem('idcashier_refresh_token');
     }
   }, []);
 

@@ -90,6 +90,8 @@ export default function RegisterPage() {
       if (isPaymentMode) {
         // Payment Flow: Register without trial, then pay
         let user;
+        let token;
+
         // Register user WITHOUT trial - explicitly set skipTrial flag
         const registrationResult = await mcpRegisterClient.registerUser({
           name: name,
@@ -111,6 +113,7 @@ export default function RegisterPage() {
             const loginResult = await login(email, password);
             if (loginResult.success && loginResult.user) {
               user = loginResult.user;
+              token = loginResult.token || loginResult.session?.access_token;
               // If we logged in, we can proceed to payment.
               // Note: user object might differ slightly in structure, ensure user.id exists
             } else {
@@ -122,12 +125,18 @@ export default function RegisterPage() {
           }
         } else {
           user = registrationResult.data.user;
+          token = registrationResult.data.token;
         }
 
         // Call Payment Gateway
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : undefined
+        };
+
         const paymentResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: headers,
           body: JSON.stringify({
             paymentAmount: parseInt(planPrice, 10),
             productDetails: planName,

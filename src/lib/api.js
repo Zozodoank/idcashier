@@ -188,85 +188,45 @@ export const authAPI = {
       const normalizedEmail = email.trim().toLowerCase();
 
       // Log registration attempt
-      console.log(`Attempting registration for: ${normalizedEmail}`);
+      console.log(`Attempting registration via Edge Function for: ${normalizedEmail}`);
 
-      // First, try to sign up with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: normalizedEmail,
-        password: password,
-        options: {
-          data: {
-            name: name,
-            role: role
-          }
-        }
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
+
+      // Call auth-register edge function
+      // This ensures consistent behavior with Price Card registration (subscription creation, etc.)
+      const response = await fetch(`${supabaseUrl}/functions/v1/auth-register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': supabaseAnonKey
+        },
+        body: JSON.stringify({
+          name: name,
+          email: normalizedEmail,
+          password: password,
+          role: role,
+          trialDays: 7, // Default trial when registering via API
+          isPriceCardRegistration: false // API registration is typically trial
+        })
       });
 
-      if (authError) {
-        // Map Supabase errors to the expected format
-        let errorMessage = 'Registration failed';
-        if (authError.status === 400) {
-          errorMessage = 'Invalid input data';
-        } else if (authError.status === 409) {
-          errorMessage = 'User already exists';
-        } else if (authError.status === 500) {
-          errorMessage = 'Server error, silakan coba lagi';
-        } else {
-          errorMessage = authError.message || 'Registration failed';
-        }
-        throw new Error(errorMessage);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Registration failed');
       }
 
-      // If user already exists but is not confirmed, authData.user will be null
-      if (!authData.user) {
-        throw new Error('User already exists but is not confirmed. Please check your email.');
-      }
-
-      // Set the auth token for subsequent requests
-      if (authData.session) {
-        await supabase.auth.setSession(authData.session);
-      }
-
-      // Add a small delay to ensure the session is properly propagated
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Insert user data into users table
-      const userId = authData.user.id;
-      const userTenantId = role === 'owner' ? userId : null; // Will be set by admin
-
-      const { data: userData, error: insertError } = await supabase
-        .from('users')
-        .insert([
-          {
-            id: userId,
-            name: name,
-            email: normalizedEmail,
-            role: role,
-            tenant_id: userTenantId
-          }
-        ])
-        .select('id, name, email, role, tenant_id, permissions, created_at')
-        .single();
-
-      if (insertError) {
-        console.error('User creation error:', {
-          message: insertError.message,
-          code: insertError.code,
-          details: insertError.details,
-          hint: insertError.hint
-        });
-        throw new Error(insertError.message || 'Failed to create user profile');
-      }
-
-      // Include tenant_id as tenantId in response
-      const userResponse = {
-        ...userData,
-        tenantId: userData.tenant_id
-      };
+      console.log('✅ Registration successful via Edge Function');
 
       return {
-        user: userResponse,
-        token: authData.session?.access_token || null,
+        user: data.user,
+        token: data.token,
         message: 'User registered successfully'
       };
     } catch (error) {
@@ -351,6 +311,7 @@ export const authAPI = {
         hasToken: !!token
       });
 
+      let response;
       try {
         response = await fetch(urlWithApiKey, {
           method: 'GET',

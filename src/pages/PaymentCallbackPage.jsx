@@ -182,10 +182,33 @@ export default function PaymentCallbackPage() {
                 console.error('❌ Error during login after payment:', loginError);
                 
                 // Even if login fails, user is registered and payment is successful
-                // Redirect to login page so they can login manually
+                // Try to get session directly from Supabase as fallback
+                try {
+                  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                  
+                  if (!sessionError && session) {
+                    // Session exists, refresh user profile and redirect
+                    console.log('✅ Found existing session after payment');
+                    localStorage.setItem('idcashier_token', session.access_token);
+                    
+                    toast({
+                      title: t('registrationSuccessful'),
+                      description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+                    });
+
+                    setTimeout(() => {
+                      navigate('/store-setup', { replace: true, state: { fromPayment: true } });
+                    }, 1500);
+                    return;
+                  }
+                } catch (sessionCheckError) {
+                  console.error('Session check error:', sessionCheckError);
+                }
+                
+                // If no session found, show clear message and redirect to login
                 toast({
                   title: t('paymentSuccessful'),
-                  description: 'Pembayaran berhasil! Silakan login untuk melanjutkan.',
+                  description: 'Pembayaran berhasil! Silakan login dengan password yang tadi digunakan untuk mendaftar.',
                   variant: 'default'
                 });
                 
