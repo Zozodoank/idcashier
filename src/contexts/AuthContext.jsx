@@ -563,7 +563,12 @@ export const AuthProvider = ({ children }) => {
       let userData;
 
       if (!Array.isArray(userArray) || userArray.length === 0) {
-        throw new Error('User not found in database');
+        console.warn('⚠️ User authenticated but not found in database - cleaning up session');
+        // Auto-logout to clean up orphaned session
+        await supabase.auth.signOut();
+        setToken(null);
+        setUser(null);
+        return;
       }
 
       userData = userArray[0];
@@ -579,6 +584,13 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       console.error("Error fetching user profile:", err);
+      // If user not found, logout to prevent orphaned sessions
+      if (err.message?.includes('User not found')) {
+        console.warn('⚠️ Logging out due to missing user profile');
+        await supabase.auth.signOut();
+        setToken(null);
+        setUser(null);
+      }
       // Don't throw here to avoid breaking the auth flow
     }
   };

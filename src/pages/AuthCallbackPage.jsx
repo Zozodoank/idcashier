@@ -500,19 +500,20 @@ const AuthCallbackPage = () => {
         {status === 'processing' && (
           <>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p>Processing authentication...</p>
+            <p className="text-xl">Memproses pembayaran...</p>
+            <p className="text-sm mt-2 opacity-80">Mohon tunggu sebentar</p>
           </>
         )}
         {status === 'success' && (
           <>
             <div className="text-green-400 text-4xl mb-4">✓</div>
-            <p>Authentication successful! Redirecting...</p>
+            <p className="text-xl">Berhasil! Mengalihkan...</p>
           </>
         )}
         {status === 'error' && (
           <>
             <div className="text-red-400 text-4xl mb-4">✗</div>
-            <p>Authentication failed. Redirecting to login...</p>
+            <p className="text-xl">Terjadi kesalahan. Mengalihkan...</p>
           </>
         )}
       </div>
