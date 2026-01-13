@@ -132,8 +132,27 @@ const AuthCallbackPage = () => {
   };
 
   useEffect(() => {
+    console.log('🚀 AUTH CALLBACK PAGE - Started');
+    console.log('🔍 Current URL:', window.location.href);
+    console.log('🔍 Hash params:', window.location.hash);
+    console.log('🔍 Search params:', window.location.search);
+
+    // Safety timeout: redirect if stuck for more than 10 seconds
+    const safetyTimer = setTimeout(() => {
+      console.error('⏰ AUTH CALLBACK TIMEOUT - Stuck for 10 seconds, redirecting to login');
+      setStatus('error');
+      toast({
+        title: 'Timeout',
+        description: 'Proses terlalu lama. Silakan coba lagi.',
+        variant: 'destructive'
+      });
+      setTimeout(() => navigate('/login'), 2000);
+    }, 10000);
+
     const handleAuthCallback = async () => {
       try {
+        console.log('📝 handleAuthCallback - Started');
+
         // For OAuth callback, we need to handle the URL hash first
         // Supabase OAuth redirects with session in URL hash
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -491,7 +510,16 @@ const AuthCallbackPage = () => {
       }
     };
 
-    handleAuthCallback();
+    handleAuthCallback().finally(() => {
+      // Clear safety timer once callback completes (success or error)
+      clearTimeout(safetyTimer);
+      console.log('✅ handleAuthCallback - Completed');
+    });
+
+    // Cleanup function
+    return () => {
+      clearTimeout(safetyTimer);
+    };
   }, [navigate, toast, t]);
 
   return (
