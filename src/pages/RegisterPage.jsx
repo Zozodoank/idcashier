@@ -134,53 +134,81 @@ export default function RegisterPage() {
           'Authorization': token ? `Bearer ${token}` : undefined
         };
 
-        const paymentResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify({
-            paymentAmount: parseInt(planPrice, 10),
-            productDetails: planName,
-            customerVaName: name,
-            email: email,
-            userId: user.id,
-            // Gunakan metode yang dipilih user. Jika tidak ada (seharusnya tidak terjadi
-            // karena user memilih dari PaymentMethodSelector), biarkan kosong agar
-            // edge function yang memutuskan fallback.
-            paymentMethod: paymentMethodCode || undefined,
-            isRegistration: true
-          })
-        });
+        console.log('💳 Calling Duitku payment request with user:', user.id);
 
-        const responseText = await paymentResponse.text();
-        let paymentData;
+        // Add timeout to prevent hanging forever
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
         try {
-          paymentData = JSON.parse(responseText);
-        } catch (e) {
-          console.error('Failed to parse payment response:', responseText);
-          throw new Error('Invalid response from payment server');
-        }
+          const paymentResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+              paymentAmount: parseInt(planPrice, 10),
+              productDetails: planName,
+              customerVaName: name,
+              email: email,
+              userId: user.id,
+              // Gunakan metode yang dipilih user. Jika tidak ada (seharusnya tidak terjadi
+              // karena user memilih dari PaymentMethodSelector), biarkan kosong agar
+              // edge function yang memutuskan fallback.
+              paymentMethod: paymentMethodCode || undefined,
+              isRegistration: true
+            }),
+            signal: controller.signal
+          });
 
-        if (!paymentResponse.ok) throw new Error(paymentData.error || t('paymentRequestFailed'));
+          clearTimeout(timeoutId);
 
-        if (paymentData.paymentUrl) {
-          // Save pending registration data for callback
-          const duration = planDuration ? parseInt(planDuration, 10) : 1;
-          console.log('Saving pending registration with duration:', duration);
+          console.log('💳 Payment response status:', paymentResponse.status);
 
-          localStorage.setItem('pendingRegistration', JSON.stringify({
-            name,
-            email,
-            password,
-            planDuration: duration,
-            merchantOrderId: paymentData.merchantOrderId,
-            useHPP: false, // Default
-            role: 'owner'
-          }));
+          const responseText = await paymentResponse.text();
+          console.log('💳 Payment response body:', responseText);
 
-          window.location.href = paymentData.paymentUrl;
-        } else {
-          const errorMessage = paymentData.Message || paymentData.statusMessage || t('paymentUrlNotReceived');
-          throw new Error(`Payment Gateway Error: ${errorMessage}`);
+          let paymentData;
+          try {
+            paymentData = JSON.parse(responseText);
+          } catch (e) {
+            console.error('❌ Failed to parse payment response:', responseText);
+            throw new Error('Server mengembalikan response tidak valid. Silakan coba lagi.');
+          }
+
+          // Check response status FIRST before using data
+          if (!paymentResponse.ok) {
+            console.error('❌ Payment request failed:', paymentData);
+            const errorMsg = paymentData.error || paymentData.message || t('paymentRequestFailed');
+            throw new Error(errorMsg);
+          }
+
+          if (paymentData.paymentUrl) {
+            // Save pending registration data for callback
+            const duration = planDuration ? parseInt(planDuration, 10) : 1;
+            console.log('✅ Payment URL received, saving pending registration with duration:', duration);
+
+            localStorage.setItem('pendingRegistration', JSON.stringify({
+              name,
+              email,
+              password,
+              planDuration: duration,
+              merchantOrderId: paymentData.merchantOrderId,
+              useHPP: false, // Default
+              role: 'owner'
+            }));
+
+            window.location.href = paymentData.paymentUrl;
+          } else {
+            const errorMessage = paymentData.Message || paymentData.statusMessage || t('paymentUrlNotReceived');
+            throw new Error(`Payment Gateway Error: ${errorMessage}`);
+          }
+        } catch (fetchError) {
+          // Handle timeout or network errors
+          if (fetchError.name === 'AbortError') {
+            console.error('❌ Payment request timeout');
+            throw new Error('Permintaan pembayaran timeout. Silakan coba lagi.');
+          }
+          // Re-throw other errors
+          throw fetchError;
         }
 
       } else {
