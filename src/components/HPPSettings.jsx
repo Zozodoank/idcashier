@@ -418,14 +418,20 @@ const HPPSettings = () => {
                   <SelectValue placeholder={t('selectPaymentMethod') || "Pilih Metode Pembayaran"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="VC">{t('creditCard') || 'Kartu Kredit (Visa/Master/JCB)'}</SelectItem>
-                  <SelectItem value="BC">BCA Virtual Account</SelectItem>
                   <SelectItem value="M2">Mandiri Virtual Account</SelectItem>
                   <SelectItem value="I1">BNI Virtual Account</SelectItem>
+                  <SelectItem value="B1">CIMB Niaga Virtual Account</SelectItem>
+                  <SelectItem value="BT">Permata Virtual Account</SelectItem>
+                  <SelectItem value="A1">ATM Bersama Virtual Account</SelectItem>
+                  <SelectItem value="VA">Maybank Virtual Account</SelectItem>
+                  <SelectItem value="FT">Alfamart</SelectItem>
+                  <SelectItem value="PG">Pegadaian</SelectItem>
+                  <SelectItem value="PI">Pos Indonesia</SelectItem>
                   <SelectItem value="OV">OVO</SelectItem>
+                  <SelectItem value="SA">ShopeePay</SelectItem>
                   <SelectItem value="DA">DANA</SelectItem>
-                  <SelectItem value="SA">Shopee Pay</SelectItem>
-                  <SelectItem value="GQ">QRIS</SelectItem>
+                  <SelectItem value="GQ">QRIS Nusapay</SelectItem>
+                  <SelectItem value="SP">QRIS ShopeePay</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -21,6 +21,7 @@ function getEnvVariable(name) {
 const supabaseUrl = getEnvVariable('VITE_SUPABASE_URL');
 const supabaseAnonKey = getEnvVariable('VITE_SUPABASE_ANON_KEY');
 
+// Security: Don't log Supabase URL to avoid exposing project ref
 console.log('Supabase config check:');
 console.log('- VITE_SUPABASE_URL:', supabaseUrl ? '✓ Set' : '✗ Not set');
 console.log('- VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '✓ Set' : '✗ Not set');
@@ -95,7 +96,11 @@ export async function clearStaleSession(shouldSignOut = true) {
     // Clear local storage items
     localStorage.removeItem('idcashier_token');
     localStorage.removeItem('idcashier_refresh_token');
-    localStorage.removeItem('sb-eypfeiqtvfxxiimhtycc-auth-token'); // Clear Supabase internal token
+    // Security: Use dynamic project ref from environment instead of hardcoded
+    const projectRef = supabaseUrl?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+    if (projectRef) {
+      localStorage.removeItem(`sb-${projectRef}-auth-token`); // Clear Supabase internal token
+    }
     
     // Sign out from Supabase only if requested
     // This prevents infinite loops when called from onAuthStateChange('SIGNED_OUT')

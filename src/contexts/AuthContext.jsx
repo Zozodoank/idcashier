@@ -76,7 +76,11 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             localStorage.removeItem('idcashier_token');
             localStorage.removeItem('idcashier_refresh_token');
-            localStorage.removeItem('sb-eypfeiqtvfxxiimhtycc-auth-token');
+            // Security: Use dynamic project ref from environment instead of hardcoded
+            const projectRef = import.meta.env.VITE_SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+            if (projectRef) {
+              localStorage.removeItem(`sb-${projectRef}-auth-token`);
+            }
           }
           if (mounted) setLoading(false);
           console.timeEnd('AuthInit');

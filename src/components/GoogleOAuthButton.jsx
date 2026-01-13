@@ -27,7 +27,8 @@ export const performGoogleOAuth = async ({ planName, planPrice, planDuration, pa
       redirectTo = `${redirectTo}?${params.toString()}`;
     }
 
-    console.log('🔐 Initiating Google OAuth with redirect:', redirectTo);
+    // Security: Don't log redirect URL to avoid exposing project ref
+    console.log('🔐 Initiating Google OAuth...');
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -37,11 +38,16 @@ export const performGoogleOAuth = async ({ planName, planPrice, planDuration, pa
           access_type: 'offline',
           prompt: 'consent',
         },
+        // Security: Skip browser redirect to prevent project ref exposure
+        skipBrowserRedirect: false,
       },
     });
 
     if (error) {
-      throw error;
+      // Security: Don't expose project ref in error messages
+      const safeError = new Error(error.message || 'Authentication failed');
+      safeError.name = error.name || 'AuthError';
+      throw safeError;
     }
 
     // The redirect will happen automatically

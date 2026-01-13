@@ -40,32 +40,32 @@ const logger = {
 // Utility function to redact sensitive data from logs
 function sanitizeLogData(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
-  
+
   // Clone the object to avoid mutating the original
-  const sanitized = Array.isArray(obj) ? [...obj] : {...obj};
-  
+  const sanitized = Array.isArray(obj) ? [...obj] : { ...obj };
+
   // Fields to redact
   const sensitiveFields = ['authorization', 'apikey', 'merchantCode', 'merchantKey', 'signature', 'password'];
-  
+
   for (const key in sanitized) {
     if (sensitiveFields.some(field => key.toLowerCase().includes(field.toLowerCase()))) {
       sanitized[key] = '[REDACTED]';
     } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
       sanitized[key] = sanitizeLogData(sanitized[key]);
-    } else if (typeof sanitized[key] === 'string' && 
-               (key.toLowerCase().includes('email') || key.toLowerCase().includes('phone'))) {
+    } else if (typeof sanitized[key] === 'string' &&
+      (key.toLowerCase().includes('email') || key.toLowerCase().includes('phone'))) {
       // Mask email and phone numbers
       sanitized[key] = maskSensitiveString(sanitized[key]);
     }
   }
-  
+
   return sanitized;
 }
 
 // Mask sensitive strings like emails and phone numbers
 function maskSensitiveString(str: string): string {
   if (!str || typeof str !== 'string') return str;
-  
+
   // For emails: keep first char and domain
   if (str.includes('@')) {
     const [local, domain] = str.split('@');
@@ -74,7 +74,7 @@ function maskSensitiveString(str: string): string {
     }
     return `***@${domain}`;
   }
-  
+
   // For phone numbers: keep last 3 digits
   if (/^\\+?[0-9\\s\\-\\(\\)]+$/.test(str)) {
     const digits = str.replace(/\D/g, '');
@@ -83,7 +83,7 @@ function maskSensitiveString(str: string): string {
     }
     return '***';
   }
-  
+
   return str;
 }
 
@@ -106,31 +106,31 @@ const createDuitkuPayment = async (
 ): Promise<DuitkuResponse> => {
   try {
     // Resolve Duitku configuration from environment (sandbox or production)
-    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'sandbox').toLowerCase();
+    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
     const DUITKU_MERCHANT_CODE = Deno.env.get('DUITKU_MERCHANT_CODE') || '';
-          const DUITKU_MERCHANT_KEY = Deno.env.get('DUITKU_API_KEY')?.trim() || Deno.env.get('DUITKU_MERCHANT_KEY')?.trim() || '';
-    
+    const DUITKU_MERCHANT_KEY = Deno.env.get('DUITKU_API_KEY')?.trim() || Deno.env.get('DUITKU_MERCHANT_KEY')?.trim() || '';
+
     // Derive base URL from environment
-    const DUITKU_BASE_URL = ENV === 'production' 
+    const DUITKU_BASE_URL = ENV === 'production'
       ? (Deno.env.get('DUITKU_BASE_URL') || 'https://passport.duitku.com')
       : (Deno.env.get('DUITKU_BASE_URL') || 'https://sandbox.duitku.com');
-    
+
     const ACTIVE_MERCHANT = DUITKU_MERCHANT_CODE;
     const ACTIVE_API_KEY = DUITKU_MERCHANT_KEY;
     const DUITKU_URL = `${DUITKU_BASE_URL}/webapi/api/merchant/v2/inquiry`;
-    
+
     if (!ACTIVE_MERCHANT || !ACTIVE_API_KEY) {
-      logger.error('Missing Duitku configuration', { 
-        merchantCodePresent: !!ACTIVE_MERCHANT, 
+      logger.error('Missing Duitku configuration', {
+        merchantCodePresent: !!ACTIVE_MERCHANT,
         merchantKeyPresent: !!ACTIVE_API_KEY,
-        environment: ENV 
+        environment: ENV
       });
       return { success: false, errorMessage: 'Duitku configuration missing' };
     }
-    
+
     const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://idcashier.com';
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-    
+
     const duitkuRequestData: any = {
       merchantCode: ACTIVE_MERCHANT,
       merchantOrderId,
@@ -143,34 +143,34 @@ const createDuitkuPayment = async (
       callbackUrl: `${SUPABASE_URL}/functions/v1/duitku-callback`,
       returnUrl: `${FRONTEND_URL}/payment-callback?renewal=1`
     };
-    
+
     const signatureString = ACTIVE_MERCHANT + merchantOrderId + paymentAmount + ACTIVE_API_KEY;
     const encoder = new TextEncoder();
     const data = encoder.encode(signatureString);
     const hashBuffer = await crypto.subtle.digest('SHA-266', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    
+
     duitkuRequestData.signature = signature;
     duitkuRequestData.expiryPeriod = 60;
-    
+
     logger.info('Sending payment request to Duitku', { url: DUITKU_URL, data: { ...duitkuRequestData, merchantCode: '[REDACTED]', merchantKey: '[REDACTED]', signature: '[REDACTED]' } });
-    
+
     const response = await fetch(DUITKU_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(duitkuRequestData),
     });
-    
+
     const responseData = await response.json();
-    
+
     if (!response.ok) {
       logger.error('Duitku API error response', { status: response.status, data: responseData });
       return { success: false, errorMessage: `Duitku API error: ${responseData.errorMessage || 'Unknown error'}` };
     }
-    
+
     logger.info('Duitku payment created successfully', { reference: responseData.reference });
-    
+
     return { success: true, paymentUrl: responseData.paymentUrl, reference: responseData.reference };
   } catch (error) {
     logger.error('Error creating Duitku payment', { message: error.message });
@@ -182,7 +182,7 @@ const createDuitkuPayment = async (
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin') || '';
   const corsHeaders = getCorsHeaders(origin);
-  
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -203,7 +203,7 @@ Deno.serve(async (req) => {
         body = {};
       }
     }
-    
+
     const { plan_id: raw_plan_id, email: unauthenticatedEmailRaw } = body || {};
     const unauthenticatedEmail = typeof unauthenticatedEmailRaw === 'string' ? unauthenticatedEmailRaw.trim().toLowerCase() : unauthenticatedEmailRaw;
     const plan_id = raw_plan_id ?? body?.plan;
@@ -232,7 +232,7 @@ Deno.serve(async (req) => {
         logger.error('Token validation failed', { message: error.message });
         return new Response(JSON.stringify({ success: false, error: 'Invalid token', code: 401 }), { headers: corsHeaders, status: 401 });
       }
-      
+
       const { data, error: userError } = await supabase.from('users').select('name, email, phone').eq('id', userId).single();
 
       if (userError || !data) {
@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString()
       })
       .eq('id', paymentRecord.id);
-      
+
     if (updateError) {
       logger.error('Error updating payment record with Duitku details', { error: updateError.message });
       return new Response(JSON.stringify({ success: false, error: `Failed to update payment record: ${updateError.message}` }), { headers: corsHeaders, status: 500 });

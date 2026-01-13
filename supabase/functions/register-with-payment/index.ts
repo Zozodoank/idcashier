@@ -52,53 +52,53 @@ const logger = {
 // Validation utilities
 const validateUserData = (data: UserData): string[] => {
   const errors: string[] = [];
-  
+
   if (!data.name || data.name.trim().length < 2) {
     errors.push('Name must be at least 2 characters long');
   }
-  
+
   if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
     errors.push('Valid email is required');
   }
-  
+
   if (!data.phone || !/^\+?[1-9]\d{1,14}$/.test(data.phone.replace(/\s/g, ''))) {
     errors.push('Valid phone number is required');
   }
-  
+
   if (!data.password || data.password.length < 6) {
     errors.push('Password must be at least 6 characters long');
   }
-  
+
   return errors;
 };
 
 const validatePaymentData = (data: PaymentData): string[] => {
   const errors: string[] = [];
-  
+
   if (!data.paymentAmount || data.paymentAmount <= 0) {
     errors.push('Valid payment amount is required');
   }
-  
+
   if (!data.productDetails || data.productDetails.trim().length === 0) {
     errors.push('Product details are required');
   }
-  
+
   if (!data.merchantOrderId || data.merchantOrderId.trim().length === 0) {
     errors.push('Merchant order ID is required');
   }
-  
+
   if (!data.customerVaName || data.customerVaName.trim().length === 0) {
     errors.push('Customer VA name is required');
   }
-  
+
   if (!data.customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerEmail)) {
     errors.push('Valid customer email is required');
   }
-  
+
   if (!data.customerPhone || !/^\+?[1-9]\d{1,14}$/.test(data.customerPhone.replace(/\s/g, ''))) {
     errors.push('Valid customer phone is required');
   }
-  
+
   return errors;
 };
 
@@ -106,12 +106,12 @@ const validatePaymentData = (data: PaymentData): string[] => {
 const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResponse> => {
   try {
     // Resolve Duitku configuration from environment (sandbox or production)
-    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'sandbox').toLowerCase();
+    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
     const SANDBOX_MERCHANT = Deno.env.get('DUITKU_SANDBOX_MERCHANT_CODE') || '';
     const SANDBOX_API_KEY = Deno.env.get('DUITKU_SANDBOX_API_KEY') || '';
     const SANDBOX_BASE_URL = Deno.env.get('DUITKU_SANDBOX_BASE_URL') || 'https://sandbox.duitku.com';
-    const PROD_MERCHANT = Deno.env.get('DUITKU_PRODUCTION_MERCHANT_CODE') || '';
-    const PROD_API_KEY = Deno.env.get('DUITKU_PRODUCTION_API_KEY') || '';
+    const PROD_MERCHANT = Deno.env.get('DUITKU_MERCHANT_CODE') || '';
+    const PROD_API_KEY = Deno.env.get('DUITKU_API_KEY') || '';
     const PROD_BASE_URL = Deno.env.get('DUITKU_PRODUCTION_BASE_URL') || 'https://passport.duitku.com';
 
     const ACTIVE_MERCHANT = ENV === 'production' ? PROD_MERCHANT : SANDBOX_MERCHANT;
@@ -119,7 +119,7 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
     const ACTIVE_BASE_URL = ENV === 'production' ? PROD_BASE_URL : SANDBOX_BASE_URL;
 
     const DUITKU_URL = `${ACTIVE_BASE_URL}/webapi/api/merchant/v2/inquiry`;
-    
+
     // Prepare data for Duitku API
     const duitkuRequestData: any = {
       merchantCode: ACTIVE_MERCHANT,
@@ -133,7 +133,7 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
       callbackUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/register-with-payment/callback`,
       returnUrl: 'https://idcashier.com/registration-success'
     };
-    
+
     // Generate signature
     const signatureString = ACTIVE_MERCHANT + paymentData.merchantOrderId + paymentData.paymentAmount + ACTIVE_API_KEY;
     const encoder = new TextEncoder();
@@ -141,11 +141,11 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    
+
     duitkuRequestData.signature = signature;
-    
+
     logger.info('Sending payment request to Duitku', { url: DUITKU_URL, data: duitkuRequestData });
-    
+
     // Make request to Duitku API
     const response = await fetch(DUITKU_URL, {
       method: 'POST',
@@ -154,9 +154,9 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
       },
       body: JSON.stringify(duitkuRequestData),
     });
-    
+
     const responseData = await response.json();
-    
+
     if (!response.ok) {
       logger.error('Duitku API error response', { status: response.status, data: responseData });
       return {
@@ -164,9 +164,9 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
         errorMessage: `Duitku API error: ${responseData.errorMessage || 'Unknown error'}`
       };
     }
-    
+
     logger.info('Duitku payment created successfully', responseData);
-    
+
     return {
       success: true,
       paymentUrl: responseData.paymentUrl,
@@ -190,15 +190,15 @@ const createSupabaseClient = () => {
 };
 
 const createUserAndPaymentRecord = async (
-  userData: UserData, 
+  userData: UserData,
   paymentData: PaymentData
 ): Promise<{ success: boolean; userId?: string; paymentId?: string; error?: string }> => {
   const supabase = createSupabaseClient();
-  
+
   try {
     // Start a transaction-like operation by creating user first
     logger.info('Creating user account', { email: userData.email });
-    
+
     // Create Supabase Auth user
     const { data: authData, error: createAuthError } = await supabase.auth.admin.createUser({
       email: userData.email,
@@ -316,11 +316,11 @@ Deno.serve(async (req) => {
     // Validate input data
     if (!userData || !paymentData) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Both userData and paymentData are required' 
+        JSON.stringify({
+          success: false,
+          error: 'Both userData and paymentData are required'
         }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400
         }
@@ -331,12 +331,12 @@ Deno.serve(async (req) => {
     const userValidationErrors = validateUserData(userData);
     if (userValidationErrors.length > 0) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           error: 'User data validation failed',
           details: userValidationErrors
         }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400
         }
@@ -347,12 +347,12 @@ Deno.serve(async (req) => {
     const paymentValidationErrors = validatePaymentData(paymentData);
     if (paymentValidationErrors.length > 0) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           error: 'Payment data validation failed',
           details: paymentValidationErrors
         }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400
         }
@@ -361,14 +361,14 @@ Deno.serve(async (req) => {
 
     // Create user and payment records in database
     const dbResult = await createUserAndPaymentRecord(userData, paymentData);
-    
+
     if (!dbResult.success) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           error: dbResult.error
         }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500
         }
@@ -377,7 +377,7 @@ Deno.serve(async (req) => {
 
     // Create payment with Duitku
     const paymentResult = await createDuitkuPayment(paymentData);
-    
+
     if (!paymentResult.success) {
       // Rollback user creation if payment creation fails
       const supabase = createSupabaseClient();
@@ -388,13 +388,13 @@ Deno.serve(async (req) => {
       } catch (rollbackError) {
         logger.error('Failed to rollback after payment creation failure', rollbackError);
       }
-      
+
       return new Response(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           error: paymentResult.errorMessage
         }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500
         }
@@ -405,7 +405,7 @@ Deno.serve(async (req) => {
     const supabase = createSupabaseClient();
     await supabase
       .from('payments')
-      .update({ 
+      .update({
         payment_url: paymentResult.paymentUrl,
         reference: paymentResult.reference,
         updated_at: new Date().toISOString()
@@ -414,14 +414,14 @@ Deno.serve(async (req) => {
 
     // Return success response
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         message: 'Registration initiated successfully. Please complete the payment to activate your account.',
         paymentUrl: paymentResult.paymentUrl,
         userId: dbResult.userId,
         paymentId: dbResult.paymentId
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 201
       }
@@ -429,12 +429,12 @@ Deno.serve(async (req) => {
   } catch (error) {
     logger.error('Unhandled error in register-with-payment function', error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: false,
         error: 'Internal server error',
         message: error.message
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }

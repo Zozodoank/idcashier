@@ -12,9 +12,18 @@ const AuthCallbackPage = () => {
   const [status, setStatus] = useState('processing');
 
   // Helper to process payment
-  const processDuitkuPayment = async (plan, user, token, methodCode) => {
+  const processDuitkuPayment = async (plan, userProfile, token, methodCode) => {
     try {
       setStatus('processing');
+      // Use userProfile data, fallback to session user if needed
+      const userName = userProfile?.name || userProfile?.user_metadata?.name || userProfile?.email?.split('@')[0] || 'User';
+      const userEmail = userProfile?.email || '';
+      const userId = userProfile?.id || '';
+
+      if (!userId || !userEmail) {
+        throw new Error('User data tidak lengkap. Silakan coba lagi.');
+      }
+
       const paymentResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
         method: 'POST',
         headers: {
@@ -24,16 +33,16 @@ const AuthCallbackPage = () => {
         body: JSON.stringify({
           paymentAmount: parseInt(plan.planPrice, 10),
           productDetails: plan.planName,
-          customerVaName: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-          email: user.email,
-          userId: user.id,
+          customerVaName: userName,
+          email: userEmail,
+          userId: userId,
           isRegistration: true,
           paymentMethod: methodCode // Pass selected payment method
         })
       });
 
       const paymentData = await paymentResponse.json();
-      
+
       if (!paymentResponse.ok) {
         // Map common API errors to user-friendly messages
         const friendlyError = mapApiErrorToFriendly(paymentData.error || paymentData.message);
@@ -56,7 +65,7 @@ const AuthCallbackPage = () => {
 
         // Clean up OAuth plan data
         localStorage.removeItem('pendingOAuthPlan');
-        
+
         // Redirect immediately to payment gateway
         window.location.href = paymentData.paymentUrl;
         return true;
@@ -65,20 +74,21 @@ const AuthCallbackPage = () => {
       }
     } catch (paymentError) {
       console.error('❌ Payment processing error:', paymentError);
-      
+
       setStatus('error');
       toast({
         title: 'Gagal Memproses Pembayaran',
         description: paymentError.message || 'Terjadi kesalahan saat memproses pembayaran. Silakan coba lagi nanti.',
         variant: 'destructive'
       });
-      
+
       // Redirect back to register with plan details to retry
       setTimeout(() => {
         const params = new URLSearchParams();
         if (plan.planName) params.append('plan', plan.planName);
         if (plan.planPrice) params.append('price', plan.planPrice);
         if (plan.planDuration) params.append('duration', plan.planDuration);
+        if (methodCode) params.append('paymentMethod', methodCode);
         window.location.href = `/register?${params.toString()}`;
       }, 3000);
       return false;
@@ -88,9 +98,9 @@ const AuthCallbackPage = () => {
   // Helper to map API errors to user-friendly messages
   const mapApiErrorToFriendly = (errorMsg) => {
     if (!errorMsg) return 'Terjadi kesalahan yang tidak dikenal.';
-    
+
     const msg = errorMsg.toLowerCase();
-    
+
     if (msg.includes('payment') || msg.includes('duitku')) {
       return 'Gagal terhubung ke sistem pembayaran. Silakan coba lagi nanti.';
     }
@@ -109,7 +119,7 @@ const AuthCallbackPage = () => {
     if (msg.includes('duplicate') || msg.includes('exists')) {
       return 'Data sudah ada sebelumnya. Silakan gunakan data lain.';
     }
-    
+
     // Default friendly message
     return 'Terjadi kesalahan saat memproses pembayaran. Silakan coba lagi nanti.';
   };
@@ -122,7 +132,7 @@ const AuthCallbackPage = () => {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
-        
+
         // If we have tokens in URL hash, set the session first
         if (accessToken && refreshToken) {
           console.log('🔐 Setting session from URL hash...');
@@ -130,15 +140,15 @@ const AuthCallbackPage = () => {
             access_token: accessToken,
             refresh_token: refreshToken
           });
-          
+
           if (sessionSetError) {
             console.error('❌ Failed to set session:', sessionSetError);
             throw sessionSetError;
           }
-          
+
           console.log('✅ Session set from URL hash');
         }
-        
+
         // Get the session from the URL hash
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
@@ -153,7 +163,7 @@ const AuthCallbackPage = () => {
           navigate('/login');
           return;
         }
-        
+
         console.log('✅ Session found:', session.user?.email);
 
         const user = session.user;
@@ -165,17 +175,17 @@ const AuthCallbackPage = () => {
         const pendingOAuthPlan = localStorage.getItem('pendingOAuthPlan');
         const urlParams = new URLSearchParams(window.location.search);
         const isFromPriceCard = urlParams.get('plan') !== null || !!pendingOAuthPlan;
-        
+
         console.log('🔍 Debug - URL params:', Object.fromEntries(urlParams));
         console.log('🔍 Debug - pendingOAuthPlan:', pendingOAuthPlan);
         console.log('🔍 Debug - isFromPriceCard:', isFromPriceCard);
-        
+
         // Check if user exists in public.users
         try {
           const token = session.access_token;
           const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
           const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-          
+
           if (!supabaseUrl || !supabaseAnonKey) {
             throw new Error('Supabase configuration missing.');
           }
@@ -204,15 +214,15 @@ const AuthCallbackPage = () => {
 
           // If profile found, proceed to login
           if (userProfile && userProfile.id) {
-             // Success - Existing User
-             console.log('✅ Login successful for existing user');
+            // Success - Existing User
+            console.log('✅ Login successful for existing user');
           } else {
             // No profile found, assumes new user -> REGISTER
             console.log('📝 New OAuth user detected. Registering...');
-            
+
             const cleanUrl = supabaseUrl.replace(/\/$/, '');
             const functionUrl = `${cleanUrl}/functions/v1/auth-register`;
-            
+
             // 🔧 FIXED: Enhanced request body with explicit price card flag
             const requestBody = {
               name: name,
@@ -229,17 +239,23 @@ const AuthCallbackPage = () => {
             if (isFromPriceCard) {
               requestBody.skipTrial = true;
               requestBody.trialDays = 0; // Explicitly set trial days to 0
-              
+
               // Get plan details from localStorage or URL params
               let pendingPlan = JSON.parse(pendingOAuthPlan || '{}');
-              
+
               // Fallback to URL params if localStorage is empty but URL has params
               if (!pendingPlan.planName && urlParams.get('plan')) {
                 pendingPlan = {
                   planName: urlParams.get('plan'),
                   planPrice: urlParams.get('price'),
-                  planDuration: urlParams.get('duration')
+                  planDuration: urlParams.get('duration'),
+                  paymentMethod: urlParams.get('paymentMethod')
                 };
+              }
+
+              // Also check URL params for payment method if not in pendingPlan
+              if (!pendingPlan.paymentMethod && urlParams.get('paymentMethod')) {
+                pendingPlan.paymentMethod = urlParams.get('paymentMethod');
               }
 
               if (pendingPlan.planDuration) {
@@ -251,7 +267,7 @@ const AuthCallbackPage = () => {
             }
 
             console.log('📋 Request body:', requestBody);
-            
+
             const response = await fetch(functionUrl, {
               method: 'POST',
               headers: {
@@ -267,35 +283,44 @@ const AuthCallbackPage = () => {
             if (!response.ok) {
               // Ignore "already registered" errors for OAuth - this means race condition or temporary fetch failure
               if (response.status !== 422 &&
-                  !data.error?.includes('already registered') &&
-                  !data.error?.includes('already exists')) {
+                !data.error?.includes('already registered') &&
+                !data.error?.includes('already exists')) {
                 throw new Error(data.error || 'Failed to create user profile');
               }
               console.log('ℹ️ User likely already exists (backend handled conflict)');
             } else {
-               console.log('✅ Registration successful:', data);
+              console.log('✅ Registration successful:', data);
             }
-            
+
             // Assuming registration succeeded (or user exists), we can proceed.
             // We don't strictly need to fetch the profile again if we trust the registration/login flow.
             // But we'll do a quick check to set userProfile for consistency, but won't block on it.
-             try {
-                // Wait a moment for DB propagation
-                await new Promise(r => setTimeout(r, 1000));
-                userProfile = await authAPI.getCurrentUser(token);
-             } catch (e) {
-                console.warn('⚠️ Could not fetch profile immediately after reg, but proceeding:', e.message);
-                // Create a dummy profile object to satisfy the check below,
-                // since we know auth-register succeeded.
-                userProfile = { id: user.id, email: email, name: name, role: 'owner' };
-             }
+            try {
+              // Wait a moment for DB propagation (increased delay for OAuth registration)
+              await new Promise(r => setTimeout(r, 2000));
+              userProfile = await authAPI.getCurrentUser(token);
+              console.log('✅ User profile fetched after registration:', userProfile?.id);
+            } catch (e) {
+              console.warn('⚠️ Could not fetch profile immediately after reg, but proceeding:', e.message);
+              // For OAuth registration, create profile object from auth user data
+              // This ensures we can proceed even if profile fetch fails temporarily
+              userProfile = {
+                id: user.id,
+                email: email,
+                name: name,
+                role: 'owner',
+                // Mark as temporary to handle in payment flow
+                _temp: true
+              };
+              console.log('📝 Using temporary profile object for OAuth registration');
+            }
           }
 
           // Final success check
           if (userProfile) {
             // Manually update auth context
             localStorage.setItem('idcashier_token', token);
-            
+
             // 🔧 FIXED: If from price card, process payment directly instead of redirecting
             if (isFromPriceCard) {
               // Prefer URL params for fresh data, fallback to localStorage
@@ -305,27 +330,38 @@ const AuthCallbackPage = () => {
                 planDuration: urlParams.get('duration'),
                 paymentMethod: urlParams.get('paymentMethod')
               };
-              
-              // Fill from localStorage if missing in URL
+
+              // Fill from localStorage if missing in URL (prioritize URL params)
               const storedPlan = JSON.parse(pendingOAuthPlan || '{}');
               if (!pendingPlan.planName) pendingPlan.planName = storedPlan.planName;
               if (!pendingPlan.planPrice) pendingPlan.planPrice = storedPlan.planPrice;
               if (!pendingPlan.planDuration) pendingPlan.planDuration = storedPlan.planDuration;
-              if (!pendingPlan.paymentMethod) pendingPlan.paymentMethod = storedPlan.paymentMethod;
+              // Payment method: prefer URL params, then localStorage
+              if (!pendingPlan.paymentMethod) {
+                pendingPlan.paymentMethod = storedPlan.paymentMethod;
+              }
 
               console.log('💰 Price card registration detected, processing payment...');
-              
+
               // Store plan details for payment processing
               if (pendingPlan.planName && pendingPlan.planPrice && pendingPlan.planDuration) {
                 // If payment method is selected, proceed to payment
                 if (pendingPlan.paymentMethod) {
-                  const paymentSuccess = await processDuitkuPayment(pendingPlan, userProfile, token, pendingPlan.paymentMethod);
+                  // Use userProfile if available, otherwise fallback to session user
+                  const paymentUser = userProfile && userProfile.id ? userProfile : {
+                    id: user.id,
+                    email: email,
+                    name: name,
+                    user_metadata: user.user_metadata
+                  };
+                  const paymentSuccess = await processDuitkuPayment(pendingPlan, paymentUser, token, pendingPlan.paymentMethod);
                   if (paymentSuccess) return; // Exit if redirecting
                   // If payment failed (returned false), error already shown, redirect back to register
                   const params = new URLSearchParams();
                   params.append('plan', pendingPlan.planName);
                   params.append('price', pendingPlan.planPrice);
                   params.append('duration', pendingPlan.planDuration);
+                  params.append('paymentMethod', pendingPlan.paymentMethod);
                   localStorage.removeItem('pendingOAuthPlan');
                   setTimeout(() => {
                     window.location.href = `/register?${params.toString()}`;
@@ -339,13 +375,13 @@ const AuthCallbackPage = () => {
                     description: 'Silakan pilih metode pembayaran untuk melanjutkan.',
                     variant: 'default'
                   });
-                  
+
                   const params = new URLSearchParams();
                   params.append('plan', pendingPlan.planName);
                   params.append('price', pendingPlan.planPrice);
                   params.append('duration', pendingPlan.planDuration);
                   localStorage.removeItem('pendingOAuthPlan');
-                  
+
                   setTimeout(() => {
                     window.location.href = `/register?${params.toString()}`;
                   }, 1500);
@@ -369,14 +405,14 @@ const AuthCallbackPage = () => {
               // Non-price-card registration - clean up and proceed normally
               console.log('✅ Standard registration (with trial)');
             }
-            
+
             // Standard success path (No payment, or payment skipped/missing data)
             setStatus('success');
             toast({
               title: t('loginSuccess'),
               description: `Welcome, ${name}!`,
             });
-            
+
             setTimeout(() => {
               window.location.href = '/dashboard';
             }, 1000);
@@ -385,10 +421,10 @@ const AuthCallbackPage = () => {
           }
         } catch (error) {
           console.error('Error handling OAuth callback:', error);
-          
+
           // Provide more specific error messages
           let errorMessage = error.message || 'Failed to complete authentication';
-          
+
           if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
             errorMessage = 'Network error: Unable to connect to server. Please check your internet connection and try again.';
           } else if (error.message?.includes('API key')) {
@@ -396,37 +432,37 @@ const AuthCallbackPage = () => {
           } else if (error.message?.includes('Network error')) {
             errorMessage = error.message; // Use the specific network error message
           }
-          
+
           setStatus('error');
           toast({
             title: t('loginFailed'),
             description: errorMessage,
             variant: 'destructive',
           });
-          
+
           setTimeout(() => {
             navigate('/login');
           }, 2000);
         }
       } catch (error) {
         console.error('Auth callback error:', error);
-        
+
         // Provide more specific error messages
         let errorMessage = error.message || 'Authentication failed';
-        
+
         if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
           errorMessage = 'Network error: Unable to connect to server. Please check your internet connection and try again.';
         } else if (error.message?.includes('session')) {
           errorMessage = 'Session error: Please try logging in again.';
         }
-        
+
         setStatus('error');
         toast({
           title: t('loginFailed'),
           description: errorMessage,
           variant: 'destructive',
         });
-        
+
         setTimeout(() => {
           navigate('/login');
         }, 2000);

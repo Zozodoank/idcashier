@@ -3,20 +3,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 
+// Payment methods for personal Duitku account
+// Excludes BCA VA (BC) as per requirement
 const PAYMENT_METHODS = [
-  { code: 'VC', name: 'Credit Card (Visa/Master/JCB)', type: 'Credit Card' },
-  { code: 'BC', name: 'BCA Virtual Account', type: 'Virtual Account' },
+  // Virtual Accounts (all except BCA)
   { code: 'M2', name: 'Mandiri Virtual Account', type: 'Virtual Account' },
-  { code: 'VA', name: 'Maybank Virtual Account', type: 'Virtual Account' },
   { code: 'I1', name: 'BNI Virtual Account', type: 'Virtual Account' },
   { code: 'B1', name: 'CIMB Niaga Virtual Account', type: 'Virtual Account' },
   { code: 'BT', name: 'Permata Virtual Account', type: 'Virtual Account' },
-  { code: 'A1', name: 'ATM Bersama', type: 'Virtual Account' },
+  { code: 'A1', name: 'ATM Bersama Virtual Account', type: 'Virtual Account' },
+  { code: 'VA', name: 'Maybank Virtual Account', type: 'Virtual Account' },
+  // Retail outlets
+  { code: 'FT', name: 'Alfamart', type: 'Retail' },
+  { code: 'PG', name: 'Pegadaian', type: 'Retail' },
+  { code: 'PI', name: 'Pos Indonesia', type: 'Retail' },
+  // E-Wallets
   { code: 'OV', name: 'OVO', type: 'E-Wallet' },
+  { code: 'SA', name: 'ShopeePay', type: 'E-Wallet' },
   { code: 'DA', name: 'DANA', type: 'E-Wallet' },
-  { code: 'SA', name: 'Shopee Pay App', type: 'E-Wallet' },
-  { code: 'GQ', name: 'QRIS (Gudang Voucher)', type: 'QRIS' },
-  { code: 'SP', name: 'QRIS (ShopeePay)', type: 'QRIS' }
+  // QRIS
+  { code: 'GQ', name: 'QRIS Nusapay', type: 'QRIS' },
+  { code: 'SP', name: 'QRIS ShopeePay', type: 'QRIS' }
 ];
 
 export default function PaymentMethodSelector({ isOpen, onClose, onSelect, amount }) {

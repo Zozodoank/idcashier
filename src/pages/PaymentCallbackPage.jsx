@@ -104,7 +104,7 @@ export default function PaymentCallbackPage() {
 
               console.log('📝 Calling auth-register to activate subscription...');
               
-              const registerRes = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/auth-register', {
+              const registerRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-register`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',

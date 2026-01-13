@@ -8,10 +8,11 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import ThemeToggle from '@/components/ThemeToggle';
-import { 
-  Smartphone, CreditCard, BarChart3, Users, Shield, Zap, 
-  Menu, X, Globe, HeadphonesIcon, Calculator, Check, Star 
+import {
+  Smartphone, CreditCard, BarChart3, Users, Shield, Zap,
+  Menu, X, Globe, HeadphonesIcon, Calculator, Check, Star
 } from 'lucide-react';
+import PaymentMethodSelector from '@/components/PaymentMethodSelector';
 
 const LandingPage = () => {
   const { t, language, setLanguage } = useLanguage();
@@ -22,6 +23,8 @@ const LandingPage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDemoLoading, setIsDemoLoading] = useState(false);
   const [locale, setLocale] = useState('id');
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState(null);
 
   // Handle Supabase Auth Redirects (Fallback if server redirect config is missing)
   useEffect(() => {
@@ -54,9 +57,9 @@ const LandingPage = () => {
       // Normalize demo email on client side
       const demoEmail = 'demo@idcashier.com';
       const normalizedDemoEmail = demoEmail.trim().toLowerCase();
-      
+
       const result = await login(normalizedDemoEmail, 'Demo2025');
-      
+
       if (result.success) {
         toast({
           title: `${t('welcome')} ${result.user.name || result.user.email}!`,
@@ -117,7 +120,7 @@ const LandingPage = () => {
     setIsDuitkuProcessing(true);
     try {
       // Create payment request to our edge function
-      const response = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/duitku-payment-request', {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -148,7 +151,7 @@ const LandingPage = () => {
           title: t('paymentProcessing'),
           description: t('redirectingToPayment'),
         });
-        
+
         // Fallback - simulate redirect
         setTimeout(() => {
           alert(t('duitkuPaymentFallback'));
@@ -171,9 +174,9 @@ const LandingPage = () => {
     return {
       currency: 'Rp',
       plans: [
-        { 
-          name: t('landingPlan1Month'), 
-          price: 50000, 
+        {
+          name: t('landingPlan1Month'),
+          price: 50000,
           duration: 1,
           features: [
             t('landingFeatureMultiBranch'),
@@ -182,10 +185,10 @@ const LandingPage = () => {
             t('landingFeatureEmailSupport')
           ]
         },
-        { 
-          name: t('landingPlan3Months'), 
-          price: 150000, 
-          duration: 3, 
+        {
+          name: t('landingPlan3Months'),
+          price: 150000,
+          duration: 3,
           popular: true,
           features: [
             t('landingFeatureAll1Month'),
@@ -194,9 +197,9 @@ const LandingPage = () => {
             t('landingFeatureBarcodeScanner')
           ]
         },
-        { 
-          name: t('landingPlan6Months'), 
-          price: 250000, 
+        {
+          name: t('landingPlan6Months'),
+          price: 250000,
           duration: 6,
           features: [
             t('landingFeatureAll3Months'),
@@ -205,9 +208,9 @@ const LandingPage = () => {
             t('landingFeatureAPIAccess')
           ]
         },
-        { 
-          name: t('landingPlan1Year'), 
-          price: 500000, 
+        {
+          name: t('landingPlan1Year'),
+          price: 500000,
           duration: 12,
           features: [
             t('landingFeatureAll6Months'),
@@ -307,8 +310,8 @@ const LandingPage = () => {
                 {t('landingTestimonials')}
               </button>
               <ThemeToggle />
-              <select 
-                value={language} 
+              <select
+                value={language}
                 onChange={(e) => setLanguage(e.target.value)}
                 className="text-sm border rounded px-2 py-1 bg-white dark:bg-gray-800"
               >
@@ -321,17 +324,17 @@ const LandingPage = () => {
             <div className="flex items-center space-x-4">
               {user ? (
                 <>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="hidden md:inline-flex"
                     onClick={() => navigate('/dashboard')}
                   >
                     {t('dashboard')}
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={handleLogout}
                   >
                     {t('logout')}
@@ -339,9 +342,9 @@ const LandingPage = () => {
                 </>
               ) : (
                 <>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="hidden md:inline-flex"
                     onClick={() => navigate('/login')}
                   >
@@ -374,8 +377,8 @@ const LandingPage = () => {
               </button>
               <div className="flex space-x-2 pt-2">
                 <ThemeToggle />
-                <select 
-                  value={language} 
+                <select
+                  value={language}
                   onChange={(e) => setLanguage(e.target.value)}
                   className="text-sm border rounded px-2 py-1 bg-white dark:bg-gray-800 flex-1"
                 >
@@ -387,17 +390,17 @@ const LandingPage = () => {
               <div className="flex space-x-2 pt-2">
                 {user ? (
                   <>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="flex-1"
                       onClick={() => navigate('/dashboard')}
                     >
                       {t('dashboard')}
                     </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="flex-1"
                       onClick={handleLogout}
                     >
@@ -405,9 +408,9 @@ const LandingPage = () => {
                     </Button>
                   </>
                 ) : (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="flex-1"
                     onClick={() => navigate('/login')}
                   >
@@ -433,8 +436,8 @@ const LandingPage = () => {
             {t('landingHeroSubtitle')}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               onClick={handleDemo}
               disabled={isDemoLoading}
@@ -450,7 +453,7 @@ const LandingPage = () => {
                 </>
               )}
             </Button>
-            
+
             {/* Free Trial button - shows for all languages */}
             <Button
               size="lg"
@@ -460,11 +463,11 @@ const LandingPage = () => {
             >
               🆓 {t('freeTrial')}
             </Button>
-            
+
             {/* Register button */}
             {!user && (
-              <Button 
-                size="lg" 
+              <Button
+                size="lg"
                 variant="outline"
                 className="border-purple-600 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950"
                 onClick={() => navigate('/register')}
@@ -543,12 +546,13 @@ const LandingPage = () => {
                   </ul>
                 </CardContent>
                 <CardFooter>
-                  <Button 
-                    className="w-full" 
+                  <Button
+                    className="w-full"
                     variant={plan.popular ? "default" : "outline"}
                     onClick={() => {
-                      // For new registration (price card), always redirect to register page
-                      navigate(`/register?plan=${plan.name}&price=${plan.price}&duration=${plan.duration}`);
+                      // Open payment method selector
+                      setSelectedPlan(plan);
+                      setIsPaymentModalOpen(true);
                     }}
                   >
                     {t('landingSubscribe')}
@@ -645,6 +649,18 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
+
+      <PaymentMethodSelector
+        isOpen={isPaymentModalOpen}
+        onClose={setIsPaymentModalOpen}
+        amount={selectedPlan?.price || 0}
+        onSelect={(method) => {
+          setIsPaymentModalOpen(false);
+          if (selectedPlan) {
+            navigate(`/register?plan=${selectedPlan.name}&price=${selectedPlan.price}&duration=${selectedPlan.duration}&paymentMethod=${method}`);
+          }
+        }}
+      />
 
     </div>
   );

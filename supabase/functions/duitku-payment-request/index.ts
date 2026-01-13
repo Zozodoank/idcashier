@@ -55,21 +55,21 @@ Deno.serve(async (req) => {
     const nameParts = fullName.split(' ');
     let firstName = nameParts[0];
     let lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0];
-    
+
     // Ensure phone number format
     const validPhone = phoneNumber || '081234567890';
 
     const customerDetail = {
-        firstName: firstName,
-        lastName: lastName,
-        email: email,
-        phoneNumber: validPhone,
-        billingAddress: {
-            firstName, lastName, address: "Indonesia", city: "Jakarta", postalCode: "12345", phone: validPhone, countryCode: "ID"
-        },
-        shippingAddress: {
-            firstName, lastName, address: "Indonesia", city: "Jakarta", postalCode: "12345", phone: validPhone, countryCode: "ID"
-        }
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      phoneNumber: validPhone,
+      billingAddress: {
+        firstName, lastName, address: "Indonesia", city: "Jakarta", postalCode: "12345", phone: validPhone, countryCode: "ID"
+      },
+      shippingAddress: {
+        firstName, lastName, address: "Indonesia", city: "Jakarta", postalCode: "12345", phone: validPhone, countryCode: "ID"
+      }
     };
 
     // Ensure paymentAmount is integer
@@ -83,9 +83,9 @@ Deno.serve(async (req) => {
     let finalReturnUrl = returnUrl;
     console.log('Before register param:', finalReturnUrl, 'isRegistration:', isRegistration);
     if (isRegistration) {
-        const separator = finalReturnUrl.includes('?') ? '&' : '?';
-        finalReturnUrl = `${finalReturnUrl}${separator}register=1`;
-        console.log('After register param:', finalReturnUrl);
+      const separator = finalReturnUrl.includes('?') ? '&' : '?';
+      finalReturnUrl = `${finalReturnUrl}${separator}register=1`;
+      console.log('After register param:', finalReturnUrl);
     }
 
     const duitkuPayload: any = {
@@ -100,9 +100,9 @@ Deno.serve(async (req) => {
       email,
       phoneNumber: validPhone,
       itemDetails: itemDetails || [{
-          name: productDetails,
-          price: amountInt,
-          quantity: 1
+        name: productDetails,
+        price: amountInt,
+        quantity: 1
       }],
       customerDetail,
       callbackUrl,
@@ -114,7 +114,15 @@ Deno.serve(async (req) => {
 
     console.log('Sending to Duitku:', JSON.stringify(duitkuPayload));
 
-    const duitkuApiUrl = 'https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry';
+    // Duitku Endpoint Configuration
+    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
+    const DUITKU_BASE_URL = ENV === 'sandbox'
+      ? 'https://sandbox.duitku.com'
+      : 'https://passport.duitku.com';
+
+    const duitkuApiUrl = `${DUITKU_BASE_URL}/webapi/api/merchant/v2/inquiry`;
+
+    console.log(`Using Duitku Environment: ${ENV}, URL: ${duitkuApiUrl}`);
 
     const response = await fetch(duitkuApiUrl, {
       method: 'POST',
@@ -124,12 +132,26 @@ Deno.serve(async (req) => {
       body: JSON.stringify(duitkuPayload),
     });
 
-    const data = await response.json();
+    let data;
+    try {
+      const text = await response.text();
+      console.log('Raw Duitku Response Body:', text);
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Failed to parse Duitku response as JSON:', text);
+        throw new Error('Invalid JSON response from Duitku');
+      }
+    } catch (err) {
+      console.error('Error reading Duitku response:', err);
+      throw err;
+    }
+
     console.log('Duitku Response:', data);
 
     if (!data.paymentUrl) {
-        console.error('Duitku Error:', data);
-        // Don't throw immediately, check if we can still insert pending payment for debugging
+      console.error('Duitku Error:', data);
+      // Don't throw immediately, check if we can still insert pending payment for debugging
     }
 
     // Insert into payments table
@@ -140,28 +162,28 @@ Deno.serve(async (req) => {
     );
 
     const { error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          user_id: userId,
-          amount: paymentAmount,
-          merchant_order_id: merchantOrderId,
-          product_details: productDetails,
-          customer_va_name: customerVaName,
-          customer_email: email,
-          customer_phone: validPhone,
-          status: 'pending',
-          payment_url: data.paymentUrl,
-          reference: data.reference
-        });
-        
+      .from('payments')
+      .insert({
+        user_id: userId,
+        amount: paymentAmount,
+        merchant_order_id: merchantOrderId,
+        product_details: productDetails,
+        customer_va_name: customerVaName,
+        customer_email: email,
+        customer_phone: validPhone,
+        status: 'pending',
+        payment_url: data.paymentUrl,
+        reference: data.reference
+      });
+
     if (paymentError) {
-        console.error('Failed to insert payment:', paymentError);
+      console.error('Failed to insert payment:', paymentError);
     }
 
     if (!data.paymentUrl) {
-         console.error('Duitku Error Response:', JSON.stringify(data));
-         const errorMsg = data.statusMessage || data.Message || 'Failed to get payment URL from Duitku';
-         throw new Error(`${errorMsg} (Code: ${data.statusCode || 'Unknown'}) - ${JSON.stringify(data)}`);
+      console.error('Duitku Error Response:', JSON.stringify(data));
+      const errorMsg = data.statusMessage || data.Message || 'Failed to get payment URL from Duitku';
+      throw new Error(`${errorMsg} (Code: ${data.statusCode || 'Unknown'}) - ${JSON.stringify(data)}`);
     }
 
     // Return merchantOrderId along with Duitku data

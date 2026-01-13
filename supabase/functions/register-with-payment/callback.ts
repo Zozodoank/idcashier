@@ -140,9 +140,9 @@ Deno.serve(async (req) => {
       callbackData = normalizeKeys(temp);
       logger.info('Parsed query params:', callbackData);
     }
-    
+
     logger.info('Final parsed callback data:', callbackData);
-    
+
     // Extract relevant information
     const merchantCode = (callbackData.merchantCode || callbackData['merchantcode']) as string | undefined;
     const amount = (callbackData.amount || callbackData['paymentamount']) as string | number | undefined;
@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
     // Load API key from env according to environment
     const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'sandbox').toLowerCase();
     const SANDBOX_API_KEY = Deno.env.get('DUITKU_SANDBOX_API_KEY') || '';
-    const PROD_API_KEY = Deno.env.get('DUITKU_PRODUCTION_API_KEY') || '';
+    const PROD_API_KEY = Deno.env.get('DUITKU_API_KEY') || '';
     const ACTIVE_API_KEY = ENV === 'production' ? PROD_API_KEY : SANDBOX_API_KEY;
 
     // Validate required fields
@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
         signature || '',
         ACTIVE_API_KEY
       );
-      
+
       if (!isValidSignature) {
         logger.error('Invalid signature', { expected: 'calculated signature', provided: signature });
         return new Response(
@@ -195,24 +195,24 @@ Deno.serve(async (req) => {
         );
       }
     }
-    
+
     // Validate required fields
     if (!merchantOrderId || !resultCode) {
       logger.error('Missing required fields in callback data');
       return new Response(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           message: 'Missing required fields: merchantOrderId and resultCode are required',
           receivedData: callbackData,
           extractedValues: { merchantOrderId, resultCode, paymentMethod }
         }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400
         }
       );
     }
-    
+
     // Create Supabase client with service role key for full access
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
         }
       }
     );
-    
+
     // Update transaction status based on resultCode
     // Result codes typically:
     // 00: Success
@@ -241,11 +241,11 @@ Deno.serve(async (req) => {
     } else if (resultCode === '02') {
       status = 'failed';
     }
-    
+
     // Update the payment record in database
     const { data, error } = await supabase
       .from('payments')
-      .update({ 
+      .update({
         status: status,
         payment_method: paymentMethod,
         reference: merchantOrderId,
@@ -254,43 +254,43 @@ Deno.serve(async (req) => {
       .eq('merchant_order_id', merchantOrderId)
       .select()
       .single();
-    
+
     if (error) {
       logger.error('Error updating payment record:', error);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           message: 'Failed to update payment record',
           error: error.message
         }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500
         }
       );
     }
-    
+
     // If payment is successful, we might want to update user subscription or send notification
     if (status === 'completed' && data.user_id) {
       // Log successful registration payment
-      logger.info('Registration payment completed successfully', { 
-        userId: data.user_id, 
-        paymentId: data.id 
+      logger.info('Registration payment completed successfully', {
+        userId: data.user_id,
+        paymentId: data.id
       });
-      
+
       // Here you could send a welcome email or notification
       // For now, we'll just log it
     }
-    
+
     logger.info('Payment record updated successfully:', data);
-    
+
     // Return success response to Duitku
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Callback processed successfully' 
+      JSON.stringify({
+        success: true,
+        message: 'Callback processed successfully'
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       }
@@ -298,12 +298,12 @@ Deno.serve(async (req) => {
   } catch (error) {
     logger.error('Duitku callback processing error:', error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
+      JSON.stringify({
+        success: false,
         message: 'Internal server error',
         error: error.message
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }

@@ -237,7 +237,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // 4) Konfigurasi Duitku dari ENV
-    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'sandbox').toLowerCase();
+    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
     const DUITKU_MERCHANT_CODE = Deno.env.get('DUITKU_MERCHANT_CODE')?.trim() || '';
 
     // Pakai DUITKU_API_KEY (fallback ke DUITKU_MERCHANT_KEY untuk kompatibilitas lama)

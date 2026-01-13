@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">idCashier POS</string>
-    <string name="title_activity_main">idCashier POS</string>
-    <string name="package_name">com.idcashier.pos</string>
-    <string name="custom_url_scheme">com.idcashier.pos</string>
-</resources>
