@@ -500,7 +500,7 @@ const AuthCallbackPage = () => {
         {status === 'processing' && (
           <>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-xl">Memproses pembayaran...</p>
+            <p className="text-xl">Loading Aplikasi...</p>
             <p className="text-sm mt-2 opacity-80">Mohon tunggu sebentar</p>
           </>
         )}
