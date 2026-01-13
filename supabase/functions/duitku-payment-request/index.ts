@@ -1,6 +1,14 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 /// <reference path="../deno-stubs.d.ts" />
-import { corsHeaders } from '../_shared/cors.ts'
+// import { corsHeaders } from '../_shared/cors.ts'
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, baggage, sb-request-id',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
+  'Access-Control-Max-Age': '86400', // Cache preflight for 24 hours
+  'Vary': 'Origin'
+};
 import { createHash } from "node:crypto";
 import { createClient } from '@supabase/supabase-js';
 
@@ -75,9 +83,10 @@ Deno.serve(async (req) => {
     // Ensure paymentAmount is integer
     const amountInt = parseInt(String(paymentAmount));
 
-    // If paymentMethod is ALL, default to VC (Credit Card) if we can't show selection page
-    // But ideally frontend should send specific code.
-    const methodToSend = (!paymentMethod || paymentMethod === 'ALL') ? "VC" : paymentMethod;
+    // If paymentMethod is ALL or missing, default to "GQ" (QRIS) which is more commonly available
+    // Ideally frontend should send specific code.
+    const methodToSend = (!paymentMethod || paymentMethod === 'ALL') ? "GQ" : paymentMethod;
+    console.log(`Payment Method: Original=${paymentMethod}, ToSend=${methodToSend}`);
 
     // Append register=1 to returnUrl if isRegistration is true
     let finalReturnUrl = returnUrl;
@@ -192,9 +201,9 @@ Deno.serve(async (req) => {
       status: 200,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error processing payment request:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error.message || 'Unknown error' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });

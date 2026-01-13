@@ -41,7 +41,14 @@ const AuthCallbackPage = () => {
         })
       });
 
-      const paymentData = await paymentResponse.json();
+      const responseText = await paymentResponse.text();
+      let paymentData;
+      try {
+        paymentData = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse payment response:', responseText);
+        throw new Error('Invalid response from payment server');
+      }
 
       if (!paymentResponse.ok) {
         // Map common API errors to user-friendly messages
@@ -278,7 +285,14 @@ const AuthCallbackPage = () => {
               body: JSON.stringify(requestBody)
             });
 
-            const data = await response.json();
+            const responseText = await response.text();
+            let data;
+            try {
+              data = JSON.parse(responseText);
+            } catch (e) {
+              console.error('Failed to parse auth-register response:', responseText);
+              throw new Error('Invalid response from registration server');
+            }
 
             if (!response.ok) {
               // Ignore "already registered" errors for OAuth - this means race condition or temporary fetch failure

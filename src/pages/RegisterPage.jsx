@@ -142,7 +142,15 @@ export default function RegisterPage() {
           })
         });
 
-        const paymentData = await paymentResponse.json();
+        const responseText = await paymentResponse.text();
+        let paymentData;
+        try {
+          paymentData = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Failed to parse payment response:', responseText);
+          throw new Error('Invalid response from payment server');
+        }
+
         if (!paymentResponse.ok) throw new Error(paymentData.error || t('paymentRequestFailed'));
 
         if (paymentData.paymentUrl) {

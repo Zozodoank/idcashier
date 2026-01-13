@@ -10,21 +10,21 @@ const handleResponse = async (response) => {
     url: response.url,
     headers: Object.fromEntries(response.headers.entries())
   });
-  
+
   // Check if response has content
   const contentLength = response.headers.get('content-length');
   const contentType = response.headers.get('content-type');
-  
+
   // If no content or content-length is 0, throw descriptive error
   if (contentLength === '0' || !contentLength) {
     throw new Error('Server tidak merespons dengan benar. Pastikan backend server berjalan di port 3001');
   }
-  
+
   // If content type is not JSON, throw descriptive error
   if (!contentType || !contentType.includes('application/json')) {
     throw new Error('Server tidak merespons dengan benar. Pastikan backend server berjalan di port 3001');
   }
-  
+
   try {
     const data = await response.json();
     // Log parsed data for debugging (limited size)
@@ -46,23 +46,23 @@ export const authAPI = {
     try {
       // Normalize email on client side
       const normalizedEmail = email.trim().toLowerCase();
-      
+
       // Log login attempt
       console.log(`🔐 Attempting login for: ${normalizedEmail}`);
       console.time('LoginRequest');
-      
+
       // Call auth-login edge function using fetch to access HTTP status
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       if (!supabaseUrl) {
         throw new Error('Supabase URL not configured');
       }
-      
+
       // Use the Supabase URL to call the edge function
       const functionsUrl = `${supabaseUrl}/functions/v1/auth-login-final`;
       console.log(`📡 Calling edge function: ${functionsUrl}`);
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         console.error('⏰ Login request timeout (60s) - Server took too long to respond');
@@ -90,7 +90,7 @@ export const authAPI = {
       } catch (fetchError) {
         clearTimeout(timeoutId);
         console.timeEnd('LoginRequest');
-        
+
         // Handle abort/timeout error
         if (fetchError.name === 'AbortError') {
           throw new Error('Login request timeout. Please check your internet connection and try again.');
@@ -156,7 +156,7 @@ export const authAPI = {
         ...data.user,
         tenantId: data.user.tenant_id || data.user.tenantId
       };
-      
+
       console.log('✅ Login API returning success');
       return {
         user: userResponse,
@@ -167,7 +167,7 @@ export const authAPI = {
     } catch (error) {
       // Log error detail for debugging
       console.error(`❌ Login error: ${error.message}`);
-      
+
       // Check if error is from edge function with subscription expired
       if (error.message && (error.message.includes('subscriptionExpired') || error.message.includes('Subscription expired'))) {
         return {
@@ -176,20 +176,20 @@ export const authAPI = {
           subscriptionExpired: true
         };
       }
-      
+
       // Re-throw other errors
       throw error;
     }
   },
-  
+
   register: async (name, email, password, role = 'owner') => {
     try {
       // Normalize email on client side
       const normalizedEmail = email.trim().toLowerCase();
-      
+
       // Log registration attempt
       console.log(`Attempting registration for: ${normalizedEmail}`);
-      
+
       // First, try to sign up with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: normalizedEmail,
@@ -201,7 +201,7 @@ export const authAPI = {
           }
         }
       });
-      
+
       if (authError) {
         // Map Supabase errors to the expected format
         let errorMessage = 'Registration failed';
@@ -216,24 +216,24 @@ export const authAPI = {
         }
         throw new Error(errorMessage);
       }
-      
+
       // If user already exists but is not confirmed, authData.user will be null
       if (!authData.user) {
         throw new Error('User already exists but is not confirmed. Please check your email.');
       }
-      
+
       // Set the auth token for subsequent requests
       if (authData.session) {
         await supabase.auth.setSession(authData.session);
       }
-      
+
       // Add a small delay to ensure the session is properly propagated
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Insert user data into users table
       const userId = authData.user.id;
       const userTenantId = role === 'owner' ? userId : null; // Will be set by admin
-      
+
       const { data: userData, error: insertError } = await supabase
         .from('users')
         .insert([
@@ -247,7 +247,7 @@ export const authAPI = {
         ])
         .select('id, name, email, role, tenant_id, permissions, created_at')
         .single();
-      
+
       if (insertError) {
         console.error('User creation error:', {
           message: insertError.message,
@@ -257,13 +257,13 @@ export const authAPI = {
         });
         throw new Error(insertError.message || 'Failed to create user profile');
       }
-      
+
       // Include tenant_id as tenantId in response
       const userResponse = {
         ...userData,
         tenantId: userData.tenant_id
       };
-      
+
       return {
         user: userResponse,
         token: authData.session?.access_token || null,
@@ -276,38 +276,38 @@ export const authAPI = {
       throw error;
     }
   },
-  
+
   getCurrentUser: async (token) => {
     try {
       // Log user profile request
       console.log('Fetching current user profile');
-      
+
       // Validate required environment variables
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       if (!supabaseUrl || !supabaseAnonKey) {
         throw new Error('Supabase configuration missing. Please check environment variables.');
       }
-      
+
       if (!token) {
         throw new Error('Authentication token is required');
       }
-      
+
       // Get current user from auth to get their email
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
-      
+
       if (authError) {
         throw new Error(authError.message || 'Failed to get user from auth');
       }
-      
+
       if (!authUser || !authUser.email) {
         throw new Error('User not authenticated or email not available');
       }
-      
+
       // Add a small delay to ensure the session is properly propagated
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Get user profile from users table by EMAIL instead of ID
       // This solves the ID mismatch issue between Supabase Auth and the database
       // Fallback strategy implemented to handle RLS configuration issues that cause error 406
@@ -315,7 +315,7 @@ export const authAPI = {
       // This is defensive programming for RLS misconfiguration; for permanent fix, see SUPABASE_RLS_FIX.sql
       // Use direct REST API for reliable auth
       const encodedEmail = encodeURIComponent(authUser.email);
-      
+
       // CRITICAL: Add API key to URL FIRST, then add other params
       // This ensures API key is always present even if headers are stripped
       const baseUrl = `${supabaseUrl}/rest/v1/users`;
@@ -325,12 +325,12 @@ export const authAPI = {
         'select': 'id,name,email,role,tenant_id,permissions,created_at'
       });
       const urlWithApiKey = `${baseUrl}?${urlParams.toString()}`;
-      
+
       console.log('🔍 Fetching user profile from:', baseUrl);
       console.log('🔑 API key in URL:', supabaseAnonKey ? 'YES' : 'NO');
       console.log('🔑 API key value:', supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'MISSING');
       console.log('🎫 Token:', token ? `${token.substring(0, 20)}...` : 'MISSING');
-      
+
       // Ensure API key is in BOTH header AND URL parameter
       const headers = {
         'apikey': supabaseAnonKey,
@@ -338,26 +338,23 @@ export const authAPI = {
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
       };
-      
+
       // Validate headers before making request
       if (!headers.apikey) {
         throw new Error('API key is missing from headers. Check VITE_SUPABASE_ANON_KEY environment variable.');
       }
-      
+
       console.log('📤 Request details:', {
         url: baseUrl,
         hasApiKeyInUrl: urlWithApiKey.includes('apikey='),
         hasApiKeyInHeader: !!headers.apikey,
         hasToken: !!token
       });
-      
-      let response;
+
       try {
         response = await fetch(urlWithApiKey, {
           method: 'GET',
-          headers: headers,
-          // Ensure credentials are included
-          credentials: 'include'
+          headers: headers
         });
       } catch (fetchError) {
         console.error('❌ Fetch request failed:', fetchError);
@@ -367,9 +364,9 @@ export const authAPI = {
         }
         throw fetchError;
       }
-      
+
       console.log('User profile response status:', response.status, response.statusText);
-      
+
       if (!response.ok) {
         let errorText;
         try {
@@ -378,7 +375,7 @@ export const authAPI = {
           errorText = 'Unable to read error response';
         }
         console.error('User profile fetch error:', response.status, errorText);
-        
+
         // Provide more specific error messages
         if (response.status === 406) {
           throw new Error('API key missing or invalid. Please check Supabase configuration.');
@@ -390,7 +387,7 @@ export const authAPI = {
           throw new Error(`Failed to get user profile: ${response.status} ${errorText}`);
         }
       }
-      
+
       let userArray;
       try {
         userArray = await response.json();
@@ -399,11 +396,11 @@ export const authAPI = {
         throw new Error('Invalid response format from server');
       }
       let userData;
-      
+
       if (!Array.isArray(userArray)) {
         throw new Error('Invalid response format from server');
       }
-      
+
       if (userArray.length === 0) {
         throw new Error('User not found in database');
       } else if (userArray.length === 1) {
@@ -413,13 +410,13 @@ export const authAPI = {
         // Use the first one, but log warning
         userData = userArray[0];
       }
-      
+
       // Include tenant_id as tenantId in response
       const userResponse = {
         ...userData,
         tenantId: userData.tenant_id
       };
-      
+
       console.log('User profile fetched successfully:', userResponse.id);
       return userResponse;
     } catch (error) {
@@ -429,33 +426,33 @@ export const authAPI = {
       throw error;
     }
   },
-  
+
   requestPasswordReset: async (email) => {
     try {
       // Normalize email on client side
       const normalizedEmail = email.trim().toLowerCase();
-      
+
       // Log password reset request
       console.log(`Requesting password reset for: ${normalizedEmail}`);
-      
+
       // Determine redirect URL based on environment
       // Check if running on localhost/development
-      const isDevelopment = window.location.hostname === 'localhost' || 
-                           window.location.hostname === '127.0.0.1';
-      
+      const isDevelopment = window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1';
+
       // Use current origin for development, configured URL for production
-      const redirectUrl = isDevelopment 
+      const redirectUrl = isDevelopment
         ? `${window.location.origin}/reset-password`
         : (import.meta.env.VITE_SITE_URL || 'https://idcashier.com') + '/reset-password';
-      
+
       console.log('Environment:', isDevelopment ? 'Development' : 'Production');
       console.log('Using redirect URL:', redirectUrl);
-      
+
       // Use Supabase Auth to send password reset email
       const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo: redirectUrl
       });
-      
+
       if (error) {
         // Map Supabase errors to the expected format
         let errorMessage = 'Failed to request password reset';
@@ -468,7 +465,7 @@ export const authAPI = {
         }
         throw new Error(errorMessage);
       }
-      
+
       return {
         success: true,
         message: 'If your email is registered, you will receive a password reset link shortly.'
@@ -480,15 +477,15 @@ export const authAPI = {
       throw error;
     }
   },
-  
+
   resetPassword: async (token, password) => {
     try {
       // Log password reset attempt
       console.log('Attempting to reset password');
-      
+
       // Update user's password using the token
       const { error } = await supabase.auth.updateUser({ password: password });
-      
+
       if (error) {
         // Map Supabase errors to the expected format
         let errorMessage = 'Failed to reset password';
@@ -501,7 +498,7 @@ export const authAPI = {
         }
         throw new Error(errorMessage);
       }
-      
+
       return {
         success: true,
         message: 'Password has been reset successfully.'
@@ -518,7 +515,7 @@ export const authAPI = {
     try {
       console.log('=== UPDATE PASSWORD START ===');
       console.log('Password length:', password.length);
-      
+
       // Check current session
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       console.log('Current session status:', sessionError ? 'ERROR' : 'OK');
@@ -529,12 +526,12 @@ export const authAPI = {
         console.error('No active session found!');
         throw new Error('Session expired. Please request a new password reset link.');
       }
-      
+
       // Update password - session recovery sudah di-set sebelumnya
-      const { data, error } = await supabase.auth.updateUser({ 
-        password: password 
+      const { data, error } = await supabase.auth.updateUser({
+        password: password
       });
-      
+
       if (error) {
         console.error('Update password error:', error);
         let errorMessage = 'Failed to update password';
@@ -547,10 +544,10 @@ export const authAPI = {
         }
         throw new Error(errorMessage);
       }
-      
+
       console.log('Password updated successfully');
       console.log('=== UPDATE PASSWORD END ===');
-      
+
       return {
         success: true,
         data,
@@ -566,19 +563,19 @@ export const authAPI = {
     try {
       // Get auth user to get their email
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
-      
+
       if (authError) {
         throw new Error(authError.message || 'Failed to get user from auth');
       }
-      
+
       if (!authUser) {
         throw new Error('User not authenticated');
       }
-      
+
       // Get user profile from users table by EMAIL using direct REST API
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/users?email=eq.${encodeURIComponent(authUser.email)}&select=id,name,email,role,tenant_id,permissions,created_at&apikey=${encodeURIComponent(supabaseAnonKey)}`,
         {
@@ -590,17 +587,17 @@ export const authAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get user profile: ${errorText}`);
       }
-      
+
       const userArray = await response.json();
       if (userArray.length === 0) {
         throw new Error('User not found');
       }
-      
+
       return userArray[0];
     } catch (error) {
       console.log(`Get user data error: ${error.message}`);
@@ -612,21 +609,21 @@ export const authAPI = {
     try {
       // Normalize email on client side
       const normalizedEmail = email.trim().toLowerCase();
-      
+
       // Log email verification attempt
       console.log(`🔍 Attempting email verification for: ${normalizedEmail}`);
-      
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       if (!supabaseUrl) {
         throw new Error('Supabase URL not configured');
       }
-      
+
       // Call auth-verify-email edge function
       const functionsUrl = `${supabaseUrl}/functions/v1/auth-verify-email`;
       console.log(`📡 Calling edge function: ${functionsUrl}`);
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         console.error('⏰ Email verification request timeout (20s)');
@@ -651,7 +648,7 @@ export const authAPI = {
         data = await response.json();
       } catch (fetchError) {
         clearTimeout(timeoutId);
-        
+
         if (fetchError.name === 'AbortError') {
           throw new Error('Email verification request timeout. Please try again.');
         }
@@ -683,17 +680,17 @@ export const authAPI = {
     try {
       // Normalize email on client side
       const normalizedEmail = email.trim().toLowerCase();
-      
+
       // Log resend verification attempt
       console.log(`📧 Resending verification email for: ${normalizedEmail}`);
-      
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       if (!supabaseUrl) {
         throw new Error('Supabase URL not configured');
       }
-      
+
       // Use Supabase Auth resend functionality
       const { error } = await supabase.auth.resend({
         type: 'signup',
@@ -702,7 +699,7 @@ export const authAPI = {
           emailRedirectTo: `${import.meta.env.VITE_SITE_URL || 'https://idcashier.com'}/login`
         }
       });
-      
+
       if (error) {
         // Map Supabase errors to the expected format
         let errorMessage = 'Failed to resend verification email';
@@ -715,7 +712,7 @@ export const authAPI = {
         }
         throw new Error(errorMessage);
       }
-      
+
       return {
         success: true,
         message: 'Verification email sent successfully. Please check your email.'
@@ -769,20 +766,20 @@ export const productsAPI = {
         supplier_address: product.supplier?.address || null,
         cost_price: product.cost || null // Alias for ReportsPage compatibility
       })) || [];
-      
+
       return data;
     } catch (error) {
       console.error('Products API Error:', error);
       throw error;
     }
   },
-  
+
   getById: async (id, token) => {
     try {
       console.log('📦 Getting product by ID:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/products?id=eq.${id}&select=*`,
         {
@@ -794,37 +791,37 @@ export const productsAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get product: ${errorText}`);
       }
-      
+
       const data = await response.json();
       if (data.length === 0) {
         throw new Error('Product not found');
       }
-      
+
       return data[0];
     } catch (error) {
       console.error('Product getById error:', error);
       throw error;
     }
   },
-  
+
   create: async (productData, token) => {
     try {
       console.log('📦 Creating product...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // Generate UUID for the product
       const productWithId = {
         ...productData,
         id: crypto.randomUUID()
       };
       // Note: user_id will be auto-populated by database trigger if exists
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/products`,
         {
@@ -838,13 +835,13 @@ export const productsAPI = {
           body: JSON.stringify(productWithId)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Product creation failed:', response.status, errorText);
         throw new Error(`Failed to create product: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Product created:', data[0]);
       return data[0];
@@ -853,13 +850,13 @@ export const productsAPI = {
       throw error;
     }
   },
-  
+
   update: async (id, productData, token) => {
     try {
       console.log('✏️ Updating product:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/products?id=eq.${id}`,
         {
@@ -873,13 +870,13 @@ export const productsAPI = {
           body: JSON.stringify(productData)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Product update failed:', response.status, errorText);
         throw new Error(`Failed to update product: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Product updated:', data[0]);
       return data[0];
@@ -888,13 +885,13 @@ export const productsAPI = {
       throw error;
     }
   },
-  
+
   delete: async (id, token) => {
     try {
       console.log('🗑️ Deleting product:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/products?id=eq.${id}`,
         {
@@ -907,13 +904,13 @@ export const productsAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Product deletion failed:', response.status, errorText);
         throw new Error(`Failed to delete product: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Product deleted:', data[0]);
       return data[0];
@@ -936,7 +933,7 @@ export const salesAPI = {
       // Equivalent to:
       // .select(`*,user:users!sales_user_id_fkey(name, email),customer:customers!sales_customer_id_fkey(name, email, phone),sale_items(*,product:products!sale_items_product_id_fkey(name,barcode,price,cost,supplier:suppliers!products_supplier_id_fkey(name)))`)
       // .order('created_at', { ascending: false });
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/sales?select=*,user:users!sales_user_id_fkey(name,email),customer:customers!sales_customer_id_fkey(name,email,phone),sale_items(*,product:products!sale_items_product_id_fkey(name,barcode,price,cost,supplier:suppliers!products_supplier_id_fkey(name)))&order=created_at.desc`,
         {
@@ -957,7 +954,7 @@ export const salesAPI = {
       }
 
       const rawData = await response.json();
-      
+
       // Transform data to flatten nested relationships for backward compatibility
       const data = rawData?.map(sale => {
         // Determine customer name:
@@ -967,7 +964,7 @@ export const salesAPI = {
         } else if (sale.customer?.name) {
           customerName = sale.customer.name;
         }
-        
+
         return {
           ...sale,
           user_name: sale.user?.name || null,
@@ -985,7 +982,7 @@ export const salesAPI = {
           })) || []
         };
       }) || [];
-      
+
       return data;
     } catch (error) {
       // Log error for debugging
@@ -993,13 +990,13 @@ export const salesAPI = {
       throw error;
     }
   },
-  
+
   getById: async (id, token) => {
     try {
       console.log('📄 Fetching sale by ID:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/sales?id=eq.${id}&select=*,user:users!sales_user_id_fkey(name,email),customer:customers!sales_customer_id_fkey(name,email,phone),sale_items(*,product:products!sale_items_product_id_fkey(name,barcode,price,cost,supplier:suppliers!products_supplier_id_fkey(name)))`,
         {
@@ -1011,19 +1008,19 @@ export const salesAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get sale: ${errorText}`);
       }
-      
+
       const dataArray = await response.json();
       if (dataArray.length === 0) {
         throw new Error('Sale not found');
       }
-      
+
       const rawData = dataArray[0];
-      
+
       // Transform data to flatten nested relationships for backward compatibility
       let customerName = null;
       if (rawData.customer_id === null) {
@@ -1031,7 +1028,7 @@ export const salesAPI = {
       } else if (rawData.customer?.name) {
         customerName = rawData.customer.name;
       }
-      
+
       const data = {
         ...rawData,
         user_name: rawData.user?.name || null,
@@ -1048,7 +1045,7 @@ export const salesAPI = {
           supplier_name: item.product?.supplier?.name || null
         })) || []
       };
-      
+
       console.log('✅ Sale fetched:', data.id);
       return data;
     } catch (error) {
@@ -1056,38 +1053,38 @@ export const salesAPI = {
       throw error;
     }
   },
-  
+
   create: async (saleData, token) => {
     try {
       // Log request payload for debugging
       console.log('Creating sale with data:', JSON.stringify(saleData, null, 2));
-      
+
       // Get environment variables
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // Decode token to get email (avoid supabase.auth.getUser which has API key issues)
       const tokenParts = token.split('.');
       if (tokenParts.length !== 3) {
         throw new Error('Invalid token format');
       }
-      
+
       const payload = JSON.parse(atob(tokenParts[1]));
       const userEmail = payload.email;
-      
+
       if (!userEmail) {
         throw new Error('No email found in token');
       }
-      
+
       console.log('📧 User email from token:', userEmail);
-      
+
       // Get user profile from users table by EMAIL using direct fetch
       const userProfileController = new AbortController();
       const userProfileTimeout = setTimeout(() => {
         console.error('⏰ User profile fetch timeout (10s)');
         userProfileController.abort();
       }, 10000);
-      
+
       let userResponse;
       try {
         userResponse = await fetch(
@@ -1110,45 +1107,45 @@ export const salesAPI = {
         }
         throw fetchError;
       }
-      
+
       if (!userResponse.ok) {
         const errorText = await userResponse.text();
         console.error('User profile fetch failed:', userResponse.status, errorText);
         throw new Error(`Failed to get user profile: ${userResponse.statusText}`);
       }
-      
+
       const userDataArray = await userResponse.json();
       if (!userDataArray || userDataArray.length === 0) {
         throw new Error('User profile not found');
       }
-      
+
       const userData = userDataArray[0];
       console.log('✅ User profile loaded:', userData.email);
-      
+
       // Generate UUIDs for sale and sale items
       const saleId = crypto.randomUUID();
-      
+
       // Extract custom_costs before creating sale (it's a separate table)
       const customCosts = saleData.custom_costs || [];
-      
+
       // Add user_id to sale data using the database user ID
       const saleWithUser = {
         ...saleData,
         id: saleId,
         user_id: userData.id // Use database user ID instead of Supabase Auth user ID
       };
-      
+
       // Remove sale_items and custom_costs from the sale object (they're separate tables)
       delete saleWithUser.sale_items;
       delete saleWithUser.custom_costs;
-      
+
       // Process sale items
       const saleItems = saleData.sale_items.map(item => ({
         ...item,
         id: crypto.randomUUID(),
         sale_id: saleId
       }));
-      
+
       // Create sale using direct fetch to avoid Supabase client issues
       console.log('🚀 Sending sale creation request...');
       const saleController = new AbortController();
@@ -1182,7 +1179,7 @@ export const salesAPI = {
       const saleResult = await saleResponse.json();
       const createdSale = saleResult[0];
       console.log('✅ Sale created with ID:', createdSale.id);
-      
+
       // Create sale items using direct fetch
       console.log('📦 Creating sale items...');
       const itemsController = new AbortController();
@@ -1211,7 +1208,7 @@ export const salesAPI = {
         const errorText = await itemsResponse.text();
         throw new Error(`Failed to create sale items: ${errorText}`);
       }
-      
+
       // Create custom costs if any
       if (customCosts.length > 0) {
         console.log('💰 Creating custom costs...');
@@ -1249,7 +1246,7 @@ export const salesAPI = {
           clearTimeout(costsTimeout);
         }
       }
-      
+
       // Return the complete sale with items using direct fetch
       console.log('🔄 Fetching complete sale data...');
       const completeSaleController = new AbortController();
@@ -1280,19 +1277,19 @@ export const salesAPI = {
 
       const completeSaleData = await completeSaleResponse.json();
       const completeSale = completeSaleData[0];
-      
+
       // Log response data for debugging
       console.log('Sale creation response data:', JSON.stringify(completeSale, null, 2));
-      
+
       return completeSale;
     } catch (error) {
       // Log error for debugging
       console.error('Sale creation error:', error);
-      
+
       if (error.name === 'AbortError') {
         throw new Error('Sale creation timed out. Please check your internet connection.');
       }
-      
+
       // Re-throw other errors with better formatting
       throw error;
     }
@@ -1302,10 +1299,10 @@ export const salesAPI = {
     try {
       // Log delete request for debugging
       console.log('🗑️ Deleting sale with ID:', id);
-      
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // 1. Delete custom costs first (child table)
       console.log('1️⃣ Deleting sale_custom_costs...');
       const costsResponse = await fetch(
@@ -1319,7 +1316,7 @@ export const salesAPI = {
           }
         }
       );
-      
+
       if (!costsResponse.ok) {
         const errorText = await costsResponse.text();
         console.warn('Warning deleting sale_custom_costs:', errorText);
@@ -1327,7 +1324,7 @@ export const salesAPI = {
       } else {
         console.log('✅ sale_custom_costs deleted');
       }
-      
+
       // 2. Delete sale items (child table)
       console.log('2️⃣ Deleting sale_items...');
       const itemsResponse = await fetch(
@@ -1341,14 +1338,14 @@ export const salesAPI = {
           }
         }
       );
-      
+
       if (!itemsResponse.ok) {
         const errorText = await itemsResponse.text();
         console.error('Failed to delete sale_items:', errorText);
         throw new Error(`Failed to delete sale items: ${errorText}`);
       }
       console.log('✅ sale_items deleted');
-      
+
       // 3. Delete the sale itself (parent table)
       console.log('3️⃣ Deleting sale...');
       const saleResponse = await fetch(
@@ -1363,16 +1360,16 @@ export const salesAPI = {
           }
         }
       );
-      
+
       if (!saleResponse.ok) {
         const errorText = await saleResponse.text();
         console.error('Failed to delete sale:', errorText);
         throw new Error(`Failed to delete sale: ${errorText}`);
       }
-      
+
       const deletedData = await saleResponse.json();
       console.log('✅ Sale deleted successfully:', deletedData);
-      
+
       return deletedData[0] || { id };
     } catch (error) {
       // Log error for debugging
@@ -1386,10 +1383,10 @@ export const salesAPI = {
       console.log('💳 Updating payment status for sale ID:', id, 'to:', payment_status);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // Prepare update data
       const updateData = { payment_status };
-      
+
       // If marking as paid, update payment_amount and calculate change
       if (payment_status === 'paid' && payment_amount !== undefined) {
         // Get sale to calculate change
@@ -1404,21 +1401,21 @@ export const salesAPI = {
             }
           }
         );
-        
+
         if (!saleResponse.ok) {
           const errorText = await saleResponse.text();
           throw new Error(`Failed to get sale details: ${errorText}`);
         }
-        
+
         const saleData = await saleResponse.json();
         if (saleData.length === 0) {
           throw new Error('Sale not found');
         }
-        
+
         updateData.payment_amount = payment_amount;
         updateData.change_amount = payment_amount - saleData[0].total_amount;
       }
-      
+
       // Update sale
       const response = await fetch(
         `${supabaseUrl}/rest/v1/sales?id=eq.${id}`,
@@ -1433,12 +1430,12 @@ export const salesAPI = {
           body: JSON.stringify(updateData)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to update payment status: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Payment status updated:', data[0]);
       return data[0];
@@ -1486,13 +1483,13 @@ export const usersAPI = {
       throw error;
     }
   },
-  
+
   getById: async (id, token) => {
     try {
       console.log('👤 Getting user by ID:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // CRITICAL: Add API key to URL parameter
       const urlParams = new URLSearchParams({
         'apikey': supabaseAnonKey,
@@ -1500,7 +1497,7 @@ export const usersAPI = {
         'select': '*'
       });
       const urlWithApiKey = `${supabaseUrl}/rest/v1/users?${urlParams.toString()}`;
-      
+
       const response = await fetch(urlWithApiKey, {
         method: 'GET',
         headers: {
@@ -1509,88 +1506,88 @@ export const usersAPI = {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get user: ${errorText}`);
       }
-      
+
       const data = await response.json();
       if (data.length === 0) {
         throw new Error('User not found');
       }
-      
+
       return data[0];
     } catch (error) {
       console.error('User getById error:', error);
       throw error;
     }
   },
-  
+
   create: async (newUserData, token) => {
     try {
       const { invokeFn } = await import('./invokeFn');
-      
+
       // Call the auth-register Edge Function to create user in both auth.users and public.users
       const data = await invokeFn('auth-register', {
-          name: newUserData.name,
-          email: newUserData.email,
-          password: newUserData.password,
-          role: newUserData.role || 'cashier',
-          tenant_id: newUserData.tenant_id,
-          permissions: newUserData.permissions
+        name: newUserData.name,
+        email: newUserData.email,
+        password: newUserData.password,
+        role: newUserData.role || 'cashier',
+        tenant_id: newUserData.tenant_id,
+        permissions: newUserData.permissions
       }, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
-      
+
       if (data.error) {
         throw new Error(data.error);
       }
-      
+
       return data.user;
     } catch (error) {
       // Re-throw errors
       throw error;
     }
   },
-  
+
   update: async (id, updateData, token) => {
     try {
       const { invokeFn } = await import('./invokeFn');
-      
+
       // Call the users-update Edge Function which handles both public.users and auth.users updates
       const data = await invokeFn(`users-update?id=${id}`, updateData, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
-      
+
       if (data.error) {
         throw new Error(data.error);
       }
-      
+
       return data;
     } catch (error) {
       // Re-throw errors
       throw error;
     }
   },
-  
+
   delete: async (id, token) => {
     try {
       console.log('🗑️ Deleting user:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // CRITICAL: Add API key to URL parameter
       const urlParams = new URLSearchParams({
         'apikey': supabaseAnonKey,
         'id': `eq.${id}`
       });
       const urlWithApiKey = `${supabaseUrl}/rest/v1/users?${urlParams.toString()}`;
-      
+
       const response = await fetch(urlWithApiKey, {
         method: 'DELETE',
         headers: {
@@ -1600,12 +1597,12 @@ export const usersAPI = {
           'Prefer': 'return=representation'
         }
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to delete user: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ User deleted:', data[0]);
       return data[0];
@@ -1653,13 +1650,13 @@ export const categoriesAPI = {
       throw error;
     }
   },
-  
+
   getById: async (id, token) => {
     try {
       console.log('📜 Getting category:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/categories?id=eq.${id}&select=*`,
         {
@@ -1671,12 +1668,12 @@ export const categoriesAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get category: ${errorText}`);
       }
-      
+
       const data = await response.json();
       return data[0];
     } catch (error) {
@@ -1684,18 +1681,18 @@ export const categoriesAPI = {
       throw error;
     }
   },
-  
+
   create: async (categoryData, token) => {
     try {
       console.log('📜 Creating category...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const categoryWithId = {
         ...categoryData,
         id: crypto.randomUUID()
       };
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/categories`,
         {
@@ -1709,13 +1706,13 @@ export const categoriesAPI = {
           body: JSON.stringify(categoryWithId)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Category creation failed:', response.status, errorText);
         throw new Error(`Failed to create category: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Category created:', data[0]);
       return data[0];
@@ -1724,13 +1721,13 @@ export const categoriesAPI = {
       throw error;
     }
   },
-  
+
   update: async (id, categoryData, token) => {
     try {
       console.log('✏️ Updating category:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/categories?id=eq.${id}`,
         {
@@ -1744,13 +1741,13 @@ export const categoriesAPI = {
           body: JSON.stringify(categoryData)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Category update failed:', response.status, errorText);
         throw new Error(`Failed to update category: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Category updated:', data[0]);
       return data[0];
@@ -1759,13 +1756,13 @@ export const categoriesAPI = {
       throw error;
     }
   },
-  
+
   delete: async (id, token) => {
     try {
       console.log('🗑️ Deleting category:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/categories?id=eq.${id}`,
         {
@@ -1778,13 +1775,13 @@ export const categoriesAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Category deletion failed:', response.status, errorText);
         throw new Error(`Failed to delete category: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Category deleted:', data[0]);
       return data[0];
@@ -1798,47 +1795,47 @@ export const categoriesAPI = {
 // Suppliers API
 export const suppliersAPI = {
   getAll: async (token) => {
-      try {
-        console.log('Fetching suppliers with direct fetch...');
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
-        // Use direct REST API call to bypass potential supabase-js client state issues
-        const response = await fetch(
-          `${supabaseUrl}/rest/v1/suppliers?select=*`,
-          {
-            method: 'GET',
-            headers: {
-              'apikey': supabaseAnonKey,
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            }
+    try {
+      console.log('Fetching suppliers with direct fetch...');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      // Use direct REST API call to bypass potential supabase-js client state issues
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/suppliers?select=*`,
+        {
+          method: 'GET',
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
           }
-        );
-  
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Suppliers fetch failed:', response.status, errorText);
-          throw new Error(`Failed to fetch suppliers: ${response.statusText}`);
         }
-  
-        const rawData = await response.json();
-        console.log(`Suppliers fetched: ${rawData.length} items`);
-  
-        return rawData || [];
-      } catch (error) {
-        console.error('Suppliers API Error:', error);
-        throw error;
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Suppliers fetch failed:', response.status, errorText);
+        throw new Error(`Failed to fetch suppliers: ${response.statusText}`);
       }
-    },
-  
+
+      const rawData = await response.json();
+      console.log(`Suppliers fetched: ${rawData.length} items`);
+
+      return rawData || [];
+    } catch (error) {
+      console.error('Suppliers API Error:', error);
+      throw error;
+    }
+  },
+
   getById: async (id, token) => {
     try {
       console.log('📦 Getting supplier:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/suppliers?id=eq.${id}&select=*`,
         {
@@ -1850,12 +1847,12 @@ export const suppliersAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get supplier: ${errorText}`);
       }
-      
+
       const data = await response.json();
       return data[0];
     } catch (error) {
@@ -1863,18 +1860,18 @@ export const suppliersAPI = {
       throw error;
     }
   },
-  
+
   create: async (supplierData, token) => {
     try {
       console.log('📦 Creating supplier...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const supplierWithId = {
         ...supplierData,
         id: crypto.randomUUID()
       };
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/suppliers`,
         {
@@ -1888,13 +1885,13 @@ export const suppliersAPI = {
           body: JSON.stringify(supplierWithId)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Supplier creation failed:', response.status, errorText);
         throw new Error(`Failed to create supplier: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Supplier created:', data[0]);
       return data[0];
@@ -1903,13 +1900,13 @@ export const suppliersAPI = {
       throw error;
     }
   },
-  
+
   update: async (id, supplierData, token) => {
     try {
       console.log('✏️ Updating supplier:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/suppliers?id=eq.${id}`,
         {
@@ -1923,13 +1920,13 @@ export const suppliersAPI = {
           body: JSON.stringify(supplierData)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Supplier update failed:', response.status, errorText);
         throw new Error(`Failed to update supplier: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Supplier updated:', data[0]);
       return data[0];
@@ -1938,13 +1935,13 @@ export const suppliersAPI = {
       throw error;
     }
   },
-  
+
   delete: async (id, token) => {
     try {
       console.log('🗑️ Deleting supplier:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/suppliers?id=eq.${id}`,
         {
@@ -1957,13 +1954,13 @@ export const suppliersAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Supplier deletion failed:', response.status, errorText);
         throw new Error(`Failed to delete supplier: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Supplier deleted:', data[0]);
       return data[0];
@@ -1977,47 +1974,47 @@ export const suppliersAPI = {
 // Customers API
 export const customersAPI = {
   getAll: async (token) => {
-      try {
-        console.log('Fetching customers with direct fetch...');
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
-        // Use direct REST API call to bypass potential supabase-js client state issues
-        const response = await fetch(
-          `${supabaseUrl}/rest/v1/customers?select=*`,
-          {
-            method: 'GET',
-            headers: {
-              'apikey': supabaseAnonKey,
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            }
+    try {
+      console.log('Fetching customers with direct fetch...');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      // Use direct REST API call to bypass potential supabase-js client state issues
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/customers?select=*`,
+        {
+          method: 'GET',
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
           }
-        );
-  
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Customers fetch failed:', response.status, errorText);
-          throw new Error(`Failed to fetch customers: ${response.statusText}`);
         }
-  
-        const rawData = await response.json();
-        console.log(`Customers fetched: ${rawData.length} items`);
-  
-        return rawData || [];
-      } catch (error) {
-        console.error('Customers API Error:', error);
-        throw error;
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Customers fetch failed:', response.status, errorText);
+        throw new Error(`Failed to fetch customers: ${response.statusText}`);
       }
-    },
-  
+
+      const rawData = await response.json();
+      console.log(`Customers fetched: ${rawData.length} items`);
+
+      return rawData || [];
+    } catch (error) {
+      console.error('Customers API Error:', error);
+      throw error;
+    }
+  },
+
   getById: async (id, token) => {
     try {
       console.log('👤 Getting customer by ID:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/customers?id=eq.${id}&select=*`,
         {
@@ -2029,37 +2026,37 @@ export const customersAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get customer: ${errorText}`);
       }
-      
+
       const data = await response.json();
       if (data.length === 0) {
         throw new Error('Customer not found');
       }
-      
+
       return data[0];
     } catch (error) {
       console.error('Customer getById error:', error);
       throw error;
     }
   },
-  
+
   create: async (customerData, token) => {
     try {
       console.log('👤 Creating customer...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // Generate UUID for the customer
       const customerWithId = {
         ...customerData,
         id: crypto.randomUUID()
       };
       // Note: user_id will be auto-populated by database trigger
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/customers`,
         {
@@ -2073,13 +2070,13 @@ export const customersAPI = {
           body: JSON.stringify(customerWithId)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Customer creation failed:', response.status, errorText);
         throw new Error(`Failed to create customer: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Customer created:', data[0]);
       return data[0];
@@ -2088,13 +2085,13 @@ export const customersAPI = {
       throw error;
     }
   },
-  
+
   update: async (id, customerData, token) => {
     try {
       console.log('✏️ Updating customer:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/customers?id=eq.${id}`,
         {
@@ -2108,13 +2105,13 @@ export const customersAPI = {
           body: JSON.stringify(customerData)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Customer update failed:', response.status, errorText);
         throw new Error(`Failed to update customer: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Customer updated:', data[0]);
       return data[0];
@@ -2123,13 +2120,13 @@ export const customersAPI = {
       throw error;
     }
   },
-  
+
   delete: async (id, token) => {
     try {
       console.log('🗑️ Deleting customer:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/customers?id=eq.${id}`,
         {
@@ -2142,13 +2139,13 @@ export const customersAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Customer deletion failed:', response.status, errorText);
         throw new Error(`Failed to delete customer: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Customer deleted:', data[0]);
       return data[0];
@@ -2206,7 +2203,7 @@ export const settingsAPI = {
       console.log('⚙️ Getting setting:', key);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const userFilter = userId ? `user_id=eq.${encodeURIComponent(userId)}&` : '';
 
       const response = await fetch(
@@ -2220,12 +2217,12 @@ export const settingsAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get setting: ${errorText}`);
       }
-      
+
       const data = await response.json();
       return data[0] || null;
     } catch (error) {
@@ -2233,14 +2230,14 @@ export const settingsAPI = {
       throw error;
     }
   },
-  
+
   // Optional userId: when provided, scope update to that user's row.
   update: async (key, value, token, userId) => {
     try {
       console.log('⚙️ Updating setting:', key);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // First try to get existing setting
       const userFilter = userId ? `user_id=eq.${encodeURIComponent(userId)}&` : '';
 
@@ -2255,9 +2252,9 @@ export const settingsAPI = {
           }
         }
       );
-      
+
       const existing = await existingResponse.json();
-      
+
       if (existing && existing.length > 0) {
         // Update existing setting
         const response = await fetch(
@@ -2276,12 +2273,12 @@ export const settingsAPI = {
             })
           }
         );
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`Failed to update setting: ${errorText}`);
         }
-        
+
         const data = await response.json();
         console.log('✅ Setting updated:', data[0]);
         return data[0];
@@ -2306,12 +2303,12 @@ export const settingsAPI = {
             })
           }
         );
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`Failed to create setting: ${errorText}`);
         }
-        
+
         const data = await response.json();
         console.log('✅ Setting created:', data[0]);
         return data[0];
@@ -2330,7 +2327,7 @@ export const productHPPBreakdownAPI = {
       console.log('📊 Getting HPP breakdown for product:', productId);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/product_hpp_breakdown?product_id=eq.${productId}&select=*&order=created_at`,
         {
@@ -2342,12 +2339,12 @@ export const productHPPBreakdownAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get HPP breakdown: ${errorText}`);
       }
-      
+
       const data = await response.json();
       return data || [];
     } catch (error) {
@@ -2355,13 +2352,13 @@ export const productHPPBreakdownAPI = {
       throw error;
     }
   },
-  
+
   save: async (productId, breakdownItems, token) => {
     try {
       console.log('💾 Saving HPP breakdown for product:', productId);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // Delete existing breakdown items for this product
       const deleteResponse = await fetch(
         `${supabaseUrl}/rest/v1/product_hpp_breakdown?product_id=eq.${productId}`,
@@ -2374,12 +2371,12 @@ export const productHPPBreakdownAPI = {
           }
         }
       );
-      
+
       if (!deleteResponse.ok) {
         const errorText = await deleteResponse.text();
         throw new Error(`Failed to delete old breakdown: ${errorText}`);
       }
-      
+
       // Insert new breakdown items (only if there are items)
       if (breakdownItems && breakdownItems.length > 0) {
         const itemsToInsert = breakdownItems
@@ -2390,7 +2387,7 @@ export const productHPPBreakdownAPI = {
             label: item.label,
             amount: parseFloat(item.amount) || 0
           }));
-        
+
         if (itemsToInsert.length > 0) {
           const response = await fetch(
             `${supabaseUrl}/rest/v1/product_hpp_breakdown`,
@@ -2405,31 +2402,31 @@ export const productHPPBreakdownAPI = {
               body: JSON.stringify(itemsToInsert)
             }
           );
-          
+
           if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to save HPP breakdown: ${errorText}`);
           }
-          
+
           const data = await response.json();
           console.log('✅ HPP breakdown saved:', data.length, 'items');
           return data;
         }
       }
-      
+
       return [];
     } catch (error) {
       console.error('HPP Breakdown API save error:', error);
       throw error;
     }
   },
-  
+
   delete: async (productId, token) => {
     try {
       console.log('🗑️ Deleting HPP breakdown for product:', productId);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/product_hpp_breakdown?product_id=eq.${productId}`,
         {
@@ -2441,12 +2438,12 @@ export const productHPPBreakdownAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to delete HPP breakdown: ${errorText}`);
       }
-      
+
       console.log('✅ HPP breakdown deleted');
       return true;
     } catch (error) {
@@ -2492,13 +2489,13 @@ export const rawMaterialsAPI = {
       throw error;
     }
   },
-  
+
   getById: async (id, token) => {
     try {
       console.log('🧪 Getting raw material:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/raw_materials?id=eq.${id}&select=*`,
         {
@@ -2510,12 +2507,12 @@ export const rawMaterialsAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get raw material: ${errorText}`);
       }
-      
+
       const data = await response.json();
       return data[0];
     } catch (error) {
@@ -2523,18 +2520,18 @@ export const rawMaterialsAPI = {
       throw error;
     }
   },
-  
+
   create: async (materialData, token) => {
     try {
       console.log('🧪 Creating raw material...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const materialWithId = {
         ...materialData,
         id: crypto.randomUUID()
       };
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/raw_materials`,
         {
@@ -2548,13 +2545,13 @@ export const rawMaterialsAPI = {
           body: JSON.stringify(materialWithId)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Raw material creation failed:', response.status, errorText);
         throw new Error(`Failed to create raw material: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Raw material created:', data[0]);
       return data[0];
@@ -2563,18 +2560,18 @@ export const rawMaterialsAPI = {
       throw error;
     }
   },
-  
+
   update: async (id, materialData, token) => {
     try {
       console.log('✏️ Updating raw material:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const updateData = {
         ...materialData,
         updated_at: new Date().toISOString()
       };
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/raw_materials?id=eq.${id}`,
         {
@@ -2588,13 +2585,13 @@ export const rawMaterialsAPI = {
           body: JSON.stringify(updateData)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Raw material update failed:', response.status, errorText);
         throw new Error(`Failed to update raw material: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Raw material updated:', data[0]);
       return data[0];
@@ -2603,13 +2600,13 @@ export const rawMaterialsAPI = {
       throw error;
     }
   },
-  
+
   delete: async (id, token) => {
     try {
       console.log('🗑️ Deleting raw material:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/raw_materials?id=eq.${id}`,
         {
@@ -2622,7 +2619,7 @@ export const rawMaterialsAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         // Check if it's a foreign key constraint error
@@ -2632,7 +2629,7 @@ export const rawMaterialsAPI = {
         console.error('Raw material deletion failed:', response.status, errorText);
         throw new Error(`Failed to delete raw material: ${errorText}`);
       }
-      
+
       console.log('✅ Raw material deleted');
       return true;
     } catch (error) {
@@ -2640,13 +2637,13 @@ export const rawMaterialsAPI = {
       throw error;
     }
   },
-  
+
   deductStock: async (id, quantity, token) => {
     try {
       console.log('📩 Deducting stock for raw material:', id, 'quantity:', quantity);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // Get current stock
       const getResponse = await fetch(
         `${supabaseUrl}/rest/v1/raw_materials?id=eq.${id}&select=stock`,
@@ -2659,18 +2656,18 @@ export const rawMaterialsAPI = {
           }
         }
       );
-      
+
       if (!getResponse.ok) {
         throw new Error('Failed to get raw material stock');
       }
-      
+
       const materials = await getResponse.json();
       if (!materials || materials.length === 0) {
         throw new Error('Raw material not found');
       }
-      
+
       const newStock = parseFloat(materials[0].stock) - parseFloat(quantity);
-      
+
       // Update stock
       const updateResponse = await fetch(
         `${supabaseUrl}/rest/v1/raw_materials?id=eq.${id}`,
@@ -2688,11 +2685,11 @@ export const rawMaterialsAPI = {
           })
         }
       );
-      
+
       if (!updateResponse.ok) {
         throw new Error('Failed to deduct stock');
       }
-      
+
       const data = await updateResponse.json();
       console.log('✅ Stock deducted:', data[0]);
       return data[0];
@@ -2710,7 +2707,7 @@ export const productRecipesAPI = {
       console.log('🍽️ Getting recipes for product:', productId);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/product_recipes?product_id=eq.${productId}&select=*,raw_materials:raw_material_id(id,name,unit,price_per_unit,stock)&order=created_at`,
         {
@@ -2722,12 +2719,12 @@ export const productRecipesAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get recipes: ${errorText}`);
       }
-      
+
       const data = await response.json();
       return data || [];
     } catch (error) {
@@ -2735,13 +2732,13 @@ export const productRecipesAPI = {
       throw error;
     }
   },
-  
+
   save: async (productId, recipes, token) => {
     try {
       console.log('💾 Saving recipes for product:', productId);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // Delete existing recipes
       const deleteResponse = await fetch(
         `${supabaseUrl}/rest/v1/product_recipes?product_id=eq.${productId}`,
@@ -2754,12 +2751,12 @@ export const productRecipesAPI = {
           }
         }
       );
-      
+
       if (!deleteResponse.ok) {
         const errorText = await deleteResponse.text();
         throw new Error(`Failed to delete old recipes: ${errorText}`);
       }
-      
+
       // Insert new recipes (only if there are items)
       if (recipes && recipes.length > 0) {
         const recipesToInsert = recipes
@@ -2770,7 +2767,7 @@ export const productRecipesAPI = {
             raw_material_id: recipe.raw_material_id,
             quantity: parseFloat(recipe.quantity)
           }));
-        
+
         if (recipesToInsert.length > 0) {
           const response = await fetch(
             `${supabaseUrl}/rest/v1/product_recipes`,
@@ -2785,36 +2782,36 @@ export const productRecipesAPI = {
               body: JSON.stringify(recipesToInsert)
             }
           );
-          
+
           if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to save recipes: ${errorText}`);
           }
-          
+
           const data = await response.json();
           console.log('✅ Recipes saved:', data.length, 'items');
           return data;
         }
       }
-      
+
       return [];
     } catch (error) {
       console.error('Product Recipes API save error:', error);
       throw error;
     }
   },
-  
+
   calculateCost: async (productId, token) => {
     try {
       // Get recipes with raw material data
       const recipes = await productRecipesAPI.getByProduct(productId, token);
-      
+
       // Calculate total cost
       const totalCost = recipes.reduce((sum, recipe) => {
         const cost = parseFloat(recipe.quantity) * parseFloat(recipe.raw_materials?.price_per_unit || 0);
         return sum + cost;
       }, 0);
-      
+
       return totalCost;
     } catch (error) {
       console.error('Product Recipes API calculateCost error:', error);
@@ -2830,10 +2827,10 @@ export const globalHPPAPI = {
       console.log('📈 Getting global HPP for:', year, month);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // Format month as YYYY-MM-01
       const monthDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/global_hpp?month=eq.${monthDate}&select=*&order=created_at.desc`,
         {
@@ -2845,12 +2842,12 @@ export const globalHPPAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to get global HPP: ${errorText}`);
       }
-      
+
       const data = await response.json();
       return data || [];
     } catch (error) {
@@ -2858,13 +2855,13 @@ export const globalHPPAPI = {
       throw error;
     }
   },
-  
+
   upsert: async (hppData, token) => {
     try {
       console.log('💾 Saving global HPP...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // Check if record exists
       const existingResponse = await fetch(
         `${supabaseUrl}/rest/v1/global_hpp?label=eq.${encodeURIComponent(hppData.label)}&month=eq.${hppData.month}&select=id`,
@@ -2877,9 +2874,9 @@ export const globalHPPAPI = {
           }
         }
       );
-      
+
       const existing = await existingResponse.json();
-      
+
       if (existing && existing.length > 0) {
         // Update existing
         const response = await fetch(
@@ -2898,12 +2895,12 @@ export const globalHPPAPI = {
             })
           }
         );
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`Failed to update global HPP: ${errorText}`);
         }
-        
+
         const data = await response.json();
         console.log('✅ Global HPP updated:', data[0]);
         return data[0];
@@ -2926,12 +2923,12 @@ export const globalHPPAPI = {
             })
           }
         );
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`Failed to create global HPP: ${errorText}`);
         }
-        
+
         const data = await response.json();
         console.log('✅ Global HPP created:', data[0]);
         return data[0];
@@ -2941,13 +2938,13 @@ export const globalHPPAPI = {
       throw error;
     }
   },
-  
+
   delete: async (id, token) => {
     try {
       console.log('🗑️ Deleting global HPP:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/global_hpp?id=eq.${id}`,
         {
@@ -2959,12 +2956,12 @@ export const globalHPPAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to delete global HPP: ${errorText}`);
       }
-      
+
       console.log('✅ Global HPP deleted');
       return true;
     } catch (error) {
@@ -2972,19 +2969,19 @@ export const globalHPPAPI = {
       throw error;
     }
   },
-  
+
   getDailyRate: async (year, month, token) => {
     try {
       const hppItems = await globalHPPAPI.getByMonth(year, month, token);
-      
+
       // Calculate total monthly amount
       const totalMonthly = hppItems.reduce((sum, item) => {
         return sum + parseFloat(item.monthly_amount || 0);
       }, 0);
-      
+
       // Divide by 30 days
       const dailyRate = totalMonthly / 30;
-      
+
       return { totalMonthly, dailyRate };
     } catch (error) {
       console.error('Global HPP API getDailyRate error:', error);
@@ -3001,7 +2998,7 @@ export const returnsAPI = {
       console.log('🔄 Creating return...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // Get user data
       const userData = await authAPI.getUserData(null, token);
 
@@ -3014,7 +3011,7 @@ export const returnsAPI = {
         reason: returnData.reason || '',
         total_amount: returnData.total_amount
       };
-      
+
       const returnResponse = await fetch(
         `${supabaseUrl}/rest/v1/returns`,
         {
@@ -3028,12 +3025,12 @@ export const returnsAPI = {
           body: JSON.stringify(returnPayload)
         }
       );
-      
+
       if (!returnResponse.ok) {
         const errorText = await returnResponse.text();
         throw new Error(`Failed to create return: ${errorText}`);
       }
-      
+
       const returnRecordArray = await returnResponse.json();
       const returnRecord = returnRecordArray[0];
 
@@ -3126,7 +3123,7 @@ export const returnsAPI = {
       console.log('🔄 Fetching returns...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/returns?select=*,sales(total_amount,customer_id,customers(name)),return_items(*,products(name))&order=created_at.desc`,
         {
@@ -3138,12 +3135,12 @@ export const returnsAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to fetch returns: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log(`✅ Returns fetched: ${data.length} items`);
       return data || [];
@@ -3159,7 +3156,7 @@ export const returnsAPI = {
       console.log('🔄 Fetching returns by sale ID:', saleId);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/returns?sale_id=eq.${saleId}&select=*,return_items(*,products(name))`,
         {
@@ -3171,12 +3168,12 @@ export const returnsAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to fetch returns: ${errorText}`);
       }
-      
+
       const data = await response.json();
       return data || [];
     } catch (error) {
@@ -3193,7 +3190,7 @@ export const expensesAPI = {
       console.log('💸 Fetching expenses...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/expenses?apikey=${supabaseAnonKey}&select=*,category:expense_categories(id,name)&order=date.desc`,
         {
@@ -3205,12 +3202,12 @@ export const expensesAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to fetch expenses: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log(`✅ Expenses fetched: ${data.length} items`);
       return data;
@@ -3219,18 +3216,18 @@ export const expensesAPI = {
       throw error;
     }
   },
-  
+
   async create(expenseData, token) {
     try {
       console.log('💸 Creating expense...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const expenseWithId = {
         ...expenseData,
         id: crypto.randomUUID()
       };
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/expenses?apikey=${supabaseAnonKey}`,
         {
@@ -3244,13 +3241,13 @@ export const expensesAPI = {
           body: JSON.stringify(expenseWithId)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Expense creation failed:', response.status, errorText);
         throw new Error(`Failed to create expense: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Expense created:', data[0]);
       return data[0];
@@ -3259,13 +3256,13 @@ export const expensesAPI = {
       throw error;
     }
   },
-  
+
   async update(id, expenseData, token) {
     try {
       console.log('✏️ Updating expense:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/expenses?id=eq.${id}&apikey=${supabaseAnonKey}`,
         {
@@ -3279,13 +3276,13 @@ export const expensesAPI = {
           body: JSON.stringify(expenseData)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Expense update failed:', response.status, errorText);
         throw new Error(`Failed to update expense: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Expense updated:', data[0]);
       return data[0];
@@ -3294,13 +3291,13 @@ export const expensesAPI = {
       throw error;
     }
   },
-  
+
   async delete(id, token) {
     try {
       console.log('🗑️ Deleting expense:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/expenses?id=eq.${id}&apikey=${supabaseAnonKey}`,
         {
@@ -3312,13 +3309,13 @@ export const expensesAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Expense deletion failed:', response.status, errorText);
         throw new Error(`Failed to delete expense: ${errorText}`);
       }
-      
+
       console.log('✅ Expense deleted');
     } catch (error) {
       console.error('Expenses API delete error:', error);
@@ -3334,7 +3331,7 @@ export const expenseCategoriesAPI = {
       console.log('📁 Fetching expense categories...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/expense_categories?select=*&order=name`,
         {
@@ -3346,12 +3343,12 @@ export const expenseCategoriesAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to fetch expense categories: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log(`✅ Expense categories fetched: ${data.length} items`);
       return data;
@@ -3360,18 +3357,18 @@ export const expenseCategoriesAPI = {
       throw error;
     }
   },
-  
+
   async create(categoryData, token) {
     try {
       console.log('📁 Creating expense category...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const categoryWithId = {
         ...categoryData,
         id: crypto.randomUUID()
       };
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/expense_categories`,
         {
@@ -3385,13 +3382,13 @@ export const expenseCategoriesAPI = {
           body: JSON.stringify(categoryWithId)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Expense category creation failed:', response.status, errorText);
         throw new Error(`Failed to create expense category: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Expense category created:', data[0]);
       return data[0];
@@ -3400,13 +3397,13 @@ export const expenseCategoriesAPI = {
       throw error;
     }
   },
-  
+
   async delete(id, token) {
     try {
       console.log('🗑️ Deleting expense category:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/expense_categories?id=eq.${id}`,
         {
@@ -3418,13 +3415,13 @@ export const expenseCategoriesAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Expense category deletion failed:', response.status, errorText);
         throw new Error(`Failed to delete expense category: ${errorText}`);
       }
-      
+
       console.log('✅ Expense category deleted');
     } catch (error) {
       console.error('Expense Categories API delete error:', error);
@@ -3440,7 +3437,7 @@ export const attendanceMachinesAPI = {
       console.log('🧑‍💼 Fetching attendance machines...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/attendance_machines?select=*&order=created_at.desc`,
         {
@@ -3452,7 +3449,7 @@ export const attendanceMachinesAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         // Check if table doesn't exist
@@ -3462,7 +3459,7 @@ export const attendanceMachinesAPI = {
         }
         throw new Error(`Failed to get attendance machines: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log(`✅ Attendance machines fetched: ${data.length} items`);
       return data || [];
@@ -3471,18 +3468,18 @@ export const attendanceMachinesAPI = {
       throw error;
     }
   },
-  
+
   create: async (machineData, token) => {
     try {
       console.log('➕ Creating attendance machine...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const machineWithId = {
         ...machineData,
         id: crypto.randomUUID()
       };
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/attendance_machines`,
         {
@@ -3496,13 +3493,13 @@ export const attendanceMachinesAPI = {
           body: JSON.stringify(machineWithId)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Attendance machine creation failed:', response.status, errorText);
         throw new Error(`Failed to create attendance machine: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Attendance machine created:', data[0]);
       return data[0];
@@ -3511,13 +3508,13 @@ export const attendanceMachinesAPI = {
       throw error;
     }
   },
-  
+
   update: async (id, machineData, token) => {
     try {
       console.log('✏️ Updating attendance machine:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/attendance_machines?id=eq.${id}`,
         {
@@ -3531,13 +3528,13 @@ export const attendanceMachinesAPI = {
           body: JSON.stringify(machineData)
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Attendance machine update failed:', response.status, errorText);
         throw new Error(`Failed to update attendance machine: ${errorText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Attendance machine updated:', data[0]);
       return data[0];
@@ -3546,13 +3543,13 @@ export const attendanceMachinesAPI = {
       throw error;
     }
   },
-  
+
   delete: async (id, token) => {
     try {
       console.log('🗑️ Deleting attendance machine:', id);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       const response = await fetch(
         `${supabaseUrl}/rest/v1/attendance_machines?id=eq.${id}`,
         {
@@ -3564,13 +3561,13 @@ export const attendanceMachinesAPI = {
           }
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Attendance machine deletion failed:', response.status, errorText);
         throw new Error(`Failed to delete attendance machine: ${errorText}`);
       }
-      
+
       console.log('✅ Attendance machine deleted');
       return true;
     } catch (error) {
@@ -3587,7 +3584,7 @@ export const profitSharesAPI = {
       console.log('💰 Tracking profit shares...');
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       // 1. Resolve Employee ID
       const employeeResponse = await fetch(
         `${supabaseUrl}/rest/v1/employees?user_id=eq.${authUser.id}&select=id`,
@@ -3600,20 +3597,20 @@ export const profitSharesAPI = {
           }
         }
       );
-      
+
       if (!employeeResponse.ok) {
         console.error('Error fetching employee record');
         return;
       }
-      
+
       const employeeData = await employeeResponse.json();
       if (!employeeData || employeeData.length === 0) {
         console.log('No employee record found for user');
         return;
       }
-      
+
       const currentEmployeeId = employeeData[0].id;
-      
+
       // 2. Check Attendance
       const today = new Date().toISOString().split('T')[0];
       const attendanceResponse = await fetch(
@@ -3627,23 +3624,23 @@ export const profitSharesAPI = {
           }
         }
       );
-      
+
       if (!attendanceResponse.ok) {
         console.error('Error fetching attendance');
         return;
       }
-      
+
       const attendanceData = await attendanceResponse.json();
       const attendance = attendanceData[0] || null;
-      
+
       // Only apply profit share if present (or late/half_day)
       const isPresent = attendance && ['present', 'late', 'half_day'].includes(attendance.status);
-      
+
       if (!isPresent) {
         console.log('Employee absent or no attendance record - skipping profit share');
         return;
       }
-      
+
       // 3. Fetch all shares for this employee
       const sharesResponse = await fetch(
         `${supabaseUrl}/rest/v1/employee_product_shares?employee_id=eq.${currentEmployeeId}&select=product_id,share_type,share_value`,
@@ -3656,22 +3653,22 @@ export const profitSharesAPI = {
           }
         }
       );
-      
+
       if (!sharesResponse.ok) {
         console.error('Error fetching employee shares');
         return;
       }
-      
+
       const employeeShares = await sharesResponse.json();
-      
+
       // 4. Process each cart item
       for (const item of cart) {
         const specificShare = employeeShares?.find(s => s.product_id === item.id);
         const globalShare = employeeShares?.find(s => s.product_id === null);
         const employeeShare = specificShare || globalShare;
-        
+
         let shareConfig = null;
-        
+
         if (employeeShare) {
           shareConfig = {
             enabled: true,
@@ -3685,17 +3682,17 @@ export const profitSharesAPI = {
             value: item.profit_share_value
           };
         }
-        
+
         // Calculate and save profit share if configured
         if (shareConfig && shareConfig.enabled) {
           let shareAmount = 0;
-          
+
           if (shareConfig.type === 'percentage') {
             shareAmount = (item.price * item.quantity * shareConfig.value) / 100;
           } else if (shareConfig.type === 'fixed') {
             shareAmount = shareConfig.value * item.quantity;
           }
-          
+
           // Save profit share to database
           if (shareAmount > 0) {
             await fetch(
@@ -3738,7 +3735,7 @@ export const storeSettingsAPI = {
       let actualGeneralSettings = generalSettings || {};
       let actualUserId = userId;
       let actualToken = token;
-      
+
       // Check if this is the old calling pattern (settingsObject, token)
       if (typeof receiptSettings === 'string' && !generalSettings && !userId && !token) {
         // Old pattern: save(settingsObject, token)
@@ -3747,7 +3744,7 @@ export const storeSettingsAPI = {
         actualReceiptSettings = {};
         actualGeneralSettings = storeSettings?.general || {};
         actualUserId = null;
-        
+
         // Extract receipt settings from the object if present
         if (storeSettings?.receipt_58mm) {
           actualReceiptSettings = { ...actualReceiptSettings, receipt_58mm: storeSettings.receipt_58mm };
@@ -3777,10 +3774,10 @@ export const storeSettingsAPI = {
           actualReceiptSettings = { ...actualReceiptSettings, receipt80mmDesign: storeSettings.receipt80mmDesign };
         }
       }
-      
+
       // Use provided userId or try to get from token
       let ownerId = actualUserId;
-      
+
       if (!ownerId && actualToken) {
         try {
           // Try to get user ID from token if not provided
@@ -3792,7 +3789,7 @@ export const storeSettingsAPI = {
           console.warn('Could not get user from token, using provided userId or fallback');
         }
       }
-      
+
       // Fallback: try without token (might work if session is active)
       if (!ownerId) {
         try {
@@ -3805,16 +3802,16 @@ export const storeSettingsAPI = {
           throw new Error('User ID is required to save store settings');
         }
       }
-      
+
       if (!ownerId) {
         throw new Error('User ID is required to save store settings');
       }
-      
+
       // Save to localStorage for quick access
       if (actualStoreSettings && Object.keys(actualStoreSettings).length > 0) {
         localStorage.setItem(`idcashier_store_settings_${ownerId}`, JSON.stringify(actualStoreSettings));
       }
-      
+
       if (actualReceiptSettings && Object.keys(actualReceiptSettings).length > 0) {
         // Save each receipt setting type separately
         Object.keys(actualReceiptSettings).forEach(key => {
@@ -3825,27 +3822,27 @@ export const storeSettingsAPI = {
           }
         });
       }
-      
+
       if (actualGeneralSettings && Object.keys(actualGeneralSettings).length > 0) {
         localStorage.setItem(`idcashier_general_settings_${ownerId}`, JSON.stringify(actualGeneralSettings));
       }
-      
+
       // Also save to database (app_settings table) for persistence across sessions/devices
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       try {
         // Build list of settings to upsert
         const settingsToUpsert = [];
-        
+
         if (actualStoreSettings && Object.keys(actualStoreSettings).length > 0) {
           settingsToUpsert.push({ user_id: ownerId, setting_key: 'store', setting_value: actualStoreSettings });
         }
-        
+
         if (actualGeneralSettings && Object.keys(actualGeneralSettings).length > 0) {
           settingsToUpsert.push({ user_id: ownerId, setting_key: 'general', setting_value: actualGeneralSettings });
         }
-        
+
         // Add individual receipt settings
         if (actualReceiptSettings) {
           Object.keys(actualReceiptSettings).forEach(key => {
@@ -3854,7 +3851,7 @@ export const storeSettingsAPI = {
             }
           });
         }
-        
+
         // Upsert each setting individually
         for (const setting of settingsToUpsert) {
           // First try to update existing
@@ -3871,7 +3868,7 @@ export const storeSettingsAPI = {
               body: JSON.stringify({ setting_value: setting.setting_value })
             }
           );
-          
+
           // If no rows updated, insert new
           if (updateResponse.status === 200 || updateResponse.status === 204) {
             // Check if any rows were updated by trying a GET
@@ -3886,7 +3883,7 @@ export const storeSettingsAPI = {
                 }
               }
             );
-            
+
             if (checkResponse.ok) {
               const existingData = await checkResponse.json();
               if (!existingData || existingData.length === 0) {
@@ -3908,23 +3905,23 @@ export const storeSettingsAPI = {
             }
           }
         }
-        
+
         console.log('[storeSettingsAPI] Settings saved to database');
       } catch (dbError) {
         console.warn('[storeSettingsAPI] Could not save to database, settings saved to localStorage only:', dbError);
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('Store settings save error:', error);
       throw error;
     }
   },
-  
+
   load: async (token) => {
     try {
       let ownerId = null;
-      
+
       if (token) {
         try {
           const { data: { user }, error } = await supabase.auth.getUser(token);
@@ -3935,7 +3932,7 @@ export const storeSettingsAPI = {
           console.warn('Could not get user from token');
         }
       }
-      
+
       if (!ownerId) {
         try {
           const { data: { user } } = await supabase.auth.getUser();
@@ -3951,7 +3948,7 @@ export const storeSettingsAPI = {
           };
         }
       }
-      
+
       if (!ownerId) {
         return {
           storeSettings: {},
@@ -3959,14 +3956,14 @@ export const storeSettingsAPI = {
           generalSettings: {}
         };
       }
-      
+
       // First try to load from database (app_settings table)
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       let dbSettings = {};
       let loadedFromDb = false;
-      
+
       try {
         const response = await fetch(
           `${supabaseUrl}/rest/v1/app_settings?user_id=eq.${ownerId}&select=setting_key,setting_value`,
@@ -3979,7 +3976,7 @@ export const storeSettingsAPI = {
             }
           }
         );
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data && data.length > 0) {
@@ -3994,7 +3991,7 @@ export const storeSettingsAPI = {
       } catch (dbError) {
         console.warn('[storeSettingsAPI] Could not load from database, falling back to localStorage:', dbError);
       }
-      
+
       // If loaded from database, also sync to localStorage for faster access
       if (loadedFromDb) {
         if (dbSettings.store) {
@@ -4024,7 +4021,7 @@ export const storeSettingsAPI = {
         if (dbSettings.deliveryNoteDesign) {
           localStorage.setItem(`idcashier_delivery_note_design_${ownerId}`, JSON.stringify(dbSettings.deliveryNoteDesign));
         }
-        
+
         return {
           store: dbSettings.store || {},
           storeSettings: dbSettings.store || {},
@@ -4039,12 +4036,12 @@ export const storeSettingsAPI = {
           deliveryNoteDesign: dbSettings.deliveryNoteDesign || null
         };
       }
-      
+
       // Fallback to localStorage if database load failed or returned no data
       const storeSettingsRaw = localStorage.getItem(`idcashier_store_settings_${ownerId}`);
       const receiptSettingsRaw = localStorage.getItem(`idcashier_receipt_settings_${ownerId}`);
       const generalSettingsRaw = localStorage.getItem(`idcashier_general_settings_${ownerId}`);
-      
+
       // Parse store settings
       let storeSettingsParsed = {};
       if (storeSettingsRaw) {
@@ -4054,7 +4051,7 @@ export const storeSettingsAPI = {
           console.error('Error parsing store settings:', e);
         }
       }
-      
+
       // Parse receipt settings
       let receiptSettingsParsed = {};
       if (receiptSettingsRaw) {
@@ -4064,7 +4061,7 @@ export const storeSettingsAPI = {
           console.error('Error parsing receipt settings:', e);
         }
       }
-      
+
       // Parse general settings
       let generalSettingsParsed = {};
       if (generalSettingsRaw) {
@@ -4074,14 +4071,14 @@ export const storeSettingsAPI = {
           console.error('Error parsing general settings:', e);
         }
       }
-      
+
       // Load individual receipt type settings
       const receipt58mm = localStorage.getItem(`idcashier_receipt_58mm_settings_${ownerId}`);
       const receipt80mm = localStorage.getItem(`idcashier_receipt_80mm_settings_${ownerId}`);
       const receiptA4 = localStorage.getItem(`idcashier_receipt_A4_settings_${ownerId}`);
       const receiptDeliveryNote = localStorage.getItem(`idcashier_receipt_delivery_note_settings_${ownerId}`);
       const enabledReceiptTypes = localStorage.getItem(`idcashier_enabled_receipt_types_${ownerId}`);
-      
+
       return {
         // Return store settings in the format expected by SettingsPage
         store: storeSettingsParsed,

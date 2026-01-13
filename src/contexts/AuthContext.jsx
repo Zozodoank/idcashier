@@ -22,16 +22,16 @@ export const AuthProvider = ({ children }) => {
   const parseTokenWithTimezone = (token) => {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      
+
       // Convert exp to proper UTC timestamp and handle timezone
       const expiryTime = payload.exp * 1000; // Convert to milliseconds
       const currentTime = Date.now();
       const utcOffset = new Date().getTimezoneOffset() * 60 * 1000; // Convert to milliseconds
-      
+
       // Adjust for timezone difference
       const adjustedCurrentTime = currentTime + utcOffset;
       const timeUntilExpiry = expiryTime - adjustedCurrentTime;
-      
+
       return {
         ...payload,
         expiryTime,
@@ -47,23 +47,23 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Initialize auth state from localStorage
-  useEffect(() => { 
+  useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
       try {
         console.log('🚀 Initializing auth...');
         console.time('AuthInit');
-        
+
         // Check localStorage first for quick initialization
         const storedToken = localStorage.getItem('idcashier_token');
-        
+
         // 1. Get session from Supabase with timeout
         const getSessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((resolve) => 
-          setTimeout(() => resolve({ 
-            data: { session: null, error: null, timedOut: true }, 
-            error: null 
+        const timeoutPromise = new Promise((resolve) =>
+          setTimeout(() => resolve({
+            data: { session: null, error: null, timedOut: true },
+            error: null
           }), 5000)
         );
 
@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }) => {
         if (sessionResult.data?.session) {
           console.log('✅ Session found from Supabase client');
           const session = sessionResult.data.session;
-          
+
           if (mounted) {
             setToken(session.access_token);
             localStorage.setItem('idcashier_token', session.access_token);
@@ -106,7 +106,7 @@ export const AuthProvider = ({ children }) => {
           await fetchUserProfileFast(session.access_token, mounted, setUser, session.user);
         } else if (storedToken) {
           console.log('ℹ️ No active session found, using stored token');
-          
+
           // Validate stored token
           const parsedStoredToken = parseTokenWithTimezone(storedToken);
           if (parsedStoredToken?.isExpired) {
@@ -124,7 +124,7 @@ export const AuthProvider = ({ children }) => {
       } catch (err) {
         console.error('Auth initialization error:', err);
         setConnectionError('Failed to initialize authentication');
-      } finally { 
+      } finally {
         if (mounted) setLoading(false);
         console.timeEnd('AuthInit');
       }
@@ -132,24 +132,24 @@ export const AuthProvider = ({ children }) => {
 
     initializeAuth();
 
-    return () => { 
+    return () => {
       mounted = false;
     };
   }, []);
 
   // Enhanced auth state change listener with better handling
-  useEffect(() => { 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {  
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, !!session);
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session && session.access_token) {
           // Parse new token
           const parsedToken = parseTokenWithTimezone(session.access_token);
-          
+
           setToken(session.access_token);
           localStorage.setItem('idcashier_token', session.access_token);
-          
+
           if (session.refresh_token) {
             localStorage.setItem('idcashier_refresh_token', session.refresh_token);
           }
@@ -159,9 +159,11 @@ export const AuthProvider = ({ children }) => {
           } catch (err) {
             console.error("Error fetching user details on auth change:", err);
           }
-          
-          // After sign-in, check for a pending OAuth plan and handle payment
-          handleOAuthPaymentRedirect(session.access_token);
+
+
+          // Conflicting with AuthCallbackPage - disabling this to prevent race condition where 
+          // localStorage is cleared before AuthCallbackPage can read it.
+          // handleOAuthPaymentRedirect(session.access_token);
         }
       } else if (event === 'SIGNED_OUT') {
         // Only clear if not already cleared to avoid loops/redundant updates
@@ -183,44 +185,44 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
-    return () => {  
+    return () => {
       subscription.unsubscribe();
     };
   }, []);
 
   // Enhanced auto-refresh with better error handling and timezone awareness
-  useEffect(() => { 
+  useEffect(() => {
     if (!token) return;
 
     let isMounted = true;
     let refreshInterval = null;
 
-    const checkTokenExpiry = async () => { 
-      if (!isMounted || !token) return; 
+    const checkTokenExpiry = async () => {
+      if (!isMounted || !token) return;
 
       try {
         const parsedToken = parseTokenWithTimezone(token);
-        
+
         if (!parsedToken) {
           console.error('Failed to parse token for expiry check');
           return;
         }
 
         console.log(`Token expires in ${parsedToken.expiresInMinutes} minutes`);
-        
+
         // Refresh token if it expires in less than 10 minutes (increased from 5)
         if (parsedToken.timeUntilExpiry < 10 * 60 * 1000 && parsedToken.timeUntilExpiry > 0) {
           console.log('Token expires soon, refreshing...');
-          
+
           try {
             const { data, error } = await supabase.auth.refreshSession();
-            
+
             if (error) {
               console.error('Token refresh failed:', error);
-              
+
               // If refresh fails due to expired refresh token, logout user
-              if (error.message?.includes('refresh_token_not_found') || 
-                  error.message?.includes('expired')) {
+              if (error.message?.includes('refresh_token_not_found') ||
+                error.message?.includes('expired')) {
                 console.warn('Refresh token expired, logging out user');
                 if (isMounted) {
                   await logout();
@@ -231,7 +233,7 @@ export const AuthProvider = ({ children }) => {
               console.log('Token refreshed successfully');
               setToken(data.session.access_token);
               localStorage.setItem('idcashier_token', data.session.access_token);
-              
+
               if (data.session.refresh_token) {
                 localStorage.setItem('idcashier_refresh_token', data.session.refresh_token);
               }
@@ -241,10 +243,10 @@ export const AuthProvider = ({ children }) => {
           }
         } else if (parsedToken.isExpired) {
           console.warn('Token is already expired, attempting refresh');
-          
+
           try {
             const { data, error } = await supabase.auth.refreshSession();
-            
+
             if (error) {
               console.error('Expired token refresh failed:', error);
               if (isMounted) {
@@ -267,7 +269,7 @@ export const AuthProvider = ({ children }) => {
     checkTokenExpiry();
     refreshInterval = setInterval(checkTokenExpiry, 2 * 60 * 1000);
 
-    return () => {  
+    return () => {
       isMounted = false;
       if (refreshInterval) {
         clearInterval(refreshInterval);
@@ -279,18 +281,18 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password, isOAuth = false) => {
     try {
       console.log('🔐 AuthContext: Starting login process', { isOAuth });
-      
+
       // For OAuth users, we need to get the session from Supabase directly
       if (isOAuth) {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !session) {
           throw new Error(sessionError?.message || 'No session found');
         }
-        
+
         // Get user profile
         const token = session.access_token;
         const userProfile = await authAPI.getCurrentUser(token);
-        
+
         if (userProfile) {
           setToken(token);
           setUser(userProfile);
@@ -300,10 +302,10 @@ export const AuthProvider = ({ children }) => {
           throw new Error('User profile not found');
         }
       }
-      
-      const result = await authAPI.login(email, password);  
-      
-      console.log('📦 AuthContext: Login API result:', {  
+
+      const result = await authAPI.login(email, password);
+
+      console.log('📦 AuthContext: Login API result:', {
         hasToken: !!result.token,
         hasUser: !!result.user,
         hasError: !!result.error,
@@ -311,83 +313,83 @@ export const AuthProvider = ({ children }) => {
       });
 
       // Check for subscription expired error
-      if (result.error && result.subscriptionExpired) {     
-        console.warn('⚠️ Subscription expired');        
-        return {    
+      if (result.error && result.subscriptionExpired) {
+        console.warn('⚠️ Subscription expired');
+        return {
           success: false,
           error: result.error,
-          subscriptionExpired: true     
+          subscriptionExpired: true
         };
       }
 
       if (result.token && result.user) {
         console.log('✅ Login successful, setting user and token');
-        
+
         // Validate token before setting
         const parsedToken = parseTokenWithTimezone(result.token);
         if (!parsedToken) {
           throw new Error('Invalid token received from server');
         }
-        
+
         setToken(result.token);
-        
+
         // Ensure tenantId is properly set
-        const userWithTenantId = {      
+        const userWithTenantId = {
           ...result.user,
           tenantId: result.user.tenant_id || result.user.tenantId,
           tokenExpiry: parsedToken.expiryTime,
           expiresInMinutes: parsedToken.expiresInMinutes
         };
-        
-        setUser(userWithTenantId);      
+
+        setUser(userWithTenantId);
         localStorage.setItem('idcashier_token', result.token);
-        
-        if (result.refreshToken) {      
+
+        if (result.refreshToken) {
           localStorage.setItem('idcashier_refresh_token', result.refreshToken);
         }
-        
+
         // Clean up current page to ensure user starts on dashboard
-        localStorage.removeItem('idcashier_current_page');  
-        
-        console.log('✅ AuthContext: Login complete, returning success');      
-        return { success: true, user: userWithTenantId };   
-      } else {      
+        localStorage.removeItem('idcashier_current_page');
+
+        console.log('✅ AuthContext: Login complete, returning success');
+        return { success: true, user: userWithTenantId };
+      } else {
         console.error('❌ Invalid response from server:', result);
-        throw new Error('Invalid response from server');    
+        throw new Error('Invalid response from server');
       }
     } catch (error) {
       console.error("❌ Login failed:", error);
 
       // Enhanced error handling with network awareness
-      if (error instanceof TypeError && error.message.includes('fetch')) {      
+      if (error instanceof TypeError && error.message.includes('fetch')) {
         console.log("Login error source: Network connectivity issue");
         setConnectionError('Network connection failed. Please check your connection.');
       } else if (error.message?.includes('Invalid token')) {
         console.log("Login error source: Invalid token from server");
         setConnectionError('Authentication token invalid. Please try again.');
-      } else {      
+      } else {
         console.log("Login error source: Server response or client-side validation");
         setConnectionError(null); // Clear connection error for server-side errors
       }
 
       // Ensure error message is useful
       let errorMessage = 'Login failed. Please try again.';
-      
+
       if (error && typeof error.message === 'string' && error.message.trim() !== '') {
         errorMessage = error.message;
       } else if (error && typeof error === 'string') {
         errorMessage = error;
       }
 
-      return { success: false, error: errorMessage, connectionError: connectionError };       
+      return { success: false, error: errorMessage, connectionError: connectionError };
     }
   };
 
   // Enhanced logout with cleanup
   const logout = useCallback(async () => {
     try {
-      console.log('Logging out...');  
-      
+      console.log('Logging out...');
+
       setToken(null);
       setUser(null);
       localStorage.removeItem('idcashier_token');
@@ -411,7 +413,7 @@ export const AuthProvider = ({ children }) => {
   const fetchUserProfileFast = async (token, mounted, setUserFn, authUser = null) => {
     try {
       console.log('🔍 DEBUG: Starting fetchUserProfileFast');
-      
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -452,7 +454,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       console.log('🔍 DEBUG: Making fetch request to Supabase...');
-      
+
       // CRITICAL: Add API key to URL parameter to ensure it's always present
       const urlParams = new URLSearchParams({
         'apikey': supabaseAnonKey, // API key MUST be in URL
@@ -460,9 +462,9 @@ export const AuthProvider = ({ children }) => {
         'select': 'id,name,email,role,tenant_id,permissions,created_at'
       });
       const urlWithApiKey = `${supabaseUrl}/rest/v1/users?${urlParams.toString()}`;
-      
+
       console.log('🔑 API key in URL:', supabaseAnonKey ? 'YES' : 'NO');
-      
+
       const response = await fetch(urlWithApiKey, {
         method: 'GET',
         headers: {
@@ -480,7 +482,7 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         const data = await response.json();
         console.log('🔍 DEBUG: User data received:', data);
-        
+
         if (data && data.length > 0 && mounted) {
           const userData = data[0];
           const userWithTenantId = {
@@ -509,11 +511,11 @@ export const AuthProvider = ({ children }) => {
       // Use direct REST API call to ensure API key is always included
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
+
       if (!supabaseUrl || !supabaseAnonKey) {
         throw new Error('Supabase configuration missing');
       }
-      
+
       // CRITICAL: Add API key to URL parameter
       const urlParams = new URLSearchParams({
         'apikey': supabaseAnonKey, // API key MUST be in URL
@@ -521,9 +523,9 @@ export const AuthProvider = ({ children }) => {
         'select': 'id,name,email,role,tenant_id,permissions,created_at'
       });
       const urlWithApiKey = `${supabaseUrl}/rest/v1/users?${urlParams.toString()}`;
-      
+
       console.log('🔍 Fetching user profile via direct API (fetchUserProfile)...');
-      
+
       const response = await fetch(urlWithApiKey, {
         method: 'GET',
         headers: {
@@ -532,23 +534,23 @@ export const AuthProvider = ({ children }) => {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to fetch user profile: ${response.status} ${errorText}`);
       }
-      
+
       const userArray = await response.json();
       let userData;
-      
+
       if (!Array.isArray(userArray) || userArray.length === 0) {
         throw new Error('User not found in database');
       }
-      
+
       userData = userArray[0];
 
       if (userData) {
-        const userWithTenantId = {    
+        const userWithTenantId = {
           ...userData,
           email_confirmed_at: authUser.email_confirmed_at,
           user_metadata: authUser.user_metadata,
@@ -638,7 +640,7 @@ export const AuthProvider = ({ children }) => {
       try {
         console.log('🔍 AuthContext: Verifying email:', email);
         const result = await authAPI.verifyEmail(email, token);
-        
+
         if (result.success) {
           console.log('✅ Email verification successful');
           // After successful verification, refresh user data
@@ -653,7 +655,7 @@ export const AuthProvider = ({ children }) => {
             }
           }
         }
-        
+
         return result;
       } catch (error) {
         console.error('❌ AuthContext: Email verification failed:', error);
