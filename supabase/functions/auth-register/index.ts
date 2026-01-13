@@ -464,7 +464,7 @@ Deno.serve(async (req) => {
         status: 201
       }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Auth register error:', error)
     return new Response(
       JSON.stringify({
