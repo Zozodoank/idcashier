@@ -83,9 +83,19 @@ Deno.serve(async (req) => {
     // Ensure paymentAmount is integer
     const amountInt = parseInt(String(paymentAmount));
 
-    // Default to "VC" (Credit Card) - matches idcashiertest working config
-    // Frontend should send specific code for best UX
-    const methodToSend = (!paymentMethod || paymentMethod === 'ALL') ? "VC" : paymentMethod;
+    // Fallback chain based on Duitku documentation:
+    // Priority: VC (Credit Card) → BC (BCA VA) → M2 (Mandiri VA) → I1 (BNI VA)
+    // These are the most commonly enabled channels for production accounts
+    // Frontend should ideally call /duitku-get-payment-methods first and send specific code
+    let methodToSend = paymentMethod;
+
+    if (!methodToSend || methodToSend === 'ALL') {
+      // Default to M2 (Mandiri VA) - confirmed active in merchant account
+      // Active channels: M2, BR, I1, A1, B1, DM, BT, S1, AG, OV, FT, NQ
+      methodToSend = "M2";
+      console.log(`⚠️ No payment method specified, defaulting to M2 (Mandiri VA)`);
+    }
+
     console.log(`Payment Method: Original=${paymentMethod}, ToSend=${methodToSend}`);
 
     // Append register=1 to returnUrl if isRegistration is true
