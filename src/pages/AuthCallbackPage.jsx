@@ -226,16 +226,30 @@ const AuthCallbackPage = () => {
             console.warn('Failed to set Supabase session:', e);
           }
 
-          // Try to get user profile
+          // Try to get user profile with STRICT TIMEOUT
+          // We fail fast here: if getting profile takes > 3s, assume user is new
           let userProfile = null;
           let profileFetchError = null;
           try {
-            console.log('🔍 Fetching user profile...');
-            userProfile = await authAPI.getCurrentUser(token);
+            console.log('🔍 Fetching user profile (with 3s timeout)...');
+
+            // Create a promise that rejects after 3 seconds
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Profile fetch timeout')), 3000)
+            );
+
+            // Race between fetch and timeout
+            userProfile = await Promise.race([
+              authAPI.getCurrentUser(token),
+              timeoutPromise
+            ]);
+
             console.log('✅ Existing user profile found:', userProfile.id);
           } catch (e) {
             profileFetchError = e;
-            console.log('ℹ️ User profile not found (new user or error):', e.message);
+            console.log('ℹ️ User profile check skipped/failed:', e.message);
+            // If timeout or not found, we assume new user and proceed to registration
+            userProfile = null;
           }
 
           // If profile found, proceed to login
