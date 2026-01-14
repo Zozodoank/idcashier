@@ -107,8 +107,11 @@ const createDuitkuPayment = async (
 ): Promise<DuitkuResponse> => {
   try {
     // Resolve Duitku configuration from environment (sandbox or production)
+    // @ts-ignore: Deno is available at runtime
     const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
+    // @ts-ignore: Deno is available at runtime
     const DUITKU_MERCHANT_CODE = Deno.env.get('DUITKU_MERCHANT_CODE') || '';
+    // @ts-ignore: Deno is available at runtime
     const DUITKU_MERCHANT_KEY = Deno.env.get('DUITKU_API_KEY')?.trim() || Deno.env.get('DUITKU_MERCHANT_KEY')?.trim() || '';
 
     // Derive base URL from environment
@@ -132,7 +135,9 @@ const createDuitkuPayment = async (
       return { success: false, errorMessage: 'Duitku configuration missing' };
     }
 
+    // @ts-ignore: Deno is available at runtime
     const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://idcashier.com';
+    // @ts-ignore: Deno is available at runtime
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 
     const duitkuRequestData: any = {
@@ -184,6 +189,7 @@ const createDuitkuPayment = async (
 };
 
 // Main handler
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin') || '';
   const corsHeaders = getCorsHeaders(origin);
@@ -203,7 +209,7 @@ Deno.serve(async (req) => {
           const text = await req.text();
           if (text) body = JSON.parse(text);
         }
-      } catch (parseError) {
+      } catch (parseError: any) {
         console.warn('Failed to parse JSON body:', parseError);
         body = {};
       }

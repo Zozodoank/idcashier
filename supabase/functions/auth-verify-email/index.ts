@@ -1,6 +1,7 @@
 /// <reference path="../deno-stubs.d.ts" />
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -20,7 +21,7 @@ Deno.serve(async (req) => {
     if (!email || !token) {
       return new Response(
         JSON.stringify({ error: 'Email and token are required' }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400
         }
@@ -30,8 +31,11 @@ Deno.serve(async (req) => {
     console.log(`Verifying email: ${email}`);
 
     // Get environment variables
+    // @ts-ignore: Deno is available at runtime
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    // @ts-ignore: Deno is available at runtime
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // @ts-ignore: Deno is available at runtime
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
     if (!supabaseUrl || !supabaseServiceKey) {
@@ -61,13 +65,13 @@ Deno.serve(async (req) => {
 
       if (verifyResponse.ok && verifyData.user) {
         console.log('Email verified successfully via Auth API');
-        
+
         return new Response(
-          JSON.stringify({ 
-            success: true, 
+          JSON.stringify({
+            success: true,
             message: 'Email verified successfully'
           }),
-          { 
+          {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200
           }
@@ -93,7 +97,7 @@ Deno.serve(async (req) => {
       }
 
       const usersData = await listUsersResponse.json();
-      const user = usersData.users?.find(u => u.email === email);
+      const user = usersData.users?.find((u: any) => u.email === email);
 
       if (!user) {
         return new Response(
@@ -123,11 +127,11 @@ Deno.serve(async (req) => {
       console.log('Email confirmed manually via Admin API');
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           message: 'Email verified successfully'
         }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200
         }
@@ -139,22 +143,22 @@ Deno.serve(async (req) => {
 
     // If all methods fail
     return new Response(
-      JSON.stringify({ 
-        error: 'Verification failed. The link may be expired or invalid. Please request a new verification email.' 
+      JSON.stringify({
+        error: 'Verification failed. The link may be expired or invalid. Please request a new verification email.'
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400
       }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Email verification error:', error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error.message || 'Internal server error'
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }

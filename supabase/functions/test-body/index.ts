@@ -4,6 +4,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 console.log("Function 'test-body' is initializing.");
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   console.log(`[test-body] Received request: ${req.method}`);
 
@@ -54,7 +55,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("[test-body] Error processing request:", error.message);
     const rawBody = await req.text().catch(() => "Could not read raw body text.");
     console.error("[test-body] Raw body content on error:", rawBody);

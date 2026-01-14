@@ -126,7 +126,7 @@ Deno.serve(async (req: Request) => {
       is_active: isActive,
       has_subscription: true
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Get subscription error:', error);
     // Return proper error instead of default subscription
     return createErrorResponse('Internal server error', 500);

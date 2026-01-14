@@ -22,6 +22,7 @@ function jsonResponse(body: Json, status = 200) {
 }
 
 // This function resets demo tenant data and seeds minimal sample records
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
 	// Handle preflight request
 	if (req.method === 'OPTIONS') {
@@ -32,6 +33,7 @@ Deno.serve(async (req) => {
 		// Validate secret parameter for cronjob authentication
 		const url = new URL(req.url)
 		const secret = url.searchParams.get('secret')
+		// @ts-ignore: Deno is available at runtime
 		const expectedSecret = Deno.env.get('CRONJOB_SECRET') || ''
 		// Optional dry-run support: if enabled, the function will not perform deletions
 		const dryRun = url.searchParams.get('dry_run') === '1' || url.searchParams.get('mode') === 'dry-run'
@@ -45,6 +47,7 @@ Deno.serve(async (req) => {
 
 		// Demo owner email (can be overridden via secret)
 		// Force using the correct email address
+		// @ts-ignore: Deno is available at runtime
 		const demoEmail = 'demo@idcashier.com' // Deno.env.get('DEMO_EMAIL') || 'demo@idcashier.com'
 
 		// Find demo owner user
@@ -245,7 +248,7 @@ Deno.serve(async (req) => {
 					console.error(`Error deleting user ${userId} from Auth:`, error.message)
 					// Continue with other deletions even if one fails
 				}
-			} catch (err) {
+			} catch (err: any) {
 				console.error(`Exception deleting user ${userId}:`, err)
 			}
 		}
@@ -275,7 +278,7 @@ Deno.serve(async (req) => {
 			}
 			try {
 				await supabase.auth.admin.deleteUser(userId)
-			} catch (err) {
+			} catch (err: any) {
 				console.error(`Error deleting cashier ${userId}:`, err)
 			}
 		}
@@ -444,6 +447,7 @@ Deno.serve(async (req) => {
 		}
 
 		// Optional: Seed employees and attendance only if explicitly enabled
+		// @ts-ignore: Deno is available at runtime
 		if (Deno.env.get('DEMO_SEED_EMPLOYEES') === 'true' && !dryRun) {
 			// Intentionally disabled by default
 		}
@@ -566,7 +570,7 @@ Deno.serve(async (req) => {
 		}
 		console.log('[demo-reset] completed', { dryRun, summary })
 		return jsonResponse({ success: true, message: dryRun ? 'Dry run completed (no changes applied)' : 'Demo data reset completed', email: demoEmail, dryRun, summary })
-	} catch (error) {
+	} catch (error: any) {
 		console.error('Demo reset error:', error)
 		return jsonResponse({ error: 'Internal server error' }, 500)
 	}

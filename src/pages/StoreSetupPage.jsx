@@ -62,31 +62,61 @@ const StoreSetupPage = () => {
 
     setLoading(true);
     try {
-      // Prepare store settings data
-      const storeSettings = {
-        name: formData.name,
-        businessOwnerName: formData.businessOwnerName,
-        address: formData.address,
-        phone: formData.phone,
-        bankAccount: formData.bankAccount,
-        logo: formData.logo,
-        npwp: formData.npwp
-      };
+      // Use the new store-setup Edge Function
+      const token = localStorage.getItem('idcashier_token');
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-setup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          storeName: formData.name,
+          storeAddress: formData.address,
+          storePhone: formData.phone,
+          storeDescription: `Owner: ${formData.businessOwnerName}`, // Map owner name to description or metadata
+          // Add other fields as needed by the Edge Function
+        })
+      });
 
-      // Save to database using storeSettingsAPI
-      await storeSettingsAPI.save(
-        storeSettings,
-        {}, // receipt settings - empty for now
-        {}, // general settings - empty for now
-        user.id,
-        token
-      );
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to setup store');
+      }
+
+      // Also save to settings table for backward compatibility if needed, 
+      // or rely on the Edge Function to do everything.
+      // For now, we trust the Edge Function did the heavy lifting.
+
+      // If we still want to save detailed settings that the Edge Function might miss:
+      try {
+        const storeSettings = {
+          name: formData.name,
+          businessOwnerName: formData.businessOwnerName,
+          address: formData.address,
+          phone: formData.phone,
+          bankAccount: formData.bankAccount,
+          logo: formData.logo,
+          npwp: formData.npwp
+        };
+        await storeSettingsAPI.save(
+          storeSettings,
+          {},
+          {},
+          user.id,
+          token
+        );
+      } catch (settingsError) {
+        console.warn('Secondary settings save failed:', settingsError);
+        // Don't block success if Edge Function worked
+      }
 
       toast({ title: t('success'), description: t('storeDataSaved') });
-      
-      // Redirect to settings page with toko tab after store setup
+
+      // Redirect to main dashboard
       setTimeout(() => {
-        navigate('/dashboard?page=settings&tab=toko');
+        window.location.href = '/dashboard';
       }, 1000);
     } catch (error) {
       console.error('Store setup error:', error);
@@ -149,7 +179,7 @@ const StoreSetupPage = () => {
                   <img src={formData.logo} alt={t('logo')} className="w-24 h-24 rounded-md border p-1 object-contain" />
                 ) : (
                   <div className="w-24 h-24 rounded-md border flex items-center justify-center bg-muted">
-                    <ImageIcon className="w-10 h-10 text-muted-foreground"/>
+                    <ImageIcon className="w-10 h-10 text-muted-foreground" />
                   </div>
                 )}
                 <div className="flex-1">

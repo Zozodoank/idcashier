@@ -1,6 +1,7 @@
 // Simple test function
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -29,7 +30,7 @@ Deno.serve(async (req) => {
         }
       }
     );
-  } catch (error) {
+  } catch (error: any) {
     return new Response(
       JSON.stringify({ error: error.message }),
       {

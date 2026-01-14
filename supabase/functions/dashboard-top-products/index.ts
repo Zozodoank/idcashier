@@ -4,6 +4,7 @@ import { corsHeaders, handleOptions, createResponse, createErrorResponse } from 
 import { createSupabaseForFunction, validateAuthHeader } from '../_shared/client.ts'
 import { createSupabaseClient, getUserIdFromToken, getTenantOwnerId } from '../_shared/auth.ts'
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -23,7 +24,7 @@ Deno.serve(async (req) => {
 
     // Extract token
     const token = authHeader.substring(7)
-    
+
     // Create Supabase client
     const supabase = createSupabaseForFunction(authHeader)
 
@@ -31,7 +32,7 @@ Deno.serve(async (req) => {
     let userId: string
     try {
       userId = await getUserIdFromToken(token);
-    } catch (error) {
+    } catch (error: any) {
       return createErrorResponse('Invalid or expired token', 401)
     }
 
@@ -39,7 +40,7 @@ Deno.serve(async (req) => {
     let ownerId: string
     try {
       ownerId = await getTenantOwnerId(supabase, userId)
-    } catch (error) {
+    } catch (error: any) {
       return createErrorResponse('Failed to resolve tenant', 401)
     }
 
@@ -48,11 +49,11 @@ Deno.serve(async (req) => {
       .from('users')
       .select('id')
       .or(`id.eq.${ownerId},tenant_id.eq.${ownerId}`)
-    
+
     if (tenantError) {
       throw tenantError
     }
-    
+
     // Check if tenantUsers is empty
     if (!tenantUsers || tenantUsers.length === 0) {
       return createResponse([])
@@ -60,7 +61,7 @@ Deno.serve(async (req) => {
 
     // Extract user IDs
     const userIds = tenantUsers.map(user => user.id)
-    
+
     // Check if userIds is empty
     if (!userIds || userIds.length === 0) {
       return createResponse([])
@@ -74,18 +75,18 @@ Deno.serve(async (req) => {
       `)
       .in('user_id', userIds)
       .order('created_at', { ascending: false })
-    
+
     const { data: salesData, error: salesError } = await salesQuery
-    
+
     if (salesError) {
       console.error('Top products error:', salesError)
       throw new Error('Failed to fetch top products')
     }
-    
+
     // Calculate top products based on quantity sold
-    const productSales = {}
-    salesData.forEach(sale => {
-      sale.sale_items.forEach(item => {
+    const productSales: Record<string, number> = {}
+    salesData.forEach((sale: any) => {
+      sale.sale_items.forEach((item: any) => {
         const productName = item.products?.name || 'Unknown Product'
         if (!productSales[productName]) {
           productSales[productName] = 0
@@ -93,15 +94,15 @@ Deno.serve(async (req) => {
         productSales[productName] += item.quantity
       })
     })
-    
+
     // Convert to array and sort
     const topProductsList = Object.entries(productSales)
-      .map(([name, sold]) => ({ name, sold }))
-      .sort((a, b) => b.sold - a.sold)
+      .map(([name, sold]) => ({ name, sold: sold as number }))
+      .sort((a: any, b: any) => b.sold - a.sold)
       .slice(0, 5)
-    
+
     return createResponse(topProductsList)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Top products error:', error)
     return createErrorResponse('Internal server error', 500)
   }

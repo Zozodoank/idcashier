@@ -237,12 +237,16 @@ Deno.serve(async (req: Request) => {
     }
 
     // 4) Konfigurasi Duitku dari ENV
+    // @ts-ignore: Deno is available at runtime
     const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
+    // @ts-ignore: Deno is available at runtime
     const DUITKU_MERCHANT_CODE = Deno.env.get('DUITKU_MERCHANT_CODE')?.trim() || '';
 
     // Pakai DUITKU_API_KEY (fallback ke DUITKU_MERCHANT_KEY untuk kompatibilitas lama)
     const DUITKU_API_KEY =
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('DUITKU_API_KEY')?.trim() ||
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('DUITKU_MERCHANT_KEY')?.trim() ||
       '';
 
@@ -256,9 +260,11 @@ Deno.serve(async (req: Request) => {
     const signature = generateSignature(signatureString);
 
     // 6) Payload ke Duitku
+    // @ts-ignore: Deno is available at runtime
     const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/duitku-callback`;
     // Use client-provided returnUrl if valid, otherwise fallback to env
     const clientReturnUrl = body?.returnUrl;
+    // @ts-ignore: Deno is available at runtime
     const defaultReturnUrl = `${Deno.env.get('FRONTEND_URL')}/payment-callback?renewal=1`;
 
     // Validate client URL (basic protection)

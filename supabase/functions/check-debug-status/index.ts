@@ -11,7 +11,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabase = createClient(
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_URL') || '',
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     );
 
@@ -45,7 +47,7 @@ Deno.serve(async (req: Request) => {
     }, null, 2), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (err) {
+  } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500

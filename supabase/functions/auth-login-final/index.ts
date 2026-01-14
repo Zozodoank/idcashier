@@ -4,6 +4,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from '@supabase/supabase-js'
 import { getCorsHeaders } from '../_shared/cors.ts'
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin') || '';
   const corsHeaders = getCorsHeaders(origin);
@@ -25,12 +26,16 @@ Deno.serve(async (req) => {
     const normalizedEmail = email.trim().toLowerCase()
 
     const supabaseAdmin = createClient(
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_URL')!,
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
     
     const supabaseAnon = createClient(
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_URL')!,
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_ANON_KEY')!
     )
 
@@ -70,7 +75,7 @@ Deno.serve(async (req) => {
               console.error('Error confirming whitelist user:', updateError);
             }
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error('Auto-confirm error:', e);
         }
       })();

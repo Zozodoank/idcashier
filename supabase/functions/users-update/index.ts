@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createSupabaseClient, getUserIdFromToken, getUserEmailFromToken } from '../_shared/auth.ts'
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -54,7 +55,9 @@ Deno.serve(async (req) => {
     if (password) {
       // Create Supabase client with service role for admin operations
       const supabaseAdmin = createClient(
+        // @ts-ignore: Deno is available at runtime
         Deno.env.get('SUPABASE_URL')!,
+        // @ts-ignore: Deno is available at runtime
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
       )
       
@@ -124,7 +127,7 @@ Deno.serve(async (req) => {
         status: 200
       }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Users-update error:', error)
     return new Response(
       JSON.stringify({ 

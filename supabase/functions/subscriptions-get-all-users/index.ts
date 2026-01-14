@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { createSupabaseClient, getUserIdFromToken } from '../_shared/auth.ts'
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Get origin from request headers for dynamic CORS
   const origin = req.headers.get('origin') || '';
@@ -104,7 +105,7 @@ Deno.serve(async (req) => {
         status: 200
       }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Get all users error:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),

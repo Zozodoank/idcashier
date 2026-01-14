@@ -4,6 +4,7 @@ import { corsHeaders, handleOptions, createResponse, createErrorResponse } from 
 import { createSupabaseForFunction, validateAuthHeader } from '../_shared/client.ts'
 import { createSupabaseClient, getUserIdFromToken, getTenantOwnerId } from '../_shared/auth.ts'
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -133,7 +134,7 @@ Deno.serve(async (req) => {
       totalSales: totalSales,
       growth: `${growth}%`
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Dashboard stats error:', error)
     return createErrorResponse('Internal server error', 500)
   }

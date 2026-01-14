@@ -12,6 +12,7 @@ export const corsHeaders = {
 import { createHash } from "node:crypto";
 import { createClient } from '@supabase/supabase-js';
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // This is needed if you're planning to invoke your function from a browser.
   if (req.method === 'OPTIONS') {
@@ -19,9 +20,13 @@ Deno.serve(async (req) => {
   }
 
   // Ambil kredensial dari environment variables (Secrets)
+  // @ts-ignore: Deno is available at runtime
   const merchantCode = Deno.env.get("DUITKU_MERCHANT_CODE") || "";
+  // @ts-ignore: Deno is available at runtime
   const apiKey = Deno.env.get("DUITKU_API_KEY")?.trim() || Deno.env.get("DUITKU_MERCHANT_KEY")?.trim() || "";
+  // @ts-ignore: Deno is available at runtime
   const callbackUrl = Deno.env.get("CALLBACK_URL") || "https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/duitku-callback";
+  // @ts-ignore: Deno is available at runtime
   const defaultReturnUrl = Deno.env.get("RETURN_URL") || "https://idcashier.com/payment-callback";
 
   try {
@@ -134,6 +139,7 @@ Deno.serve(async (req) => {
     console.log('Sending to Duitku:', JSON.stringify(duitkuPayload));
 
     // Duitku Endpoint Configuration
+    // @ts-ignore: Deno is available at runtime
     const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
     
     // Determine Base URL based on environment
@@ -163,11 +169,11 @@ Deno.serve(async (req) => {
       console.log('Raw Duitku Response Body:', text);
       try {
         data = JSON.parse(text);
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to parse Duitku response as JSON:', text);
         throw new Error('Invalid JSON response from Duitku');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error reading Duitku response:', err);
       throw err;
     }
@@ -181,7 +187,9 @@ Deno.serve(async (req) => {
 
     // Insert into payments table
     const supabase = createClient(
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_URL') || '',
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );

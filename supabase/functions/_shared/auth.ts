@@ -6,7 +6,9 @@ import { createClient } from '@supabase/supabase-js'
  */
 export function createSupabaseClient() {
   return createClient(
+    // @ts-ignore: Deno is available at runtime
     Deno.env.get('SUPABASE_URL')!,
+    // @ts-ignore: Deno is available at runtime
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 }
@@ -18,15 +20,15 @@ export function createSupabaseClient() {
 export async function getUserIdFromToken(token: string): Promise<string> {
   const supabase = createSupabaseClient()
   const { data: { user }, error } = await supabase.auth.getUser(token)
-  
+
   if (error) {
     throw new Error(`Token verification failed: ${error.message}`)
   }
-  
+
   if (!user) {
     throw new Error('Invalid or expired token')
   }
-  
+
   return user.id
 }
 
@@ -37,15 +39,15 @@ export async function getUserIdFromToken(token: string): Promise<string> {
 export async function getUserEmailFromToken(token: string): Promise<string> {
   const supabase = createSupabaseClient()
   const { data: { user }, error } = await supabase.auth.getUser(token)
-  
+
   if (error) {
     throw new Error(`Token verification failed: ${error.message}`)
   }
-  
+
   if (!user || !user.email) {
     throw new Error('Invalid or expired token')
   }
-  
+
   return user.email
 }
 
@@ -60,11 +62,11 @@ export async function getTenantOwnerId(supabase: any, userId: string): Promise<s
     .select('id, role, tenant_id')
     .eq('id', userId)
     .single()
-  
+
   if (error || !userData) {
     throw new Error('User not found')
   }
-  
+
   // If user is cashier, return their tenant_id (owner's ID)
   // If user is owner, return their own ID
   return userData.role === 'cashier' ? userData.tenant_id : userData.id
@@ -81,10 +83,10 @@ export async function validateUserPermission(supabase: any, userId: string, reso
     .eq('id', resourceId)
     .eq('user_id', userId)
     .single()
-  
+
   if (error || !data) {
     return false
   }
-  
+
   return true
 }

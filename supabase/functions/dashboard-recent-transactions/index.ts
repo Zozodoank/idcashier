@@ -4,6 +4,7 @@ import { corsHeaders, handleOptions, createResponse, createErrorResponse } from 
 import { createSupabaseForFunction, validateAuthHeader } from '../_shared/client.ts'
 import { createSupabaseClient, getUserIdFromToken, getTenantOwnerId } from '../_shared/auth.ts'
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -31,7 +32,7 @@ Deno.serve(async (req) => {
     let userId: string
     try {
       userId = await getUserIdFromToken(token);
-    } catch (error) {
+    } catch (error: any) {
       return createErrorResponse('Invalid or expired token', 401)
     }
 
@@ -39,7 +40,7 @@ Deno.serve(async (req) => {
     let ownerId: string
     try {
       ownerId = await getTenantOwnerId(supabase, userId)
-    } catch (error) {
+    } catch (error: any) {
       return createErrorResponse('Failed to resolve tenant', 401)
     }
 
@@ -95,7 +96,7 @@ Deno.serve(async (req) => {
     }))
     
     return createResponse(formattedTransactions)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Recent transactions error:', error)
     return createErrorResponse('Internal server error', 500)
   }

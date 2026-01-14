@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createSupabaseClient, getUserIdFromToken } from '../_shared/auth.ts'
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
     const supabase = createSupabaseClient()
 
     // Get user ID from token
-    const userId = await getUserIdFromToken(token, supabase)
+    const userId = await getUserIdFromToken(token)
 
     // Get sale ID from URL
     const url = new URL(req.url)
@@ -106,7 +107,7 @@ Deno.serve(async (req) => {
         status: 200
       }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Sale deletion error:', error)
     return new Response(
       JSON.stringify({ 

@@ -1,14 +1,17 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from '@supabase/supabase-js';
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   const email = url.searchParams.get('email');
-  
+
   if (!email) return new Response('Email required', { status: 400 });
 
   const supabase = createClient(
+    // @ts-ignore: Deno is available at runtime
     Deno.env.get('SUPABASE_URL') || '',
+    // @ts-ignore: Deno is available at runtime
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
   );
 
@@ -35,27 +38,27 @@ Deno.serve(async (req: Request) => {
 
   let result;
   if (sub) {
-     // Update - Schema only has start_date, end_date, created_at, updated_at
-     result = await supabase.from('subscriptions').update({
-        end_date: endDate.toISOString(),
-        updated_at: new Date().toISOString()
-     }).eq('id', sub.id).select();
+    // Update - Schema only has start_date, end_date, created_at, updated_at
+    result = await supabase.from('subscriptions').update({
+      end_date: endDate.toISOString(),
+      updated_at: new Date().toISOString()
+    }).eq('id', sub.id).select();
   } else {
-     // Insert
-     result = await supabase.from('subscriptions').insert({
-        user_id: user.tenant_id || user.id,
-        start_date: new Date().toISOString(),
-        end_date: endDate.toISOString()
-     }).select();
+    // Insert
+    result = await supabase.from('subscriptions').insert({
+      user_id: user.tenant_id || user.id,
+      start_date: new Date().toISOString(),
+      end_date: endDate.toISOString()
+    }).select();
   }
-  
+
   // Also fix pending payments for this user to avoid confusion
   await supabase.from('payments')
     .update({ status: 'completed', result_message: 'Manual Fix' })
     .eq('user_id', user.id)
     .eq('status', 'pending');
 
-  return new Response(JSON.stringify({ success: true, action: sub ? 'updated' : 'inserted', data: result.data, error: result.error }), { 
-      headers: { 'Content-Type': 'application/json' } 
+  return new Response(JSON.stringify({ success: true, action: sub ? 'updated' : 'inserted', data: result.data, error: result.error }), {
+    headers: { 'Content-Type': 'application/json' }
   });
 });

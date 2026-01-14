@@ -3,6 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from '@supabase/supabase-js'
 import { getCorsHeaders } from '../_shared/cors.ts'
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Get origin from request headers for dynamic CORS
   const origin = req.headers.get('origin') || '';
@@ -33,7 +34,9 @@ Deno.serve(async (req) => {
 
     // Create Supabase client
     const supabase = createClient(
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_URL')!,
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
@@ -266,7 +269,7 @@ Deno.serve(async (req) => {
       }
     )
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error in auth-login function:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),

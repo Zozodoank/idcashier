@@ -107,12 +107,15 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
   try {
     // Resolve Duitku configuration from environment (sandbox or production)
     // Resolve Duitku configuration from environment (sandbox or production)
+    // @ts-ignore: Deno is available at runtime
     const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
 
     // Use the main credentials configured in Supabase Secrets for the active environment
     // Note: We've set DUITKU_MERCHANT_CODE and DUITKU_API_KEY to the correct values (e.g. Sandbox credentials)
     // in the Supabase Dashboard, so we don't need separate variables here.
+    // @ts-ignore: Deno is available at runtime
     const ACTIVE_MERCHANT = Deno.env.get('DUITKU_MERCHANT_CODE') || '';
+    // @ts-ignore: Deno is available at runtime
     const ACTIVE_API_KEY = Deno.env.get('DUITKU_API_KEY') || '';
 
     const PROD_BASE_URL = 'https://passport.duitku.com';
@@ -134,6 +137,7 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
       customerEmail: paymentData.customerEmail,
       customerPhone: paymentData.customerPhone,
       paymentMethod: paymentData.paymentMethod || 'ALL', // ALL = All payment methods
+      // @ts-ignore: Deno is available at runtime
       callbackUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/register-with-payment/callback`,
       returnUrl: 'https://idcashier.com/registration-success'
     };
@@ -189,57 +193,137 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
 // Database operations
 const createSupabaseClient = () => {
   return createClient(
+    // @ts-ignore: Deno is available at runtime
     Deno.env.get('SUPABASE_URL')!,
+    // @ts-ignore: Deno is available at runtime
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
 };
 
 const createUserAndPaymentRecord = async (
   userData: UserData,
-  paymentData: PaymentData
+  paymentData: PaymentData,
+  oauthProvider?: string,
+  oauthUserId?: string
 ): Promise<{ success: boolean; userId?: string; paymentId?: string; error?: string }> => {
   const supabase = createSupabaseClient();
 
   try {
-    // Start a transaction-like operation by creating user first
-    logger.info('Creating user account', { email: userData.email });
-
-    // Create Supabase Auth user
-    const { data: authData, error: createAuthError } = await supabase.auth.admin.createUser({
+    // Normalize email for consistency
+    const normalizedEmail = userData.email.trim().toLowerCase();
+    
+    // Check if this is an OAuth user
+    const isOAuthUser = !!oauthProvider && !!oauthUserId;
+    
+    logger.info('Creating user account', {
       email: userData.email,
-      password: userData.password,
-      email_confirm: true,
-      user_metadata: {
-        name: userData.name,
-        phone: userData.phone,
-        role: userData.role || 'owner'
-      }
+      isOAuthUser,
+      oauthProvider,
+      oauthUserId
     });
 
-    if (createAuthError) {
-      logger.error('Error creating auth user', createAuthError);
+    let userId: string | null = null;
+
+    // For OAuth users, check if user already exists in auth.users
+    if (isOAuthUser) {
+      try {
+        // Try to find existing OAuth user by ID
+        const { data: authUserData, error: idError } = await supabase.auth.admin.getUserById(oauthUserId);
+        
+        if (!idError && authUserData?.user) {
+          userId = authUserData.user.id;
+          logger.info('Found existing OAuth user', { userId });
+          
+          // Update user metadata for paid subscription
+          await supabase.auth.admin.updateUserById(userId, {
+            email_confirm: true,
+            user_metadata: {
+              name: userData.name,
+              phone: userData.phone,
+              role: userData.role || 'owner',
+              payment_completed: true,
+              is_trial_user: false,
+              oauth_provider: oauthProvider,
+              oauth_user_id: oauthUserId
+            }
+          });
+          logger.info('Updated OAuth user metadata for paid subscription');
+        } else {
+          logger.warn('OAuth user not found by ID, will create new user');
+        }
+      } catch (e: any) {
+        logger.error('Error checking OAuth user', e);
+      }
+    }
+
+    // Create new user if not found
+    if (!userId) {
+      const createUserParams: any = {
+        email: normalizedEmail,
+        email_confirm: true,
+        user_metadata: {
+          name: userData.name,
+          phone: userData.phone,
+          role: userData.role || 'owner',
+          payment_completed: true,
+          is_trial_user: false
+        }
+      };
+
+      // Only add password for non-OAuth users
+      if (!isOAuthUser) {
+        createUserParams.password = userData.password;
+      } else {
+        // For OAuth users, add OAuth metadata
+        createUserParams.user_metadata.oauth_provider = oauthProvider;
+        createUserParams.user_metadata.oauth_user_id = oauthUserId;
+      }
+
+      const { data: authData, error: createAuthError } = await supabase.auth.admin.createUser(createUserParams);
+
+      if (createAuthError) {
+        // If user exists, try to recover
+        if (createAuthError.message?.includes("already registered") || createAuthError.status === 422) {
+          logger.info('User exists, recovering ID');
+          const { data: listData } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+          const foundUser = listData?.users.find((u: any) => u.email?.toLowerCase() === normalizedEmail);
+          if (foundUser) {
+            userId = foundUser.id;
+            logger.info('Recovered user ID from existing user', { userId });
+          }
+        } else {
+          logger.error('Error creating auth user', createAuthError);
+          return {
+            success: false,
+            error: `Failed to create user account: ${createAuthError.message}`
+          };
+        }
+      } else if (authData?.user) {
+        userId = authData.user.id;
+        logger.info('Auth user created successfully', { userId });
+      }
+    }
+
+    if (!userId) {
       return {
         success: false,
-        error: `Failed to create user account: ${createAuthError.message}`
+        error: 'Failed to resolve user ID'
       };
     }
 
-    const userId = authData.user.id;
-    logger.info('Auth user created successfully', { userId });
-
-    // Create user in public.users table (without phone since it's not in the schema)
+    // Create user in public.users table
     const { data: newUser, error: insertError } = await supabase
       .from('users')
       .insert([
         {
           id: userId,
           name: userData.name,
-          email: userData.email,
+          email: normalizedEmail,
           role: userData.role || 'owner',
           tenant_id: userId // Self-reference for owner
         }
       ])
-      .select('id')
+      .select('id, name, email, role, tenant_id')
       .single();
 
     if (insertError) {
@@ -267,7 +351,7 @@ const createUserAndPaymentRecord = async (
         merchant_order_id: paymentData.merchantOrderId,
         product_details: paymentData.productDetails,
         customer_va_name: paymentData.customerVaName,
-        customer_email: paymentData.customerEmail,
+        customer_email: normalizedEmail,
         customer_phone: paymentData.customerPhone,
         payment_method: paymentData.paymentMethod || 'ALL',
         status: 'pending'
@@ -308,6 +392,7 @@ const createUserAndPaymentRecord = async (
 };
 
 // Main handler
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -317,7 +402,7 @@ Deno.serve(async (req) => {
   try {
     // Parse request body
     const requestBody = await req.json();
-    const { userData, paymentData } = requestBody;
+    const { userData, paymentData, oauthProvider, oauthUserId } = requestBody;
 
     // Validate input data
     if (!userData || !paymentData) {
@@ -333,20 +418,37 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate user data
-    const userValidationErrors = validateUserData(userData);
-    if (userValidationErrors.length > 0) {
+    // For OAuth users, we need oauthProvider and oauthUserId
+    const isOAuthUser = !!oauthProvider && !!oauthUserId;
+    if (isOAuthUser && (!oauthProvider || !oauthUserId)) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'User data validation failed',
-          details: userValidationErrors
+          error: 'OAuth registration requires both oauthProvider and oauthUserId'
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400
         }
       );
+    }
+
+    // Validate user data (skip password validation for OAuth users)
+    if (!isOAuthUser) {
+      const userValidationErrors = validateUserData(userData);
+      if (userValidationErrors.length > 0) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'User data validation failed',
+            details: userValidationErrors
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          }
+        );
+      }
     }
 
     // Validate payment data
@@ -365,8 +467,15 @@ Deno.serve(async (req) => {
       );
     }
 
+    logger.info('Processing registration with payment', {
+      email: userData.email,
+      isOAuthUser,
+      oauthProvider,
+      paymentAmount: paymentData.paymentAmount
+    });
+
     // Create user and payment records in database
-    const dbResult = await createUserAndPaymentRecord(userData, paymentData);
+    const dbResult = await createUserAndPaymentRecord(userData, paymentData, oauthProvider, oauthUserId);
 
     if (!dbResult.success) {
       return new Response(
@@ -425,7 +534,8 @@ Deno.serve(async (req) => {
         message: 'Registration initiated successfully. Please complete the payment to activate your account.',
         paymentUrl: paymentResult.paymentUrl,
         userId: dbResult.userId,
-        paymentId: dbResult.paymentId
+        paymentId: dbResult.paymentId,
+        isOAuthUser
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

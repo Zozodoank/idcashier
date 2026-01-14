@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { corsHeaders } from '../_shared/cors.ts';
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -10,7 +11,9 @@ Deno.serve(async (req) => {
     try {
         const { amount = 10000 } = await req.json();
 
+        // @ts-ignore: Deno is available at runtime
         const merchantCode = Deno.env.get("DUITKU_MERCHANT_CODE") || "";
+        // @ts-ignore: Deno is available at runtime
         const apiKey = Deno.env.get("DUITKU_API_KEY")?.trim() || "";
 
         if (!merchantCode || !apiKey) {
@@ -36,6 +39,7 @@ Deno.serve(async (req) => {
 
         console.log('Fetching payment methods from Duitku...');
 
+        // @ts-ignore: Deno is available at runtime
         const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
 
         // Determine Base URL

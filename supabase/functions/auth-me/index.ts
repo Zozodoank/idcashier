@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { corsHeaders } from '../_shared/cors.ts'
 import { getUserIdFromToken } from '../_shared/auth.ts'
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -16,7 +17,7 @@ Deno.serve(async (req) => {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(
         JSON.stringify({ error: 'Authorization token required' }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401
         }
@@ -28,10 +29,10 @@ Deno.serve(async (req) => {
     try {
       const token = authHeader.substring(7)
       userId = await getUserIdFromToken(token)
-    } catch (error) {
+    } catch (error: any) {
       return new Response(
         JSON.stringify({ error: error.message }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401
         }
@@ -40,7 +41,9 @@ Deno.serve(async (req) => {
 
     // Create Supabase client
     const supabase = createClient(
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_URL')!,
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
@@ -49,7 +52,7 @@ Deno.serve(async (req) => {
       .from('users')
       .select('id, name, email, role, tenant_id, permissions, created_at')
       .eq('id', userId)
-    
+
     if (error) {
       console.error(`Database error for user ${userId}:`, error)
       throw error
@@ -58,7 +61,7 @@ Deno.serve(async (req) => {
     if (users.length === 0) {
       return new Response(
         JSON.stringify({ error: 'User not found' }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 404
         }
@@ -66,7 +69,7 @@ Deno.serve(async (req) => {
     }
 
     const user = users[0]
-    
+
     // Include tenant_id as tenantId in response
     const userResponse = {
       ...user,
@@ -75,15 +78,15 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ user: userResponse }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       }
     )
-  } catch (error) {
+  } catch (error: any) {
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }

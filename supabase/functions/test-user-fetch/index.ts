@@ -4,6 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseForFunction } from '../_shared/client.ts';
 import { getUserIdFromToken } from '../_shared/auth.ts';
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -39,7 +40,7 @@ Deno.serve(async (req) => {
     let userId;
     try {
       userId = await getUserIdFromToken(token);
-    } catch (error) {
+    } catch (error: any) {
       return new Response(JSON.stringify({ error: `Token validation failed: ${error.message}` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401
@@ -73,7 +74,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       });
-    } catch (fetchError) {
+    } catch (fetchError: any) {
       return new Response(JSON.stringify({ 
         error: `Exception during user fetch by ID: ${fetchError.message}`,
         userId: userId
@@ -82,7 +83,7 @@ Deno.serve(async (req) => {
         status: 500
       });
     }
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500

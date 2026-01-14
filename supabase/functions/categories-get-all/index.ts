@@ -3,6 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { corsHeaders } from '../_shared/cors.ts'
 import { createSupabaseClient, getUserIdFromToken, getTenantOwnerId } from '../_shared/auth.ts'
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -15,7 +16,7 @@ Deno.serve(async (req) => {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(
         JSON.stringify({ error: 'Authorization token required' }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401
         }
@@ -24,18 +25,18 @@ Deno.serve(async (req) => {
 
     // Extract token
     const token = authHeader.substring(7)
-    
+
     // Create Supabase client
     const supabase = createSupabaseClient()
 
     // Get user ID from token
     let userId: string
     try {
-      userId = await getUserIdFromToken(token, supabase)
-    } catch (error) {
+      userId = await getUserIdFromToken(token)
+    } catch (error: any) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401
         }
@@ -46,10 +47,10 @@ Deno.serve(async (req) => {
     let ownerId: string
     try {
       ownerId = await getTenantOwnerId(supabase, userId)
-    } catch (error) {
+    } catch (error: any) {
       return new Response(
         JSON.stringify({ error: 'Failed to resolve tenant' }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401
         }
@@ -61,7 +62,7 @@ Deno.serve(async (req) => {
       .from('categories')
       .select('*')
       .eq('user_id', ownerId)
-    
+
     if (error) {
       console.error('Database error fetching categories for user ${userId}:', error)
       throw error
@@ -69,15 +70,15 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify(data),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       }
     )
-  } catch (error) {
+  } catch (error: any) {
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }

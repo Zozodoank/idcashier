@@ -3,8 +3,11 @@
 // Single endpoint for all attendance machines
 // =====================================================
 
+// @ts-ignore: Deno standard library is available at runtime
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// @ts-ignore: ESM module is available at runtime
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// @ts-ignore: Deno standard library is available at runtime
 import { createHmac } from "https://deno.land/std@0.168.0/node/crypto.ts"
 
 // =====================================================
@@ -41,7 +44,8 @@ interface IngestResponse {
 // HELPERS
 // =====================================================
 
-function sha256(data: string): string {
+// @ts-ignore: async function returns Promise<string>
+function sha256(data: string): Promise<string> {
   const encoder = new TextEncoder()
   const hash = crypto.subtle.digest('SHA-256', encoder.encode(data))
   return hash.then(h => Array.from(new Uint8Array(h))
@@ -65,7 +69,7 @@ function verifyHmac(secret: string, body: string, signature: string): boolean {
     hmac.update(body)
     const computed = hmac.digest('hex')
     return computed === signature
-  } catch (e) {
+  } catch (e: any) {
     console.error('HMAC verification error:', e)
     return false
   }
@@ -87,6 +91,7 @@ function jsonResponse(data: IngestResponse, status = 200): Response {
 // MAIN HANDLER
 // =====================================================
 
+// @ts-ignore: req type is inferred from serve
 serve(async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -141,7 +146,9 @@ serve(async (req) => {
     }
 
     // Init Supabase client with service_role (bypasses RLS)
+    // @ts-ignore: Deno is available at runtime
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    // @ts-ignore: Deno is available at runtime
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
@@ -234,7 +241,7 @@ serve(async (req) => {
       reason: stored ? undefined : 'Duplicate event (dedupe_key conflict)'
     }, 200)
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error:', error)
     return jsonResponse({
       success: false,

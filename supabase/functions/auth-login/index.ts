@@ -6,14 +6,14 @@ import { getCorsHeaders } from '../_shared/cors.ts'
 // Helper function to check subscription status
 async function checkSubscription(supabase: SupabaseClient, user: any, authUser: any = null) {
   const { id, role, tenant_id, email } = user;
-  
+
   // Check if user email is confirmed first
   const isEmailConfirmed = authUser?.email_confirmed_at;
-  
+
   // Check if user has completed payment (paid user)
   const paymentCompleted = authUser?.user_metadata?.payment_completed;
   const isPaidUser = paymentCompleted || isEmailConfirmed;
-  
+
   // If email is not confirmed AND user is not paid, user should verify email first
   if (!isEmailConfirmed && !paymentCompleted) {
     return {
@@ -27,7 +27,7 @@ async function checkSubscription(supabase: SupabaseClient, user: any, authUser: 
       }
     };
   }
-  
+
   // Accounts that bypass subscription checks
   const bypassEmails = ['demo@idcashier.com', 'jho.j80@gmail.com'];
   if (bypassEmails.includes(email)) {
@@ -41,7 +41,7 @@ async function checkSubscription(supabase: SupabaseClient, user: any, authUser: 
       }
     };
   }
-  
+
   // For paid users, skip subscription check and mark as active
   if (isPaidUser) {
     return {
@@ -55,7 +55,7 @@ async function checkSubscription(supabase: SupabaseClient, user: any, authUser: 
       }
     };
   }
-  
+
   // The user ID to check for the subscription
   const effectiveUserId = role === 'cashier' ? tenant_id : id;
 
@@ -89,7 +89,7 @@ async function checkSubscription(supabase: SupabaseClient, user: any, authUser: 
 
   const timeDiff = endDate.getTime() - today.getTime();
   const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
-  
+
   const subscriptionExpired = daysRemaining < 0;
 
   return {
@@ -105,11 +105,12 @@ async function checkSubscription(supabase: SupabaseClient, user: any, authUser: 
 }
 
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Get origin from request headers for dynamic CORS
   const origin = req.headers.get('origin') || '';
   const corsHeaders = getCorsHeaders(origin);
-  
+
   // Handle preflight request
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -118,12 +119,12 @@ Deno.serve(async (req) => {
   try {
     // Parse the request body
     const { email, password } = await req.json()
-    
+
     // Validate input
     if (!email || !password) {
       return new Response(
         JSON.stringify({ error: 'Email and password are required' }),
-        { 
+        {
           headers: corsHeaders,
           status: 400
         }
@@ -135,7 +136,9 @@ Deno.serve(async (req) => {
 
     // Create Supabase client
     const supabase = createClient(
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_URL')!,
+      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
@@ -147,10 +150,10 @@ Deno.serve(async (req) => {
 
     if (authError) {
       console.error(`Supabase Auth login failed for ${normalizedEmail}:`, authError.message)
-      
+
       // Provide specific error messages based on the error
       let errorMessage = 'Invalid email or password'
-      
+
       if (authError.message.includes('Email not confirmed') || authError.message.includes('email_not_confirmed')) {
         errorMessage = 'Please confirm your email before logging in. Check your inbox for the confirmation link.'
       } else if (authError.message.includes('Invalid login credentials') || authError.message.includes('invalid_credentials')) {
@@ -158,13 +161,13 @@ Deno.serve(async (req) => {
       } else if (authError.message.includes('User not found')) {
         errorMessage = 'No account found with this email address.'
       }
-      
+
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: errorMessage,
           details: authError.message // Include original error for debugging
         }),
-        { 
+        {
           headers: corsHeaders,
           status: 401
         }
@@ -174,7 +177,7 @@ Deno.serve(async (req) => {
     if (!authData.user) {
       return new Response(
         JSON.stringify({ error: 'Invalid credentials' }),
-        { 
+        {
           headers: corsHeaders,
           status: 401
         }
@@ -187,21 +190,21 @@ Deno.serve(async (req) => {
       // Create abort signal for timeout
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
-      
+
       const { data, error } = await supabase
         .from('users')
         .select('id, name, email, role, tenant_id, permissions, created_at')
         .eq('email', normalizedEmail)
         .abortSignal(controller.signal)
         .maybeSingle()
-      
+
       clearTimeout(timeoutId)
-      
+
       if (error) {
         console.error('Error fetching user profile:', error)
         return new Response(
           JSON.stringify({ error: 'Failed to fetch user profile' }),
-          { 
+          {
             headers: corsHeaders,
             status: 500
           }
@@ -209,12 +212,12 @@ Deno.serve(async (req) => {
       }
 
       userData = data
-    } catch (fetchError) {
+    } catch (fetchError: any) {
       console.error('User profile fetch error:', fetchError)
       if (fetchError.name === 'AbortError') {
         return new Response(
           JSON.stringify({ error: 'User profile fetch timeout - check RLS policies' }),
-          { 
+          {
             headers: corsHeaders,
             status: 500
           }
@@ -222,7 +225,7 @@ Deno.serve(async (req) => {
       }
       return new Response(
         JSON.stringify({ error: 'Failed to fetch user profile' }),
-        { 
+        {
           headers: corsHeaders,
           status: 500
         }
@@ -232,7 +235,7 @@ Deno.serve(async (req) => {
     // If user exists in auth but not in public.users, create the entry
     if (!userData) {
       console.log('User exists in Auth but not in public.users, creating profile...')
-      
+
       const { data: newUserData, error: insertError } = await supabase
         .from('users')
         .insert([
@@ -252,7 +255,7 @@ Deno.serve(async (req) => {
         console.error('Error creating user profile:', insertError)
         return new Response(
           JSON.stringify({ error: 'Failed to create user profile' }),
-          { 
+          {
             headers: corsHeaders,
             status: 500
           }
@@ -278,7 +281,7 @@ Deno.serve(async (req) => {
           message: 'Login successful',
           ...subscriptionStatus
         }),
-        { 
+        {
           headers: corsHeaders,
           status: 200
         }
@@ -304,17 +307,17 @@ Deno.serve(async (req) => {
         message: 'Login successful',
         ...subscriptionStatus
       }),
-      { 
+      {
         headers: corsHeaders,
         status: 200
       }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error in auth-login function:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
-      { 
+      {
         headers: corsHeaders,
         status: 500
       }

@@ -15,6 +15,7 @@ const PLAN_MAPPING: Record<string, any> = {
 };
 
 // Main handler
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -71,7 +72,7 @@ Deno.serve(async (req) => {
       const token = authHeader.replace('Bearer ', '');
       try {
         userId = await getUserIdFromToken(token);
-      } catch (error) {
+      } catch (error: any) {
         // If token validation fails but email is provided, fall back to email-based auth
         if (email) {
           const normalizedEmail = email.trim().toLowerCase();
@@ -105,7 +106,7 @@ Deno.serve(async (req) => {
             return createErrorResponse('User not found', 404);
           }
           userData = data;
-        } catch (fetchError) {
+        } catch (fetchError: any) {
           return createErrorResponse('Failed to fetch user data', 500);
         }
       }
@@ -126,7 +127,7 @@ Deno.serve(async (req) => {
         }
         userId = data.id;
         userData = data;
-      } catch (fetchError) {
+      } catch (fetchError: any) {
         return createErrorResponse('Failed to fetch user data', 500);
       }
     } else {
@@ -161,7 +162,7 @@ Deno.serve(async (req) => {
       merchantOrderId: merchantOrderId,
       effectiveUserId: effectiveUserId
     }, 200);
-  } catch (error) {
+  } catch (error: any) {
     return createErrorResponse('Internal server error', 500);
   }
 });

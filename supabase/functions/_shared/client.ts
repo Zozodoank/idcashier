@@ -8,19 +8,21 @@ import { createClient } from '@supabase/supabase-js'
  */
 export function createSupabaseForFunction(authHeader: string | null) {
   // Validate required environment variables
+  // @ts-ignore: Deno is available at runtime
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  // @ts-ignore: Deno is available at runtime
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  
+
   if (!supabaseUrl || !supabaseServiceKey) {
     throw new Error('Missing required Supabase environment variables');
   }
-  
+
   // Create client with service role key for full access
   const supabase = createClient(
     supabaseUrl,
     supabaseServiceKey
   )
-  
+
   // Forward the Authorization header if provided
   if (authHeader) {
     // @ts-ignore - Supabase client augmentation
@@ -28,7 +30,7 @@ export function createSupabaseForFunction(authHeader: string | null) {
       access_token: authHeader.replace('Bearer ', '')
     })
   }
-  
+
   return supabase
 }
 

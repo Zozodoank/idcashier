@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createSupabaseClient, getUserIdFromToken, getUserEmailFromToken } from '../_shared/auth.ts'
 
+// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -93,7 +94,7 @@ Deno.serve(async (req) => {
         status: 201
       }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Users-create error:', error)
     return new Response(
       JSON.stringify({ 
