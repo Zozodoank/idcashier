@@ -93,19 +93,69 @@ export default function PaymentCallbackPage() {
             const isOAuthRegistration = !pendingRegistration.password || pendingRegistration.oauthProvider === 'google';
 
             if (isOAuthRegistration) {
-              // OAuth user - already logged in
-              console.log('✅ OAuth user - already logged in, redirecting to store setup');
+              // OAuth user - should be logged in via session persistence
+              console.log('✅ OAuth user - verifying session...');
+
+              // 1. Check Session
+              const { data: { session } } = await supabase.auth.getSession();
+
+              if (!session) {
+                // Try to recover from localStorage manual token
+                const manualToken = localStorage.getItem('idcashier_token');
+                if (manualToken) {
+                  console.log('🔄 Recovering session from manual token...');
+                  const { error: recoveryError } = await supabase.auth.setSession({
+                    access_token: manualToken,
+                    refresh_token: manualToken // This might not work if it's just access token, but worth a try or just rely on access token being present implies auth
+                  });
+                }
+              }
+
+              // 2. SAFETY NET: Check & Create Profile if missing
+              const currentUser = session?.user || (await supabase.auth.getUser()).data.user;
+
+              if (currentUser) {
+                // Direct DB check
+                const { data: profile } = await supabase.from('users').select('id').eq('id', currentUser.id).maybeSingle();
+
+                if (!profile) {
+                  console.log('⚠️ Profile missing for OAuth User - Invoking Server-Side Rescue...');
+                  // Use SERVER-SIDE creation (Bypass RLS) via auth-register
+                  const { error: rescueError } = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-register`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${localStorage.getItem('idcashier_token') || session?.access_token}`,
+                    },
+                    body: JSON.stringify({
+                      userId: currentUser.id,
+                      email: currentUser.email,
+                      name: pendingRegistration?.name || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
+                      role: 'owner',
+                      isPriceCardRegistration: true,
+                      paymentCompleted: true
+                    })
+                  }).then(res => res.json());
+
+                  if (rescueError) {
+                    console.error('❌ Rescue failed:', rescueError);
+                  } else {
+                    console.log('✅ Server-side profile rescue successful.');
+                  }
+                }
+              }
 
               localStorage.removeItem('pendingRegistration');
 
               toast({
                 title: t('registrationSuccessful'),
-                description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+                description: 'Pembayaran berhasil! Mengarahkan ke setup toko...',
               });
 
               setTimeout(() => {
                 navigate('/store-setup', { replace: true, state: { fromPayment: true } });
               }, 1500);
+
             } else {
               // Email/Password user - need to login
               console.log('✅ Email/Password user - logging in after payment');
@@ -113,63 +163,96 @@ export default function PaymentCallbackPage() {
               try {
                 // Login user
                 const loginRes = await login(pendingRegistration.email, pendingRegistration.password);
+
+                // If login successful, check profile
+                if (loginRes.success && loginRes.user) {
+                  const { data: profile } = await supabase.from('users').select('id').eq('id', loginRes.user.id).maybeSingle();
+                  if (!profile) {
+                    console.log('⚠️ Profile missing for Email User - Invoking Server-Side Rescue...');
+                    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-register`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${loginRes.token}`,
+                      },
+                      body: JSON.stringify({
+                        userId: loginRes.user.id,
+                        email: loginRes.user.email,
+                        name: pendingRegistration.name,
+                        role: 'owner',
+                        paymentCompleted: true
+                      })
+                    });
+                  }
+                }
+
                 if (!loginRes.success) {
                   console.error('❌ Login failed:', loginRes.error);
-                  throw new Error(loginRes.error || 'Failed to login after payment');
+                  // Don't throw immediately, try fallback session check
+                } else {
+                  console.log('✅ Login successful after payment');
+                  localStorage.removeItem('pendingRegistration');
+                  toast({
+                    title: t('registrationSuccessful'),
+                    description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+                  });
+                  setTimeout(() => {
+                    navigate('/store-setup', { replace: true, state: { fromPayment: true } });
+                  }, 1500);
+                  return; // Early return on success
                 }
 
-                console.log('✅ Login successful after payment');
-
-                localStorage.removeItem('pendingRegistration');
-
-                toast({
-                  title: t('registrationSuccessful'),
-                  description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
-                });
-
-                setTimeout(() => {
-                  navigate('/store-setup', { replace: true, state: { fromPayment: true } });
-                }, 1500);
               } catch (loginError) {
-                console.error('❌ Error during login after payment:', loginError);
-
-                // Even if login fails, user is registered and payment is successful
-                // Try to get session directly from Supabase as fallback
-                try {
-                  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-                  if (!sessionError && session) {
-                    // Session exists, refresh user profile and redirect
-                    console.log('✅ Found existing session after payment');
-                    localStorage.setItem('idcashier_token', session.access_token);
-
-                    toast({
-                      title: t('registrationSuccessful'),
-                      description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
-                    });
-
-                    setTimeout(() => {
-                      navigate('/store-setup', { replace: true, state: { fromPayment: true } });
-                    }, 1500);
-                    return;
-                  }
-                } catch (sessionCheckError) {
-                  console.error('Session check error:', sessionCheckError);
-                }
-
-                // If no session found, show clear message and redirect to login
-                toast({
-                  title: t('paymentSuccessful'),
-                  description: 'Pembayaran berhasil! Silakan login dengan password yang tadi digunakan untuk mendaftar.',
-                  variant: 'default'
-                });
-
-                localStorage.removeItem('pendingRegistration');
-
-                setTimeout(() => {
-                  navigate('/login?payment=success', { replace: true });
-                }, 2000);
+                console.error('Login attempt error:', loginError);
               }
+
+              // Fallback: Try to get session directly from Supabase
+              try {
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+                if (!sessionError && session) {
+                  // Session exists, refresh user profile and redirect
+                  console.log('✅ Found existing session after payment');
+                  localStorage.setItem('idcashier_token', session.access_token);
+
+                  // Safety profile check here too
+                  const { data: profile } = await supabase.from('users').select('id').eq('id', session.user.id).maybeSingle();
+                  if (!profile) {
+                    await supabase.from('users').insert({
+                      id: session.user.id,
+                      email: session.user.email,
+                      name: pendingRegistration.name,
+                      role: 'owner',
+                      tenant_id: session.user.id
+                    });
+                  }
+
+                  toast({
+                    title: t('registrationSuccessful'),
+                    description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+                  });
+
+                  setTimeout(() => {
+                    navigate('/store-setup', { replace: true, state: { fromPayment: true } });
+                  }, 1500);
+                  return;
+                }
+              } catch (sessionCheckError) {
+                console.error('Session check error:', sessionCheckError);
+              }
+
+              // If no session found, show clear message and redirect to login
+              toast({
+                title: t('paymentSuccessful'),
+                description: 'Pembayaran berhasil! Silakan login dengan password yang tadi digunakan untuk mendaftar.',
+                variant: 'default'
+              });
+
+              localStorage.removeItem('pendingRegistration');
+
+              setTimeout(() => {
+                navigate('/login?payment=success', { replace: true });
+              }, 2000);
             }
 
           } else if (isRenewal) {

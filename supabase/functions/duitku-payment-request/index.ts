@@ -140,12 +140,13 @@ Deno.serve(async (req) => {
 
     // Duitku Endpoint Configuration
     // @ts-ignore: Deno is available at runtime
-    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
-    
+    // FORCE DEFAULT TO SANDBOX for safety during development if env var is missing
+    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'sandbox').toLowerCase();
+
     // Determine Base URL based on environment
     // Sandbox: https://sandbox.duitku.com
     // Production: https://passport.duitku.com
-    const DUITKU_BASE_URL = ENV === 'sandbox' 
+    const DUITKU_BASE_URL = ENV === 'sandbox'
       ? 'https://sandbox.duitku.com'
       : 'https://passport.duitku.com';
 
