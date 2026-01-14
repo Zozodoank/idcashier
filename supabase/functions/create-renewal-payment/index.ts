@@ -1,5 +1,6 @@
 // @supabase/verify-jwt false
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// Fixed import to use standard package mapped in deno.json
 import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient, getUserIdFromToken } from '../_shared/auth.ts';
