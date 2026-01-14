@@ -36,7 +36,16 @@ Deno.serve(async (req) => {
 
         console.log('Fetching payment methods from Duitku...');
 
-        const apiUrl = 'https://passport.duitku.com/webapi/api/merchant/paymentmethod/getpaymentmethod';
+        const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
+
+        // Determine Base URL
+        const DUITKU_BASE_URL = ENV === 'sandbox'
+            ? 'https://sandbox.duitku.com'
+            : 'https://passport.duitku.com';
+
+        console.log(`Using Duitku Environment: ${ENV}`);
+
+        const apiUrl = `${DUITKU_BASE_URL}/webapi/api/merchant/paymentmethod/getpaymentmethod`;
 
         const response = await fetch(apiUrl, {
             method: 'POST',

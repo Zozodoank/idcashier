@@ -135,7 +135,15 @@ Deno.serve(async (req) => {
 
     // Duitku Endpoint Configuration
     const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
-    const DUITKU_BASE_URL = 'https://passport.duitku.com';
+    
+    // Determine Base URL based on environment
+    // Sandbox: https://sandbox.duitku.com
+    // Production: https://passport.duitku.com
+    const DUITKU_BASE_URL = ENV === 'sandbox' 
+      ? 'https://sandbox.duitku.com'
+      : 'https://passport.duitku.com';
+
+    console.log(`Using Duitku Environment: ${ENV} (${DUITKU_BASE_URL})`);
 
     const duitkuApiUrl = `${DUITKU_BASE_URL}/webapi/api/merchant/v2/inquiry`;
 
