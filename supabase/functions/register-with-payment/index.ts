@@ -106,17 +106,21 @@ const validatePaymentData = (data: PaymentData): string[] => {
 const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResponse> => {
   try {
     // Resolve Duitku configuration from environment (sandbox or production)
+    // Resolve Duitku configuration from environment (sandbox or production)
     const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
-    const SANDBOX_MERCHANT = Deno.env.get('DUITKU_SANDBOX_MERCHANT_CODE') || '';
-    const SANDBOX_API_KEY = Deno.env.get('DUITKU_SANDBOX_API_KEY') || '';
-    const SANDBOX_BASE_URL = Deno.env.get('DUITKU_SANDBOX_BASE_URL') || 'https://sandbox.duitku.com';
-    const PROD_MERCHANT = Deno.env.get('DUITKU_MERCHANT_CODE') || '';
-    const PROD_API_KEY = Deno.env.get('DUITKU_API_KEY') || '';
-    const PROD_BASE_URL = Deno.env.get('DUITKU_PRODUCTION_BASE_URL') || 'https://passport.duitku.com';
 
-    const ACTIVE_MERCHANT = ENV === 'production' ? PROD_MERCHANT : SANDBOX_MERCHANT;
-    const ACTIVE_API_KEY = ENV === 'production' ? PROD_API_KEY : SANDBOX_API_KEY;
-    const ACTIVE_BASE_URL = ENV === 'production' ? PROD_BASE_URL : SANDBOX_BASE_URL;
+    // Use the main credentials configured in Supabase Secrets for the active environment
+    // Note: We've set DUITKU_MERCHANT_CODE and DUITKU_API_KEY to the correct values (e.g. Sandbox credentials)
+    // in the Supabase Dashboard, so we don't need separate variables here.
+    const ACTIVE_MERCHANT = Deno.env.get('DUITKU_MERCHANT_CODE') || '';
+    const ACTIVE_API_KEY = Deno.env.get('DUITKU_API_KEY') || '';
+
+    const PROD_BASE_URL = 'https://passport.duitku.com';
+    const SANDBOX_BASE_URL = 'https://sandbox.duitku.com';
+
+    const ACTIVE_BASE_URL = ENV === 'sandbox' ? SANDBOX_BASE_URL : PROD_BASE_URL;
+
+    console.log(`Using Duitku Env: ${ENV} (${ACTIVE_BASE_URL}) for Merchant: ${ACTIVE_MERCHANT}`);
 
     const DUITKU_URL = `${ACTIVE_BASE_URL}/webapi/api/merchant/v2/inquiry`;
 

@@ -111,9 +111,12 @@ const createDuitkuPayment = async (
     const DUITKU_MERCHANT_KEY = Deno.env.get('DUITKU_API_KEY')?.trim() || Deno.env.get('DUITKU_MERCHANT_KEY')?.trim() || '';
 
     // Derive base URL from environment
-    const DUITKU_BASE_URL = ENV === 'production'
-      ? (Deno.env.get('DUITKU_BASE_URL') || 'https://passport.duitku.com')
-      : (Deno.env.get('DUITKU_BASE_URL') || 'https://sandbox.duitku.com');
+    // Derive base URL from environment
+    const PROD_BASE_URL = 'https://passport.duitku.com';
+    const SANDBOX_BASE_URL = 'https://sandbox.duitku.com';
+    const DUITKU_BASE_URL = ENV === 'sandbox' ? SANDBOX_BASE_URL : PROD_BASE_URL;
+
+    console.log(`Using Duitku Env: ${ENV} (${DUITKU_BASE_URL})`);
 
     const ACTIVE_MERCHANT = DUITKU_MERCHANT_CODE;
     const ACTIVE_API_KEY = DUITKU_MERCHANT_KEY;

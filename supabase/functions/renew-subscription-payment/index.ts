@@ -324,9 +324,11 @@ Deno.serve(async (req: Request) => {
     };
 
     // 7) Endpoint Duitku
-    const DUITKU_BASE_URL = ENV === 'production'
-      ? 'https://passport.duitku.com'
-      : 'https://sandbox.duitku.com';
+    const PROD_BASE_URL = 'https://passport.duitku.com';
+    const SANDBOX_BASE_URL = 'https://sandbox.duitku.com';
+    const DUITKU_BASE_URL = ENV === 'sandbox' ? SANDBOX_BASE_URL : PROD_BASE_URL;
+
+    console.log(`Using Duitku Env: ${ENV} (${DUITKU_BASE_URL})`);
     const DUITKU_URL = `${DUITKU_BASE_URL}/webapi/api/merchant/v2/inquiry`;
 
     logger.info('Calling Duitku inquiry', { url: DUITKU_URL });
