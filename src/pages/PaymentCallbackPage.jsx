@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -13,7 +14,7 @@ export default function PaymentCallbackPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login } = useAuth();
+  const { login, user } = useAuth(); // Removed refreshSession
   const { refreshHPPSetting } = useHPP();
   const [status, setStatus] = useState('processing');
   const [message, setMessage] = useState(t('processingPayment'));
@@ -32,10 +33,12 @@ export default function PaymentCallbackPage() {
   useEffect(() => {
     const processPaymentCallback = async () => {
       try {
+        // Cek status pembayaran dari parameter URL  
         const paymentStatus = params.get('status') || '';
         const resultCode = params.get('resultCode') || params.get('resultcode') || '';
         const result = params.get('result') || '';
 
+        // Determine success from multiple indicators
         const isSuccess =
           (paymentStatus.toLowerCase() === 'success' ||
             paymentStatus.toLowerCase() === 'paid' ||
@@ -47,6 +50,9 @@ export default function PaymentCallbackPage() {
           setStatus('success');
           setMessage(t('paymentSuccessful'));
 
+          // Payment successful - Activate subscription via auth-register
+          // User sudah diregister sebelumnya, tapi perlu call auth-register dengan paymentCompleted=true
+          // untuk aktivasi subscription
           if (isRegistration) {
             let pendingRegistration = null;
             try {
@@ -60,72 +66,83 @@ export default function PaymentCallbackPage() {
 
             if (!pendingRegistration) {
               console.warn('⚠️ No pending registration data found');
-              toast({ title: t('paymentSuccessful'), description: 'Pembayaran berhasil! Mengarahkan ke setup toko...' });
-              setTimeout(() => navigate('/store-setup', { replace: true, state: { fromPayment: true } }), 1500);
-              return;
-            }
+              // No pending data, user might be logged in already (OAuth), just redirect
+              toast({
+                title: t('paymentSuccessful'),
+                description: 'Pembayaran berhasil! Mengarahkan ke setup toko...',
+              });
 
-            console.log('💳 Processing payment for registration logic...');
-            const isOAuthRegistration = !pendingRegistration.password || pendingRegistration.oauthProvider === 'google';
-
-            if (isOAuthRegistration) {
-              console.log('✅ OAuth user - waiting for session initialization...');
-
-              // Helper to wait for session (Patient Waiter)
-              const waitForSession = async () => {
-                for (let i = 0; i < 10; i++) { // Try 10 times (5 seconds)
-                  const { data: { session } } = await supabase.auth.getSession();
-                  if (session) return session;
-                  await new Promise(r => setTimeout(r, 500));
-                }
-                return null;
-              };
-
-              let session = await waitForSession();
-
-              // Recovery attempt manual
-              if (!session) {
-                const manualToken = localStorage.getItem('idcashier_token');
-                if (manualToken) {
-                  console.log('🔄 Attempting manual token recovery...');
-                  await supabase.auth.setSession({ access_token: manualToken, refresh_token: manualToken });
-                  session = (await supabase.auth.getSession()).data.session;
-                }
-              }
-
-              if (session) {
-                console.log('✅ Session active.');
-                const currentUser = session.user;
-                // 2. SAFETY NET: Check & Create Profile if missing
-                const { data: profile } = await supabase.from('users').select('id').eq('id', currentUser.id).maybeSingle();
-
-                if (!profile) {
-                  console.log('⚠️ Profile missing - Invoking Server-Side Rescue...');
-                  await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-register`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${session.access_token}`,
-                    },
-                    body: JSON.stringify({
-                      userId: currentUser.id,
-                      email: currentUser.email,
-                      name: pendingRegistration?.name || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
-                      role: 'owner',
-                      isPriceCardRegistration: true,
-                      paymentCompleted: true
-                    })
-                  });
-                }
-              } else {
-                console.warn('⚠️ Session wait timed out. Redirecting to Store Setup anyway (ProtectedRoute will handle auth).');
-              }
-
-              localStorage.removeItem('pendingRegistration');
-              toast({ title: t('registrationSuccessful'), description: 'Pembayaran berhasil! Mengarahkan ke setup toko...' });
               setTimeout(() => {
                 navigate('/store-setup', { replace: true, state: { fromPayment: true } });
               }, 1500);
+              return;
+            }
+
+            console.log('💳 Processing payment callback - redirecting to setup');
+            console.log('📋 Pending registration data:', {
+              email: pendingRegistration.email,
+              hasPassword: !!pendingRegistration.password,
+              oauthProvider: pendingRegistration.oauthProvider
+            });
+
+            // Subscription activation is handled by server-side callback (duitku-callback)
+            // We just need to ensure the user is logged in here and redirect.
+            console.log('ℹ️ Skipping frontend activation (handled by backend)');
+
+            // Check if this is OAuth (no password) or email/password registration
+            const isOAuthRegistration = !pendingRegistration.password || pendingRegistration.oauthProvider === 'google';
+
+            if (isOAuthRegistration) {
+              // OAuth user
+              console.log('✅ OAuth user - verifying session...');
+
+              // Loop check session agar tidak kena race condition
+              let attempts = 0;
+              let currentUser = null;
+
+              while (attempts < 5 && !currentUser) {
+                const { data } = await supabase.auth.getUser();
+                currentUser = data.user;
+
+                if (!currentUser) {
+                  // Try recover from LocalStorage
+                  const manualToken = localStorage.getItem('idcashier_token');
+                  if (manualToken) {
+                    console.log(`🔄 Attempt ${attempts + 1}: Recovering session...`);
+                    await supabase.auth.setSession({ access_token: manualToken, refresh_token: manualToken });
+                  }
+                  await new Promise(r => setTimeout(r, 1000)); // Wait 1s
+                }
+                attempts++;
+              }
+
+              if (currentUser) {
+                // Double check DB profile existance to be safe (ReadOnly check)
+                const { data: profile } = await supabase.from('users').select('id').eq('id', currentUser.id).maybeSingle();
+                if (!profile) {
+                  console.warn('⚠️ User Auth exists but Profile missing in DB. This might cause issues in Store Setup.');
+                  // Optional: We could inserting here, but user asked to Undo.
+                  // So we assume profile exists as user claimed.
+                }
+
+                console.log('✅ Session verified for:', currentUser.email);
+                // Refresh token in localStorage just in case
+                if (currentUser.id) localStorage.setItem('idcashier_token', (await supabase.auth.getSession()).data.session?.access_token);
+              } else {
+                console.error('❌ Failed to recover session after 5 attempts.');
+                // Still try to redirect, maybe ProtectedRoute works differently?
+              }
+
+              localStorage.removeItem('pendingRegistration');
+
+              toast({
+                title: t('registrationSuccessful'),
+                description: 'Pembayaran berhasil! Mengarahkan ke setup toko...',
+              });
+
+              setTimeout(() => {
+                navigate('/store-setup', { replace: true, state: { fromPayment: true } });
+              }, 500); // Faster redirect if session confirmed
 
             } else {
               // Email/Password user
@@ -136,101 +153,210 @@ export default function PaymentCallbackPage() {
                 const loginRes = await login(pendingRegistration.email, pendingRegistration.password);
 
                 if (loginRes.success && loginRes.user) {
-                  const { data: profile } = await supabase.from('users').select('id').eq('id', loginRes.user.id).maybeSingle();
-                  if (!profile) {
-                    console.log('⚠️ Profile missing for Email User - Invoking Server-Side Rescue...');
-                    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-register`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${loginRes.token}`,
-                      },
-                      body: JSON.stringify({
-                        userId: loginRes.user.id,
-                        email: loginRes.user.email,
-                        name: pendingRegistration.name,
-                        role: 'owner',
-                        paymentCompleted: true
-                      })
-                    });
-                  }
-                }
-
-                if (!loginRes.success) {
-                  throw new Error(loginRes.error || 'Login failed');
-                } else {
                   console.log('✅ Login successful after payment');
-                  localStorage.removeItem('pendingRegistration');
-                  toast({ title: t('registrationSuccessful'), description: 'Pembayaran berhasil! Mengarahkan ke setup toko...' });
-                  setTimeout(() => navigate('/store-setup', { replace: true, state: { fromPayment: true } }), 1500);
-                  return;
-                }
+                  localStorage.setItem('idcashier_token', loginRes.token);
 
+                  localStorage.removeItem('pendingRegistration');
+                  toast({
+                    title: t('registrationSuccessful'),
+                    description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+                  });
+                  setTimeout(() => {
+                    navigate('/store-setup', { replace: true, state: { fromPayment: true } });
+                  }, 1000);
+                  return;
+                } else {
+                  throw new Error(loginRes.error || 'Login failed');
+                }
               } catch (loginError) {
-                console.error('Login attempt error:', loginError);
-                // Fallback: Check existing session
+                console.error('❌ Login error:', loginError);
+
+                // Fallback attempt: Check if session already exists
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session) {
-                  localStorage.setItem('idcashier_token', session.access_token);
-                  navigate('/store-setup', { replace: true, state: { fromPayment: true } });
+                  navigate('/store-setup', { replace: true });
                   return;
                 }
 
-                // Ultimate fallback: Redirect to login with message
-                console.warn('Login failed and no session. Standard redirect to login.');
-                toast({ title: t('paymentSuccessful'), description: 'Silakan login ulang untuk melanjutkan.' });
-                setTimeout(() => navigate('/login?payment=success', { replace: true }), 2000);
+                toast({
+                  title: t('paymentSuccessful'),
+                  description: 'Pembayaran berhasil! Silakan login.',
+                  variant: 'default'
+                });
+                localStorage.removeItem('pendingRegistration');
+                setTimeout(() => navigate('/login?payment=success'), 2000);
               }
             }
 
           } else if (isRenewal) {
-            // RENEWAL LOGIC
+            // Renewal logic - Redirect to store setup after successful payment (unless HPP activation)
+            console.log('🔄 Processing renewal payment callback...');
+
+            // Check if this is HPP activation
             if (isHPPActivation) {
-              // ... HPP Logic (Simplified for brevity, assumes standard flow)
-              // Keeping optimistic updates as they were good
-              const token = localStorage.getItem('idcashier_token');
-              if (token) {
+              console.log('🔄 [HPP Activation] Processing HPP activation in frontend...');
+              // Handle HPP activation
+              // Force enable HPP setting if payment was successful, even if pending data is missing
+              // This is a robust fallback for when backend processing lags or fails
+              try {
+                console.log('🔄 [HPP Activation] Attempting to force enable HPP setting...');
                 const { settingsAPI } = await import('@/lib/api');
-                settingsAPI.update('hpp_enabled', { enabled: true }, token).catch(console.error);
-                refreshHPPSetting && refreshHPPSetting();
+                const token = localStorage.getItem('idcashier_token');
+
+                if (token) {
+                  // Always attempt to update setting to enabled, regardless of pending data
+                  console.log('🔄 [HPP Activation] Updating HPP setting via API...');
+                  await settingsAPI.update('hpp_enabled', { enabled: true }, token);
+                  console.log('✅ [HPP Activation] HPP setting successfully updated via API');
+
+                  // Clear pending data if it exists
+                  localStorage.removeItem('pendingHPPActivation');
+
+                  // Set optimistic flag to avoid UI lag until context refresh completes
+                  localStorage.setItem('idcashier_hpp_optimistic', JSON.stringify({
+                    enabled: true,
+                    ts: Date.now(),
+                    ttl: 10 * 60 * 1000 // 10 minutes
+                  }));
+
+                  // Refresh HPP context to reflect the change immediately
+                  if (refreshHPPSetting) {
+                    console.log('🔄 [HPP Activation] Refreshing HPP context...');
+                    await refreshHPPSetting();
+                    console.log('✅ [HPP Activation] HPP context refreshed');
+                  }
+                } else {
+                  console.warn('⚠️ [HPP Activation] Token missing, setting optimistic flag anyway');
+                  // Even without token, set optimistic flag as fallback
+                  localStorage.setItem('idcashier_hpp_optimistic', JSON.stringify({
+                    enabled: true,
+                    ts: Date.now(),
+                    ttl: 10 * 60 * 1000 // 10 minutes
+                  }));
+                }
+              } catch (error) {
+                console.error('❌ [HPP Activation] Error forcing HPP activation:', error);
+                // Even if API update fails, still set optimistic flag as fallback
+                localStorage.setItem('idcashier_hpp_optimistic', JSON.stringify({
+                  enabled: true,
+                  ts: Date.now(),
+                  ttl: 10 * 60 * 1000 // 10 minutes
+                }));
+                console.log('🔄 [HPP Activation] Set optimistic flag as fallback after API error');
               }
-              localStorage.setItem('idcashier_hpp_optimistic', JSON.stringify({ enabled: true, ts: Date.now(), ttl: 600000 }));
-              setMessage(t('paymentSuccessful') || 'HPP Activated');
-              setTimeout(() => window.location.href = '/dashboard?page=settings&tab=hpp&hpp_refreshed=true', 2000);
+
+              setMessage(t('paymentSuccessful') || 'Pembayaran berhasil! Fitur HPP telah diaktifkan.');
+
+              setTimeout(() => {
+                const hasToken = localStorage.getItem('idcashier_token');
+                if (hasToken) {
+                  // Set flag to force refresh HPP setting after redirect
+                  localStorage.setItem('idcashier_hpp_refresh_needed', 'true');
+                  console.log('🔄 [HPP Activation] Setting refresh flag and redirecting...');
+                  // Redirect to HPP settings tab instead of general
+                  window.location.href = '/dashboard?page=settings&tab=hpp&hpp_refreshed=true';
+                } else {
+                  window.location.href = '/login?message=hpp_activated';
+                }
+              }, 2000);
             } else {
-              // Standard Renewal
-              setMessage(t('paymentVerifiedRedirecting'));
+              // Regular renewal - redirect to store setup
+              setMessage(t('paymentVerifiedRedirecting') || 'Pembayaran terverifikasi. Mengarahkan ke pengaturan toko...');
+
+              // Set optimistic flag that allows temporary access while server syncs
               localStorage.setItem('idcashier_renewal_pending', Date.now().toString());
+              localStorage.setItem('idcashier_current_page', 'store-setup');
+
+              // Force refresh subscription status by clearing any cached data
               localStorage.removeItem('idcashier_subscription_cache');
-              setTimeout(() => window.location.href = '/store-setup?fromRenewal=true', 2000);
+              sessionStorage.removeItem('idcashier_subscription_cache');
+
+              // Wait briefly for UX (so user sees success message) then redirect to store setup
+              setTimeout(() => {
+                console.log('✅ Redirecting to store setup after renewal');
+                const hasToken = localStorage.getItem('idcashier_token');
+                if (hasToken) {
+                  // Redirect to store setup page
+                  window.location.href = '/store-setup?fromRenewal=true';
+                } else {
+                  window.location.href = '/login?message=subscription_extended';
+                }
+              }, 2000);
             }
 
           } else {
-            // General Success
-            localStorage.setItem('idcashier_current_page', 'subscription');
-            localStorage.removeItem('idcashier_subscription_cache');
-            setTimeout(() => window.location.href = '/dashboard?subscription_refreshed=true', 1500);
-          }
+            // General success
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('idcashier_current_page', 'subscription');
+            }
 
+            const hasToken = localStorage.getItem('idcashier_token');
+            if (hasToken) {
+              console.log('✅ General Payment Success - Redirecting');
+              // Also set optimistic flag just in case
+              localStorage.setItem('idcashier_renewal_pending', Date.now().toString());
+              // Force refresh subscription status
+              localStorage.removeItem('idcashier_subscription_cache');
+              sessionStorage.removeItem('idcashier_subscription_cache');
+
+              setTimeout(() => {
+                // Force full page reload to refresh subscription status
+                window.location.href = '/dashboard?subscription_refreshed=true';
+              }, 1500);
+            } else {
+              window.location.href = '/login?payment=success';
+            }
+          }
         } else {
-          // FAILED / CANCELLED
+          // Pembayaran gagal atau dibatalkan
           setStatus('failed');
           setMessage(t('paymentFailedOrCancelled'));
-          if (isRegistration) localStorage.removeItem('pendingRegistration');
+
+          if (isRegistration) {
+            // Pastikan data registrasi sementara dibersihkan
+            localStorage.removeItem('pendingRegistration');
+          }
+
+          // Jangan mengaktifkan langganan / HPP apa pun di sini.
+          // Hanya arahkan kembali dengan pesan agar user mencoba bayar lagi.
           setTimeout(() => {
             const hasToken = localStorage.getItem('idcashier_token');
-            navigate(isRegistration || !hasToken ? '/login?payment_failed=1' : '/dashboard?payment_failed=1', { replace: true });
+            if (isRegistration || !hasToken) {
+              // User belum punya sesi yang valid – arahkan ke login
+              navigate('/login?payment_failed=1', { replace: true });
+            } else {
+              // Untuk renewal / HPP, arahkan ke dashboard dengan peringatan
+              navigate('/dashboard?payment_failed=1', { replace: true });
+            }
           }, 2500);
         }
       } catch (error) {
-        console.error('❌ Payment Callback Critical Error:', error);
+        console.error('❌ Payment callback error:', error);
         setStatus('error');
-        setMessage('Terjadi kesalahan memproses pembayaran.');
-        if (isRegistration) localStorage.removeItem('pendingRegistration');
-        setTimeout(() => navigate('/login?error=callback_exception'), 3000);
+        // User-friendly error message dengan spasi yang benar
+        const errorMessage = error.message || 'Terjadi kesalahan saat memproses pembayaran.';
+        // Ensure error message has proper spacing
+        const formattedError = errorMessage.replace(/([a-z])([A-Z])/g, '$1 $2');
+        setMessage(t('paymentProcessingError') || formattedError);
+
+        // Remove registration data if this is registration process
+        if (isRegistration) {
+          localStorage.removeItem('pendingRegistration');
+        }
+
+        // Redirect ke dashboard atau login tanpa menampilkan detail teknis
+        setTimeout(() => {
+          const hasToken = localStorage.getItem('idcashier_token');
+          if (isRegistration || !hasToken) {
+            navigate('/login?payment_failed=1', { replace: true });
+          } else {
+            navigate('/dashboard?payment_failed=1', { replace: true });
+          }
+        }, 3000);
       }
     };
 
+    // Start processing immediately
     processPaymentCallback();
   }, [params, navigate, toast, login, isRegistration, isRenewal, isHPPActivation, refreshHPPSetting, t]);
 
@@ -252,6 +378,7 @@ export default function PaymentCallbackPage() {
               <p>{message}</p>
             </div>
           )}
+
           {status === 'success' && (
             <div className="flex flex-col items-center gap-4">
               <div className="rounded-full bg-green-100 p-3">
@@ -260,11 +387,44 @@ export default function PaymentCallbackPage() {
                 </svg>
               </div>
               <p>{message}</p>
+              <p className="text-sm text-muted-foreground">
+                {isRegistration
+                  ? t('accountCreatedRedirectToStoreSetup')
+                  : isRenewal && isHPPActivation
+                    ? (t('hppActivatedRedirectToSettings') || 'Fitur HPP telah diaktifkan. Mengalihkan ke pengaturan...')
+                    : isRenewal
+                      ? t('subscriptionExtendedRedirectToSubscription')
+                      : t('paymentProcessedRedirectToSubscription')
+                }
+              </p>
             </div>
           )}
-          {status !== 'processing' && status !== 'success' && (
+
+          {status === 'failed' && (
             <div className="flex flex-col items-center gap-4">
-              <p className="text-red-500">{message}</p>
+              <div className="rounded-full bg-red-100 p-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <p className="text-red-500 font-medium">{message}</p>
+              <p className="text-sm text-muted-foreground">
+                {t('paymentFailedRedirecting') || 'Pembayaran tidak berhasil. Anda akan diarahkan kembali untuk mencoba lagi.'}
+              </p>
+            </div>
+          )}
+
+          {status === 'error' && (
+            <div className="flex flex-col items-center gap-4">
+              <div className="rounded-full bg-yellow-100 p-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <p className="text-red-600 font-medium">{message}</p>
+              <p className="text-sm text-muted-foreground">
+                {t('paymentErrorRedirecting') || 'Terjadi kesalahan. Anda akan diarahkan kembali ke aplikasi.'}
+              </p>
             </div>
           )}
         </CardContent>
