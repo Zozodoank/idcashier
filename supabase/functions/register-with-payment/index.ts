@@ -176,11 +176,12 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
       paymentUrl: responseData.paymentUrl,
       reference: responseData.reference
     };
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as Error;
     logger.error('Error creating Duitku payment', error);
     return {
       success: false,
-      errorMessage: `Failed to create payment: ${error.message}`
+      errorMessage: `Failed to create payment: ${error.message || String(error)}`
     };
   }
 };
@@ -296,11 +297,12 @@ const createUserAndPaymentRecord = async (
       userId: newUser.id,
       paymentId: paymentRecord.id
     };
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as Error;
     logger.error('Unexpected error in createUserAndPaymentRecord', error);
     return {
       success: false,
-      error: `Unexpected error: ${error.message}`
+      error: `Unexpected error: ${error.message || String(error)}`
     };
   }
 };
@@ -430,13 +432,14 @@ Deno.serve(async (req) => {
         status: 201
       }
     );
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as Error;
     logger.error('Unhandled error in register-with-payment function', error);
     return new Response(
       JSON.stringify({
         success: false,
         error: 'Internal server error',
-        message: error.message
+        message: error.message || String(error)
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

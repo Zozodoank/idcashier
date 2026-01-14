@@ -175,9 +175,10 @@ const createDuitkuPayment = async (
     logger.info('Duitku payment created successfully', { reference: responseData.reference });
 
     return { success: true, paymentUrl: responseData.paymentUrl, reference: responseData.reference };
-  } catch (error) {
-    logger.error('Error creating Duitku payment', { message: error.message });
-    return { success: false, errorMessage: `Failed to create payment: ${error.message}` };
+  } catch (err: unknown) {
+    const error = err as Error;
+    logger.error('Error creating Duitku payment', { message: error.message || String(error) });
+    return { success: false, errorMessage: `Failed to create payment: ${error.message || String(error)}` };
   }
 };
 
@@ -231,7 +232,8 @@ Deno.serve(async (req) => {
       try {
         userId = await getUserIdFromToken(token);
         logger.info('Token validated', { userId: '[REDACTED]' });
-      } catch (error) {
+      } catch (err: unknown) {
+        const error = err as Error;
         logger.error('Token validation failed', { message: error.message });
         return new Response(JSON.stringify({ success: false, error: 'Invalid token', code: 401 }), { headers: corsHeaders, status: 401 });
       }
@@ -326,8 +328,9 @@ Deno.serve(async (req) => {
       }),
       { headers: corsHeaders, status: 201 }
     );
-  } catch (error) {
-    logger.error('Unhandled error in create-renewal-payment function', { message: error.message });
+  } catch (err: unknown) {
+    const error = err as Error;
+    logger.error('Unhandled error in create-renewal-payment function', { message: error.message || String(error) });
     return new Response(JSON.stringify({ success: false, error: 'Internal server error' }), { headers: corsHeaders, status: 500 });
   }
 });
