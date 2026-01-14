@@ -1,6 +1,6 @@
 // @supabase/verify-jwt false
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient, getUserIdFromToken } from '../_shared/auth.ts';
 
