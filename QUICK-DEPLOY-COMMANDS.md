@@ -1,121 +1,28 @@
-# Quick Deploy Commands - Copy & Paste
+# Quick Deploy Commands
 
-## 🚀 Deploy Payment Functions (Paling Sering Digunakan)
+## Deploy ALL Public Functions (NO JWT) - 21 Functions
 
 ```powershell
-npx supabase functions deploy duitku-callback --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy duitku-payment-request --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy duitku-get-payment-methods --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt
+npx supabase functions deploy duitku-callback --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy duitku-payment-request --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy duitku-get-payment-methods --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-register --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-login --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-login-bypass --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-login-explicit --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-login-final --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-login-fixed --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-request-password-reset --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-reset-password --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-verify-email --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy test-simple --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy test-env-vars --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy test-log --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy test-body --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy test-user-fetch --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy test-renewal-simple --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy check-debug-status --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy developer-operations --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy demo-reset --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt
 ```
 
 ---
 
-## 📦 Deploy ALL Public Functions (NO JWT) - 21 Functions
+## Deploy ALL Protected Functions (WITH JWT) - 45 Functions
 
 ```powershell
-npx supabase functions deploy duitku-callback --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy duitku-payment-request --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy duitku-get-payment-methods --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-register --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-login --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-request-password-reset --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-reset-password --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-verify-email --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt
+npx supabase functions deploy auth-me --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy store-setup --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy create-renewal-payment --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy renew-subscription-payment --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy register-with-payment --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy emergency-fix-sub --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy ensure-subscription --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-create --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-get-by-id --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-cleanup-cronjob --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy categories-create --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy categories-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy categories-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy categories-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy categories-get-by-id --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy customers-create --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy customers-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy customers-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy customers-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy customers-get-by-id --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy suppliers-create --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy suppliers-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy suppliers-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy suppliers-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy suppliers-get-by-id --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy sales-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy sales-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy sales-get-by-id --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy users-create --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy users-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy users-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy users-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy users-get-by-id --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy subscriptions-create-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy subscriptions-get-all-users --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy subscriptions-get-current --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy subscriptions-get-current-user --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy subscriptions-update-user --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy dashboard-stats --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy dashboard-recent-transactions --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy dashboard-top-products --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy attendance-ingest --project-ref eypfeiqtvfxxiimhtycc
 ```
 
 ---
 
-## 🔒 Deploy Protected Functions (WITH JWT)
+## Usage
 
-### Products (5)
-```powershell
-npx supabase functions deploy products-create --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-get-by-id --project-ref eypfeiqtvfxxiimhtycc
-```
+1. Copy command yang diinginkan (klik triple untuk select all)
+2. Paste di PowerShell
+3. Press Enter
+4. Wait sampai selesai
 
-### Categories (5)
-```powershell
-npx supabase functions deploy categories-create --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy categories-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy categories-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy categories-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy categories-get-by-id --project-ref eypfeiqtvfxxiimhtycc
-```
-
-### Customers (5)
-```powershell
-npx supabase functions deploy customers-create --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy customers-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy customers-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy customers-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy customers-get-by-id --project-ref eypfeiqtvfxxiimhtycc
-```
-
-### Suppliers (5)
-```powershell
-npx supabase functions deploy suppliers-create --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy suppliers-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy suppliers-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy suppliers-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy suppliers-get-by-id --project-ref eypfeiqtvfxxiimhtycc
-```
-
-### Sales (3)
-```powershell
-npx supabase functions deploy sales-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy sales-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy sales-get-by-id --project-ref eypfeiqtvfxxiimhtycc
-```
-
-### Users (5)
-```powershell
-npx supabase functions deploy users-create --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy users-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy users-delete --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy users-get-all --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy users-get-by-id --project-ref eypfeiqtvfxxiimhtycc
-```
-
-### Subscriptions (5)
-```powershell
-npx supabase functions deploy subscriptions-create-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy subscriptions-get-all-users --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy subscriptions-get-current --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy subscriptions-get-current-user --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy subscriptions-update-user --project-ref eypfeiqtvfxxiimhtycc
-```
-
-### Dashboard (3)
-```powershell
-npx supabase functions deploy dashboard-stats --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy dashboard-recent-transactions --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy dashboard-top-products --project-ref eypfeiqtvfxxiimhtycc
-```
-
-### Store & Auth (3)
-```powershell
-npx supabase functions deploy auth-me --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy store-setup --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy attendance-ingest --project-ref eypfeiqtvfxxiimhtycc
-```
-
-### Payment Management (3)
-```powershell
-npx supabase functions deploy create-renewal-payment --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy renew-subscription-payment --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy register-with-payment --project-ref eypfeiqtvfxxiimhtycc
-```
-
----
-
-## 🎯 Single Function Deploy (Template)
-
-### NO JWT (Public)
-```powershell
-npx supabase functions deploy FUNCTION-NAME --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt
-```
-
-### WITH JWT (Protected)
-```powershell
-npx supabase functions deploy FUNCTION-NAME --project-ref eypfeiqtvfxxiimhtycc
-```
-
-**Replace `FUNCTION-NAME` dengan nama function**
-
----
-
-## ⚡ Super Quick Deploy (Most Common)
-
-### Deploy Payment Callback Only (30 detik)
-```powershell
-npx supabase functions deploy duitku-callback --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt
-```
-
-### Deploy Auth Functions (1 menit)
-```powershell
-npx supabase functions deploy auth-register --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt; npx supabase functions deploy auth-login --project-ref eypfeiqtvfxxiimhtycc --no-verify-jwt
-```
-
-### Deploy Products Functions (1 menit)
-```powershell
-npx supabase functions deploy products-create --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-update --project-ref eypfeiqtvfxxiimhtycc; npx supabase functions deploy products-get-all --project-ref eypfeiqtvfxxiimhtycc
-```
-
----
-
-## 💡 Usage
-
-1. Buka PowerShell di direktori project ini
-2. Copy command yang diinginkan
-3. Paste di PowerShell (klik kanan)
-4. Press Enter
-
-**Semicolon (;)** memisahkan multiple commands agar berjalan berurutan.
-
----
-
-**Project**: IDCashier  
-**Project Ref**: eypfeiqtvfxxiimhtycc  
-**Last Updated**: 2026-01-15
+**Time:**
+- Public functions (21): ~1-2 menit
+- Protected functions (45): ~5-7 menit
