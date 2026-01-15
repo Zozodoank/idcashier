@@ -20,6 +20,7 @@ interface RegisterRequest {
     skipTrial?: boolean;
     userId?: string; // Optional: provided for OAuth sync
     oauthProvider?: string; // Optional: to indicate OAuth flow
+    paymentCompleted?: boolean;
 }
 
 // @ts-ignore: Deno is available in Supabase Edge Functions runtime
@@ -39,7 +40,8 @@ Deno.serve(async (req) => {
             isPriceCardRegistration = false,
             skipTrial = false,
             userId: providedUserId,
-            oauthProvider
+            oauthProvider,
+            paymentCompleted
         }: RegisterRequest = await req.json();
 
         // Validate input
@@ -93,8 +95,8 @@ Deno.serve(async (req) => {
                     name,
                     phone: phone || '',
                     role,
-                    is_trial_user: !isPriceCardRegistration,
-                    payment_completed: false,
+                    is_trial_user: !isPriceCardRegistration && !paymentCompleted,
+                    payment_completed: paymentCompleted || false,
                     is_price_card_registration: isPriceCardRegistration,
                 },
             });
@@ -123,8 +125,8 @@ Deno.serve(async (req) => {
                     name,
                     phone: phone || '',
                     role,
-                    is_trial_user: !isPriceCardRegistration,
-                    payment_completed: false,
+                    is_trial_user: !isPriceCardRegistration && !paymentCompleted,
+                    payment_completed: paymentCompleted || false,
                     is_price_card_registration: isPriceCardRegistration,
                     oauth_provider: oauthProvider
                 }
@@ -195,7 +197,6 @@ Deno.serve(async (req) => {
                         user_id: userId,
                         start_date: startDate.toISOString().split('T')[0],
                         end_date: endDate.toISOString().split('T')[0],
-                        status: 'active',
                     });
 
                 if (subError) {

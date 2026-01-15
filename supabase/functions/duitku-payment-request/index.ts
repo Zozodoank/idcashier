@@ -112,13 +112,20 @@ Deno.serve(async (req) => {
       console.log('After register param:', finalReturnUrl);
     }
 
+    // Include userId and email in additionalParam for callback to find user
+    const additionalParamData = {
+      userId: userId,
+      email: email
+    };
+    const additionalParam = JSON.stringify(additionalParamData);
+
     const duitkuPayload: any = {
       merchantCode,
       paymentAmount: amountInt,
       paymentMethod: methodToSend,
       merchantOrderId,
       productDetails,
-      additionalParam: "", // Optional
+      additionalParam: additionalParam, // Include userId and email for callback
       merchantUserInfo: "", // Optional
       customerVaName: fullName,
       email,

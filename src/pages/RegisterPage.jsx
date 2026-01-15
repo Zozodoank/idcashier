@@ -124,8 +124,19 @@ export default function RegisterPage() {
             throw new Error(registrationResult.error || t('registrationFailed'));
           }
         } else {
-          user = registrationResult.data.user;
-          token = registrationResult.data.token;
+          // Registration successful, but auth-register doesn't return token
+          // So we need to login to get session
+          console.log('✅ Registration successful, logging in to get session...');
+          const loginResult = await login(email, password);
+          
+          if (!loginResult.success || !loginResult.user) {
+            throw new Error('Registrasi berhasil, tapi gagal login. Silakan coba login manual.');
+          }
+          
+          user = loginResult.user;
+          token = loginResult.token || localStorage.getItem('idcashier_token');
+          
+          console.log('✅ Login successful after registration, user ID:', user.id);
         }
 
         // Call Payment Gateway
@@ -195,6 +206,23 @@ export default function RegisterPage() {
               useHPP: false, // Default
               role: 'owner'
             }));
+
+            // Save token to localStorage before redirect
+            if (token) {
+              localStorage.setItem('idcashier_token', token);
+              console.log('✅ Token saved to localStorage before payment redirect');
+            }
+
+            // Also save session if available
+            try {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session) {
+                localStorage.setItem('idcashier_token', session.access_token);
+                console.log('✅ Session saved to localStorage before payment redirect');
+              }
+            } catch (sessionError) {
+              console.warn('⚠️ Could not save session:', sessionError);
+            }
 
             window.location.href = paymentData.paymentUrl;
           } else {

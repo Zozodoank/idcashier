@@ -159,9 +159,9 @@ const SubscriptionPage = () => {
                 <div className="bg-primary/80 rounded-xl p-6">
                   <div className="flex items-center gap-3 mb-2">
                     <Calendar className="w-6 h-6" />
-                    <span className="font-semibold">{t('registeredDate')}</span>
+                    <span className="font-semibold">{t('startDate') || 'Tanggal Mulai'}</span>
                   </div>
-                  <p className="text-2xl font-bold">{user?.created_at ? formatDate(user.created_at) : t('noData')}</p>
+                  <p className="text-2xl font-bold">{subscriptionData?.start_date ? formatDate(subscriptionData.start_date) : (user?.created_at ? formatDate(user.created_at) : t('noData'))}</p>
                 </div>
                 <div className="bg-primary/80 rounded-xl p-6">
                   <div className="flex items-center gap-3 mb-2">

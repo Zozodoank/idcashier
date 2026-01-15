@@ -93,45 +93,60 @@ export default function PaymentCallbackPage() {
             const isOAuthRegistration = !pendingRegistration.password || pendingRegistration.oauthProvider === 'google';
 
             if (isOAuthRegistration) {
-              // OAuth user
+              // OAuth user - should be logged in via session persistence
               console.log('✅ OAuth user - verifying session...');
 
-              // Loop check session agar tidak kena race condition
-              let attempts = 0;
-              let currentUser = null;
+              // 1. Check Session
+              const { data: { session } } = await supabase.auth.getSession();
 
-              while (attempts < 5 && !currentUser) {
-                const { data } = await supabase.auth.getUser();
-                currentUser = data.user;
-
-                if (!currentUser) {
-                  // Try recover from LocalStorage
-                  const manualToken = localStorage.getItem('idcashier_token');
-                  if (manualToken) {
-                    console.log(`🔄 Attempt ${attempts + 1}: Recovering session...`);
-                    await supabase.auth.setSession({ access_token: manualToken, refresh_token: manualToken });
-                  }
-                  await new Promise(r => setTimeout(r, 1000)); // Wait 1s
+              if (!session) {
+                // Try to recover from localStorage manual token
+                const manualToken = localStorage.getItem('idcashier_token');
+                if (manualToken) {
+                  console.log('🔄 Recovering session from manual token...');
+                  const { error: recoveryError } = await supabase.auth.setSession({
+                    access_token: manualToken,
+                    refresh_token: manualToken // This might not work if it's just access token, but worth a try or just rely on access token being present implies auth
+                  });
                 }
-                attempts++;
               }
+
+              // 2. SAFETY NET: Check & Create Profile if missing
+              const currentUser = session?.user || (await supabase.auth.getUser()).data.user;
 
               if (currentUser) {
-                // Double check DB profile existance to be safe (ReadOnly check)
+                // Direct DB check
                 const { data: profile } = await supabase.from('users').select('id').eq('id', currentUser.id).maybeSingle();
-                if (!profile) {
-                  console.warn('⚠️ User Auth exists but Profile missing in DB. This might cause issues in Store Setup.');
-                  // Optional: We could inserting here, but user asked to Undo.
-                  // So we assume profile exists as user claimed.
-                }
 
-                console.log('✅ Session verified for:', currentUser.email);
-                // Refresh token in localStorage just in case
-                if (currentUser.id) localStorage.setItem('idcashier_token', (await supabase.auth.getSession()).data.session?.access_token);
-              } else {
-                console.error('❌ Failed to recover session after 5 attempts.');
-                // Still try to redirect, maybe ProtectedRoute works differently?
+                if (!profile) {
+                  console.log('⚠️ Profile missing for OAuth User - Invoking Server-Side Rescue...');
+                  // Use SERVER-SIDE creation (Bypass RLS) via auth-register
+                  const { error: rescueError } = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-register`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${localStorage.getItem('idcashier_token') || session?.access_token}`,
+                    },
+                    body: JSON.stringify({
+                      userId: currentUser.id,
+                      email: currentUser.email,
+                      name: pendingRegistration?.name || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
+                      role: 'owner',
+                      isPriceCardRegistration: true,
+                      paymentCompleted: true
+                    })
+                  }).then(res => res.json());
+
+                  if (rescueError) {
+                    console.error('❌ Rescue failed:', rescueError);
+                  } else {
+                    console.log('✅ Server-side profile rescue successful.');
+                  }
+                }
               }
+
+              // Wait a bit for auth context to update
+              await new Promise(resolve => setTimeout(resolve, 500));
 
               localStorage.removeItem('pendingRegistration');
 
@@ -140,51 +155,225 @@ export default function PaymentCallbackPage() {
                 description: 'Pembayaran berhasil! Mengarahkan ke setup toko...',
               });
 
+              // Use window.location.href instead of navigate to force full page reload
               setTimeout(() => {
-                navigate('/store-setup', { replace: true, state: { fromPayment: true } });
-              }, 500); // Faster redirect if session confirmed
+                window.location.href = '/store-setup';
+              }, 1000);
 
             } else {
-              // Email/Password user
+              // Email/Password user - need to login
               console.log('✅ Email/Password user - logging in after payment');
+              console.log('📋 Login attempt with email:', pendingRegistration.email);
 
               try {
                 // Login user
                 const loginRes = await login(pendingRegistration.email, pendingRegistration.password);
 
+                console.log('📋 Login result:', {
+                  success: loginRes.success,
+                  hasUser: !!loginRes.user,
+                  hasToken: !!loginRes.token,
+                  error: loginRes.error
+                });
+
+                // If login successful, check profile
                 if (loginRes.success && loginRes.user) {
+                  // Save token to localStorage
+                  if (loginRes.token) {
+                    localStorage.setItem('idcashier_token', loginRes.token);
+                    console.log('✅ Token saved to localStorage after login');
+                  }
+
+                  // Set Supabase session if available
+                  if (loginRes.session) {
+                    try {
+                      await supabase.auth.setSession({
+                        access_token: loginRes.session.access_token,
+                        refresh_token: loginRes.session.refresh_token
+                      });
+                      console.log('✅ Supabase session set after login');
+                    } catch (sessionError) {
+                      console.warn('⚠️ Could not set Supabase session:', sessionError);
+                    }
+                  }
+
+                  const { data: profile } = await supabase.from('users').select('id').eq('id', loginRes.user.id).maybeSingle();
+                  if (!profile) {
+                    console.log('⚠️ Profile missing for Email User - Invoking Server-Side Rescue...');
+                    const rescueRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-register`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${loginRes.token}`,
+                      },
+                      body: JSON.stringify({
+                        userId: loginRes.user.id,
+                        email: loginRes.user.email,
+                        name: pendingRegistration.name,
+                        role: 'owner',
+                        paymentCompleted: true
+                      })
+                    });
+                    const rescueData = await rescueRes.json();
+                    if (rescueData.success) {
+                      console.log('✅ User profile created via rescue');
+                    } else {
+                      console.error('❌ Rescue failed:', rescueData.error);
+                    }
+                  } else {
+                    console.log('✅ User profile exists');
+                  }
+
                   console.log('✅ Login successful after payment');
-                  localStorage.setItem('idcashier_token', loginRes.token);
+
+                  // Wait a bit for auth context to update
+                  await new Promise(resolve => setTimeout(resolve, 500));
 
                   localStorage.removeItem('pendingRegistration');
                   toast({
                     title: t('registrationSuccessful'),
                     description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
                   });
+
+                  // Use window.location.href instead of navigate to force full page reload
+                  // This ensures auth context is properly refreshed
                   setTimeout(() => {
-                    navigate('/store-setup', { replace: true, state: { fromPayment: true } });
+                    window.location.href = '/store-setup';
+                  }, 1000);
+                  return; // Early return on success
+                }
+
+                if (!loginRes.success) {
+                  console.error('❌ Login failed:', loginRes.error);
+                  // Don't throw immediately, try fallback session check
+                }
+
+              } catch (loginError) {
+                console.error('Login attempt error:', loginError);
+              }
+
+              // Fallback: Try to get session directly from Supabase
+              try {
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+                if (!sessionError && session) {
+                  // Session exists, refresh user profile and redirect
+                  console.log('✅ Found existing session after payment');
+                  localStorage.setItem('idcashier_token', session.access_token);
+
+                  // Safety profile check here too
+                  const { data: profile } = await supabase.from('users').select('id').eq('id', session.user.id).maybeSingle();
+                  if (!profile) {
+                    console.log('⚠️ Profile missing, creating via auth-register...');
+                    const rescueRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-register`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                      },
+                      body: JSON.stringify({
+                        userId: session.user.id,
+                        email: session.user.email,
+                        name: pendingRegistration?.name || session.user.user_metadata?.name || session.user.email?.split('@')[0],
+                        role: 'owner',
+                        paymentCompleted: true
+                      })
+                    });
+                    const rescueData = await rescueRes.json();
+                    if (rescueData.success) {
+                      console.log('✅ User profile created via rescue');
+                    } else {
+                      console.error('❌ Rescue failed:', rescueData.error);
+                    }
+                  }
+
+                  // Wait a bit for auth context to update
+                  await new Promise(resolve => setTimeout(resolve, 500));
+
+                  toast({
+                    title: t('registrationSuccessful'),
+                    description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+                  });
+
+                  // Use window.location.href instead of navigate to force full page reload
+                  setTimeout(() => {
+                    window.location.href = '/store-setup';
                   }, 1000);
                   return;
                 } else {
-                  throw new Error(loginRes.error || 'Login failed');
-                }
-              } catch (loginError) {
-                console.error('❌ Login error:', loginError);
+                  console.log('⚠️ No session found, checking localStorage token...');
+                  // Try to use token from localStorage
+                  const storedToken = localStorage.getItem('idcashier_token');
+                  if (storedToken) {
+                    console.log('✅ Found token in localStorage, attempting to set session...');
+                    try {
+                      const { data: { user: userFromToken }, error: userError } = await supabase.auth.getUser(storedToken);
+                      if (!userError && userFromToken) {
+                        console.log('✅ User found from token, redirecting to store-setup...');
+                        // Set session for Supabase
+                        try {
+                          await supabase.auth.setSession({
+                            access_token: storedToken,
+                            refresh_token: storedToken
+                          });
+                        } catch (e) {
+                          console.warn('Could not set session from token:', e);
+                        }
 
-                // Fallback attempt: Check if session already exists
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session) {
-                  navigate('/store-setup', { replace: true });
-                  return;
-                }
+                        toast({
+                          title: t('registrationSuccessful'),
+                          description: 'Pembayaran berhasil! Akun Anda telah aktif. Mengarahkan ke setup toko...',
+                        });
 
+                        // Wait a bit for auth context to update
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        // Use window.location.href instead of navigate to force full page reload
+                        setTimeout(() => {
+                          window.location.href = '/store-setup';
+                        }, 1000);
+                        return;
+                      }
+                    } catch (tokenError) {
+                      console.error('❌ Error getting user from token:', tokenError);
+                    }
+                  }
+                }
+              } catch (sessionCheckError) {
+                console.error('Session check error:', sessionCheckError);
+              }
+
+              // If no session found after payment success, try to recover or redirect to store-setup
+              // The backend callback should have already created the subscription
+              console.log('⚠️ No session found after payment, attempting recovery...');
+
+              // Check if we have pending registration data with email
+              if (pendingRegistration?.email) {
                 toast({
                   title: t('paymentSuccessful'),
-                  description: 'Pembayaran berhasil! Silakan login.',
+                  description: 'Pembayaran berhasil! Silakan login untuk melanjutkan setup toko.',
                   variant: 'default'
                 });
+
                 localStorage.removeItem('pendingRegistration');
-                setTimeout(() => navigate('/login?payment=success'), 2000);
+
+                setTimeout(() => {
+                  navigate('/login?payment=success&email=' + encodeURIComponent(pendingRegistration.email), { replace: true });
+                }, 2000);
+              } else {
+                // No email found, but payment was successful - redirect to store-setup anyway
+                // The user might be logged in via OAuth but session not detected
+                toast({
+                  title: t('paymentSuccessful'),
+                  description: 'Pembayaran berhasil! Mengarahkan ke setup toko...',
+                  variant: 'default'
+                });
+
+                localStorage.removeItem('pendingRegistration');
+
+                setTimeout(() => {
+                  window.location.href = '/store-setup?fromPayment=true';
+                }, 2000);
               }
             }
 

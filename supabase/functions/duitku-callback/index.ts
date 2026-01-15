@@ -252,14 +252,42 @@ Deno.serve(async (req: Request) => {
       const { data: userByEmail } = await supabase
         .from('users')
         .select('id')
-        .eq('email', targetEmail)
-        .single();
+        .eq('email', targetEmail.toLowerCase().trim())
+        .maybeSingle();
 
       if (userByEmail) {
         userIdFromPayment = userByEmail.id;
         console.log('User found via email fallback:', userIdFromPayment);
       } else {
         console.warn('User not found via email fallback:', targetEmail);
+        // Try to find in auth.users as last resort
+        try {
+          const { data: authUsers } = await supabase.auth.admin.listUsers();
+          const foundAuthUser = authUsers?.users.find((u: any) =>
+            u.email?.toLowerCase().trim() === targetEmail.toLowerCase().trim()
+          );
+          if (foundAuthUser) {
+            userIdFromPayment = foundAuthUser.id;
+            console.log('User found in auth.users, creating profile in public.users...');
+            // Create user profile in public.users
+            const { error: createError } = await supabase
+              .from('users')
+              .insert({
+                id: foundAuthUser.id,
+                email: foundAuthUser.email,
+                name: foundAuthUser.user_metadata?.name || foundAuthUser.email?.split('@')[0] || 'User',
+                role: 'owner',
+                tenant_id: foundAuthUser.id
+              });
+            if (createError && !createError.message.includes('duplicate')) {
+              console.error('Failed to create user profile:', createError);
+            } else {
+              console.log('✅ User profile created in public.users');
+            }
+          }
+        } catch (authError) {
+          console.error('Error checking auth.users:', authError);
+        }
       }
     }
 
@@ -296,14 +324,77 @@ Deno.serve(async (req: Request) => {
     // If this is a successful payment (renewal or new order), update subscription
     if (isSuccess && (merchantOrderId?.startsWith('RENEWAL-') || merchantOrderId?.startsWith('ORDER-') || merchantOrderId?.startsWith('ORD-'))) {
       // Use user ID from payment record if available, otherwise extract from merchantOrderId
-      let userId = userIdFromPayment || merchantOrderIdParts?.[1];
+      let userId = userIdFromPayment;
 
-      if (!userIdFromPayment && (merchantOrderId?.startsWith('ORDER-') || merchantOrderId?.startsWith('ORD-')) && userId && !userId.includes('-')) {
-        // Reconstruct UUID: 8-4-4-4-12
-        userId = userId.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
+      console.log('🔍 [Subscription Creation] Starting subscription creation process', {
+        merchantOrderId,
+        userIdFromPayment,
+        merchantOrderIdParts,
+        additionalInfo
+      });
+
+      // For ORD- format: ORD-userIdNoDash-timestamp, userId is at index 1
+      // For ORDER- format: ORDER-userId-timestamp, userId is at index 1  
+      // For RENEWAL- format: RENEWAL-userId-timestamp, userId is at index 1
+      if (!userId && merchantOrderIdParts && merchantOrderIdParts.length >= 2) {
+        userId = merchantOrderIdParts[1];
+        console.log('🔍 [Subscription Creation] Extracted userId from merchantOrderId:', userId);
+
+        // If userId doesn't have dashes (was stripped), reconstruct UUID: 8-4-4-4-12
+        if (userId && !userId.includes('-') && userId.length === 32) {
+          userId = userId.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
+          console.log('🔍 [Subscription Creation] Reconstructed UUID:', userId);
+        }
+      }
+
+      // Final fallback: use additionalParam userId
+      if (!userId && additionalInfo.userId) {
+        userId = additionalInfo.userId;
+        console.log('🔍 [Subscription Creation] Using userId from additionalParam:', userId);
+      }
+
+      if (!userId) {
+        console.error('❌ [Subscription Creation] Failed to extract userId from all sources', {
+          merchantOrderId,
+          userIdFromPayment,
+          additionalInfo
+        });
       }
 
       if (userId) {
+        // First, ensure user exists in public.users table
+        const { data: existingUser, error: userCheckError } = await supabase
+          .from('users')
+          .select('id, role, tenant_id')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (!existingUser) {
+          // User doesn't exist in public.users, create it
+          console.log(`⚠️ User ${userId} not found in public.users, creating profile...`);
+          const userEmail = additionalInfo.email || customerEmail || '';
+          const userName = additionalInfo.name || 'User';
+
+          const { error: createUserError } = await supabase
+            .from('users')
+            .insert({
+              id: userId,
+              email: userEmail.toLowerCase().trim(),
+              name: userName,
+              role: 'owner',
+              tenant_id: userId
+            });
+
+          if (createUserError) {
+            console.error('❌ Failed to create user profile in callback:', createUserError);
+            // Don't return here - try to create subscription anyway
+          } else {
+            console.log(`✅ User profile created for ${userId}`);
+          }
+        } else {
+          console.log(`✅ User profile exists for ${userId}`);
+        }
+
         // For cashiers, use the owner's ID for subscription
         let effectiveUserId = userId;
 
@@ -312,7 +403,7 @@ Deno.serve(async (req: Request) => {
           .from('users')
           .select('role, tenant_id')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
 
         if (!userError && userData && userData.role === 'cashier') {
           effectiveUserId = userData.tenant_id;
@@ -360,19 +451,37 @@ Deno.serve(async (req: Request) => {
           planName = '12_months';
         }
 
+        console.log(`💰 Payment amount: ${amountNum}, Extension: ${extensionMonths} months, Plan: ${planName}`);
+
         // Find existing subscription or create new one
+        console.log('🔍 [Subscription Creation] Looking for existing subscription for user:', effectiveUserId);
         const { data: existingSubscription, error: subError } = await supabase
           .from('subscriptions')
           .select('*')
           .eq('user_id', effectiveUserId)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
+
+        if (subError && subError.code !== 'PGRST116') { // PGRST116 = no rows returned
+          console.error('❌ [Subscription Creation] Error checking existing subscription:', subError);
+        } else {
+          console.log('🔍 [Subscription Creation] Existing subscription check result:', existingSubscription ? 'Found' : 'Not found');
+        }
+
+        // Always create subscription for registration payments (ORD- prefix)
+        // Don't extend existing subscription for new registrations
+        const isNewRegistration = merchantOrderId?.startsWith('ORD-');
+        if (isNewRegistration && existingSubscription) {
+          console.log('🔍 [Subscription Creation] New registration detected, will create new subscription instead of extending');
+        }
 
         const newEndDate = new Date();
 
-        if (existingSubscription) {
-          // Extend existing subscription
+        // For new registrations (ORD-), always create new subscription
+        // For renewals (RENEWAL-), extend existing subscription
+        if (existingSubscription && !isNewRegistration) {
+          // Extend existing subscription (renewal case)
           const currentEndDate = new Date(existingSubscription.end_date);
           // If current end date is in the past, start from today
           if (currentEndDate < new Date()) {
@@ -382,47 +491,63 @@ Deno.serve(async (req: Request) => {
             newEndDate.setTime(currentEndDate.getTime() + (extensionMonths * 30 * 24 * 60 * 60 * 1000));
           }
 
-          // Determine status based on end_date
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const subscriptionStatus = newEndDate >= today ? 'active' : 'expired';
+          console.log(`🔄 [Subscription Extension] Extending subscription ${existingSubscription.id} from ${existingSubscription.end_date} to ${newEndDate.toISOString().split('T')[0]}`);
 
           const { error: updateError } = await supabase
             .from('subscriptions')
             .update({
               end_date: newEndDate.toISOString().split('T')[0],
-              status: subscriptionStatus,
+              status: 'active',
               updated_at: new Date().toISOString()
             })
             .eq('id', existingSubscription.id);
 
           if (updateError) {
-            console.error('Error updating subscription:', updateError);
+            console.error('❌ [Subscription Creation] Error updating subscription:', updateError);
           } else {
-            console.log(`Subscription ${existingSubscription.id} extended by ${extensionMonths} months, status: ${subscriptionStatus}`);
+            console.log(`✅ [Subscription Creation] Subscription ${existingSubscription.id} extended by ${extensionMonths} months`);
           }
         } else {
           // Create new subscription
           newEndDate.setDate(newEndDate.getDate() + (extensionMonths * 30));
 
-          // Determine status - new subscriptions should be active
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const subscriptionStatus = newEndDate >= today ? 'active' : 'expired';
+          console.log('🔍 [Subscription Creation] Creating new subscription', {
+            user_id: effectiveUserId,
+            plan_name: planName,
+            duration: extensionMonths,
+            start_date: new Date().toISOString().split('T')[0],
+            end_date: newEndDate.toISOString().split('T')[0],
+            status: 'active'
+          });
 
-          const { error: insertError } = await supabase
+          const { data: newSubscription, error: insertError } = await supabase
             .from('subscriptions')
             .insert({
               user_id: effectiveUserId,
+              plan_name: planName,
+              duration: extensionMonths,
               start_date: new Date().toISOString().split('T')[0],
               end_date: newEndDate.toISOString().split('T')[0],
-              status: subscriptionStatus
-            });
+              status: 'active'
+            })
+            .select()
+            .single();
 
           if (insertError) {
-            console.error('Error creating subscription:', insertError);
+            console.error('❌ [Subscription Creation] Error creating subscription:', insertError);
+            console.error('❌ [Subscription Creation] Insert error details:', {
+              code: insertError.code,
+              message: insertError.message,
+              details: insertError.details,
+              hint: insertError.hint
+            });
           } else {
-            console.log(`New subscription created for user ${effectiveUserId}, valid until ${newEndDate.toISOString().split('T')[0]}, status: ${subscriptionStatus}`);
+            console.log(`✅ [Subscription Creation] New subscription created for user ${effectiveUserId}`, {
+              subscriptionId: newSubscription?.id,
+              validUntil: newEndDate.toISOString().split('T')[0],
+              planName,
+              duration: extensionMonths
+            });
           }
         }
 
