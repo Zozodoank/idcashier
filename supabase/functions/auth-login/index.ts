@@ -1,3 +1,4 @@
+// @ts-nocheck - Deno Edge Function (types are available at runtime)
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
