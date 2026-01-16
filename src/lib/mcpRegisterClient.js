@@ -60,7 +60,18 @@ class MCPRegisterClient {
         body: JSON.stringify(requestBody)
       });
 
-      const result = await response.json();
+      // Clone response to avoid "body stream already read" error
+      // (in case api-monitor or other interceptors read it first)
+      const responseClone = response.clone();
+
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        // If json() fails (body already read), try the clone
+        console.warn('Response body already read, using clone:', jsonError.message);
+        result = await responseClone.json();
+      }
 
       if (!response.ok) {
         throw new Error(result.error || 'Registration failed');
@@ -103,7 +114,16 @@ class MCPRegisterClient {
         })
       });
 
-      const result = await response.json();
+      // Clone response to avoid "body stream already read" error
+      const responseClone = response.clone();
+
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        console.warn('Response body already read, using clone:', jsonError.message);
+        result = await responseClone.json();
+      }
 
       if (!response.ok) {
         throw new Error(result.error || 'Registration with trial failed');

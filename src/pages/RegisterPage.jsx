@@ -29,7 +29,7 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  
+
   const planName = searchParams.get('plan');
   const planPrice = searchParams.get('price');
   const planDuration = searchParams.get('duration');
@@ -80,12 +80,14 @@ export default function RegisterPage() {
           planDuration: planDuration ? parseInt(planDuration, 10) : 1
         });
 
+        console.log('Registration result:', registrationResult);
+
         if (!registrationResult.success) {
           // Handle "already registered" case - try to login if password matches
           if (registrationResult.error && (
-              registrationResult.error.includes('already been registered') || 
-              registrationResult.error.includes('already registered')
-            )) {
+            registrationResult.error.includes('already been registered') ||
+            registrationResult.error.includes('already registered')
+          )) {
             // Try to login
             const loginResult = await login(email, password);
             if (loginResult.success && loginResult.user) {
@@ -100,7 +102,18 @@ export default function RegisterPage() {
             throw new Error(registrationResult.error || t('registrationFailed'));
           }
         } else {
-          user = registrationResult.data.user;
+          // Extract user from registration result
+          // auth-register returns: { user, token, session, message }
+          user = registrationResult.data.user || registrationResult.data;
+
+          console.log('Extracted user:', user);
+
+          // Verify user has id
+          if (!user || !user.id) {
+            console.error('Invalid user object:', user);
+            console.error('Full registration result:', registrationResult);
+            throw new Error('Registration succeeded but user data is invalid. Please try logging in.');
+          }
         }
 
         // Call Payment Gateway
@@ -125,24 +138,24 @@ export default function RegisterPage() {
         if (!paymentResponse.ok) throw new Error(paymentData.error || t('paymentRequestFailed'));
 
         if (paymentData.paymentUrl) {
-           // Save pending registration data for callback
-           const duration = planDuration ? parseInt(planDuration, 10) : 1;
-           console.log('Saving pending registration with duration:', duration);
-           
-           localStorage.setItem('pendingRegistration', JSON.stringify({
-             name,
-             email,
-             password,
-             planDuration: duration,
-             merchantOrderId: paymentData.merchantOrderId,
-             useHPP: false, // Default
-             role: 'owner'
-           }));
+          // Save pending registration data for callback
+          const duration = planDuration ? parseInt(planDuration, 10) : 1;
+          console.log('Saving pending registration with duration:', duration);
 
-           window.location.href = paymentData.paymentUrl;
+          localStorage.setItem('pendingRegistration', JSON.stringify({
+            name,
+            email,
+            password,
+            planDuration: duration,
+            merchantOrderId: paymentData.merchantOrderId,
+            useHPP: false, // Default
+            role: 'owner'
+          }));
+
+          window.location.href = paymentData.paymentUrl;
         } else {
-           const errorMessage = paymentData.Message || paymentData.statusMessage || t('paymentUrlNotReceived');
-           throw new Error(`Payment Gateway Error: ${errorMessage}`);
+          const errorMessage = paymentData.Message || paymentData.statusMessage || t('paymentUrlNotReceived');
+          throw new Error(`Payment Gateway Error: ${errorMessage}`);
         }
 
       } else {
@@ -160,12 +173,12 @@ export default function RegisterPage() {
 
         // Check if email verification is needed (trial users need verification)
         const needsVerification = registrationResult.data?.emailVerificationSent === true;
-        
+
         if (needsVerification) {
-          toast({ 
-            title: t('verifyEmailRequired'), 
+          toast({
+            title: t('verifyEmailRequired'),
             description: t('verifyEmailDesc'),
-            duration: 5000 
+            duration: 5000
           });
 
           // Redirect to login after delay
@@ -174,10 +187,10 @@ export default function RegisterPage() {
           }, 2000);
         } else {
           // User is already verified (shouldn't happen for trial, but just in case)
-          toast({ 
-            title: t('registrationSuccessful'), 
+          toast({
+            title: t('registrationSuccessful'),
             description: t('loginSuccess'),
-            duration: 3000 
+            duration: 3000
           });
 
           setTimeout(() => {
@@ -187,10 +200,10 @@ export default function RegisterPage() {
       }
     } catch (error) {
       console.error('Registration error:', error);
-      toast({ 
-        title: t('error'), 
+      toast({
+        title: t('error'),
         description: error.message || t('registrationFailedTryAgain'),
-        variant: 'destructive' 
+        variant: 'destructive'
       });
     } finally {
       setIsLoading(false);
@@ -203,7 +216,7 @@ export default function RegisterPage() {
         <title>{t('register')} - idCashier</title>
         <meta name="description" content={t('registerMetaDesc')} />
       </Helmet>
-      
+
       <div className="min-h-screen gradient-bg flex flex-col">
         <header className="p-4 flex justify-between items-center">
           <LanguageSelector />
@@ -231,8 +244,8 @@ export default function RegisterPage() {
                     e.target.style.display = 'none';
                     e.target.nextSibling.style.display = 'flex';
                   }} />
-                  <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white font-bold text-2xl mx-auto" 
-                       style={{ display: 'none' }}>
+                  <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white font-bold text-2xl mx-auto"
+                    style={{ display: 'none' }}>
                     IC
                   </div>
                 </motion.div>
@@ -330,8 +343,8 @@ export default function RegisterPage() {
               <div className="mt-6 text-center">
                 <p className="text-sm text-white/80">
                   {t('alreadyHaveAccount')}{' '}
-                  <Link 
-                    to="/login" 
+                  <Link
+                    to="/login"
                     className="text-white hover:text-white underline transition-colors"
                   >
                     {t('login')}
@@ -349,14 +362,14 @@ export default function RegisterPage() {
           onSelect={(method) => {
             setIsPaymentModalOpen(false);
             if (authMethod === 'google') {
-              performGoogleOAuth({ 
-                planName, 
-                planPrice, 
-                planDuration, 
+              performGoogleOAuth({
+                planName,
+                planPrice,
+                planDuration,
                 paymentMethod: method,
-                t, 
-                toast, 
-                mode: 'signup' 
+                t,
+                toast,
+                mode: 'signup'
               });
             } else {
               processRegistration(method);
