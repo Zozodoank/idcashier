@@ -7,12 +7,11 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 
 // Duitku callback handler
 // Duitku callback handler
-// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req: Request) => {
   // Get origin from request headers for dynamic CORS
   const origin = req.headers.get('origin') || '';
   const corsHeaders = getCorsHeaders(origin);
-
+  
   // Handle preflight request
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -31,7 +30,7 @@ Deno.serve(async (req: Request) => {
       }
       return out;
     };
-
+    
 
 
 
@@ -103,10 +102,10 @@ Deno.serve(async (req: Request) => {
       callbackData = normalizeKeys(temp);
       console.log('Parsed query params:', callbackData);
     }
-
+    
     // Log the callback data for debugging
     console.log('Final parsed callback data:', callbackData);
-
+    
     // Extract relevant information with proper typing
     const merchantCode = (callbackData.merchantCode || callbackData['merchantcode']) as string | undefined;
     const amount = (callbackData.amount || callbackData['paymentamount']) as string | number | undefined;
@@ -122,12 +121,12 @@ Deno.serve(async (req: Request) => {
     // Load Duitku configuration from environment
     // @ts-ignore: Deno is available at runtime
     const DUITKU_MERCHANT_CODE = Deno.env.get('DUITKU_MERCHANT_CODE') || '';
-    // @ts-ignore: Deno is available at runtime
-    const DUITKU_API_KEY = Deno.env.get('DUITKU_API_KEY')?.trim() || Deno.env.get('DUITKU_MERCHANT_KEY')?.trim() || '';
-    // Duitku callbacks always use MD5 according to spec
-    const DUITKU_SIGNATURE_ALGO = 'md5';
+          // @ts-ignore: Deno is available at runtime
+      const DUITKU_API_KEY = Deno.env.get('DUITKU_API_KEY')?.trim() || Deno.env.get('DUITKU_MERCHANT_KEY')?.trim() || '';
+      // Duitku callbacks always use MD5 according to spec
+      const DUITKU_SIGNATURE_ALGO = 'md5';
 
-
+    
 
     // Helper for timing-safe comparison
     const timingSafeEqual = (a: string, b: string) => {
@@ -155,18 +154,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!DUITKU_API_KEY) {
-      console.warn('Duitku API key not set in environment, skipping signature verification');
-    } else {
+      if (!DUITKU_API_KEY) {
+    console.warn('Duitku API key not set in environment, skipping signature verification');
+  } else {
       try {
-        // For callback: MD5(merchantCode + amount + merchantOrderId + apiKey)
-        const rawString = `${merchantCode}${amount}${merchantOrderId}${DUITKU_API_KEY}`;
-
-        console.log('🔍 Callback Signature Debug:', {
+          // For callback: MD5(merchantCode + amount + merchantOrderId + apiKey)
+  const rawString = `${merchantCode}${amount}${merchantOrderId}${DUITKU_API_KEY}`;
+  
+  console.log('🔍 Callback Signature Debug:', {
           merchantCode,
           amount,
           merchantOrderId,
-          merchantKey: DUITKU_API_KEY.substring(0, 10) + '...',
+                      merchantKey: DUITKU_API_KEY.substring(0, 10) + '...',
           signatureString: rawString,
           algorithm: DUITKU_SIGNATURE_ALGO
         });
@@ -232,63 +231,35 @@ Deno.serve(async (req: Request) => {
     // Fallback: Check additionalParam for userId and email (Most Reliable Fallback)
     let additionalInfo: any = {};
     if (!userIdFromPayment && additionalParam) {
-      try {
-        additionalInfo = JSON.parse(additionalParam);
-        console.log('Parsed additionalParam:', additionalInfo);
-
-        if (additionalInfo.userId) {
-          userIdFromPayment = additionalInfo.userId;
-          console.log('User found via additionalParam userId:', userIdFromPayment);
+        try {
+           additionalInfo = JSON.parse(additionalParam);
+           console.log('Parsed additionalParam:', additionalInfo);
+           
+           if (additionalInfo.userId) {
+              userIdFromPayment = additionalInfo.userId;
+              console.log('User found via additionalParam userId:', userIdFromPayment);
+           }
+        } catch (e) {
+           console.error('Error parsing additionalParam:', e);
         }
-      } catch (e: any) {
-        console.error('Error parsing additionalParam:', e);
-      }
     }
 
     // Fallback: If payment not found, find user by email (from additionalParam or callback)
     const targetEmail = additionalInfo.email || customerEmail;
     if (!userIdFromPayment && targetEmail) {
-      console.log('Payment lookup failed, attempting fallback with email:', targetEmail);
-      const { data: userByEmail } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', targetEmail.toLowerCase().trim())
-        .maybeSingle();
-
-      if (userByEmail) {
-        userIdFromPayment = userByEmail.id;
-        console.log('User found via email fallback:', userIdFromPayment);
-      } else {
-        console.warn('User not found via email fallback:', targetEmail);
-        // Try to find in auth.users as last resort
-        try {
-          const { data: authUsers } = await supabase.auth.admin.listUsers();
-          const foundAuthUser = authUsers?.users.find((u: any) =>
-            u.email?.toLowerCase().trim() === targetEmail.toLowerCase().trim()
-          );
-          if (foundAuthUser) {
-            userIdFromPayment = foundAuthUser.id;
-            console.log('User found in auth.users, creating profile in public.users...');
-            // Create user profile in public.users
-            const { error: createError } = await supabase
-              .from('users')
-              .insert({
-                id: foundAuthUser.id,
-                email: foundAuthUser.email,
-                name: foundAuthUser.user_metadata?.name || foundAuthUser.email?.split('@')[0] || 'User',
-                role: 'owner',
-                tenant_id: foundAuthUser.id
-              });
-            if (createError && !createError.message.includes('duplicate')) {
-              console.error('Failed to create user profile:', createError);
-            } else {
-              console.log('✅ User profile created in public.users');
-            }
-          }
-        } catch (authError) {
-          console.error('Error checking auth.users:', authError);
-        }
-      }
+       console.log('Payment lookup failed, attempting fallback with email:', targetEmail);
+       const { data: userByEmail } = await supabase
+         .from('users')
+         .select('id')
+         .eq('email', targetEmail)
+         .single();
+       
+       if (userByEmail) {
+          userIdFromPayment = userByEmail.id;
+          console.log('User found via email fallback:', userIdFromPayment);
+       } else {
+          console.warn('User not found via email fallback:', targetEmail);
+       }
     }
 
     // Update payment status based on resultCode
@@ -324,92 +295,29 @@ Deno.serve(async (req: Request) => {
     // If this is a successful payment (renewal or new order), update subscription
     if (isSuccess && (merchantOrderId?.startsWith('RENEWAL-') || merchantOrderId?.startsWith('ORDER-') || merchantOrderId?.startsWith('ORD-'))) {
       // Use user ID from payment record if available, otherwise extract from merchantOrderId
-      let userId = userIdFromPayment;
+      let userId = userIdFromPayment || merchantOrderIdParts?.[1];
 
-      console.log('🔍 [Subscription Creation] Starting subscription creation process', {
-        merchantOrderId,
-        userIdFromPayment,
-        merchantOrderIdParts,
-        additionalInfo
-      });
-
-      // For ORD- format: ORD-userIdNoDash-timestamp, userId is at index 1
-      // For ORDER- format: ORDER-userId-timestamp, userId is at index 1  
-      // For RENEWAL- format: RENEWAL-userId-timestamp, userId is at index 1
-      if (!userId && merchantOrderIdParts && merchantOrderIdParts.length >= 2) {
-        userId = merchantOrderIdParts[1];
-        console.log('🔍 [Subscription Creation] Extracted userId from merchantOrderId:', userId);
-
-        // If userId doesn't have dashes (was stripped), reconstruct UUID: 8-4-4-4-12
-        if (userId && !userId.includes('-') && userId.length === 32) {
-          userId = userId.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
-          console.log('🔍 [Subscription Creation] Reconstructed UUID:', userId);
-        }
+      if (!userIdFromPayment && (merchantOrderId?.startsWith('ORDER-') || merchantOrderId?.startsWith('ORD-')) && userId && !userId.includes('-')) {
+         // Reconstruct UUID: 8-4-4-4-12
+         userId = userId.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
       }
-
-      // Final fallback: use additionalParam userId
-      if (!userId && additionalInfo.userId) {
-        userId = additionalInfo.userId;
-        console.log('🔍 [Subscription Creation] Using userId from additionalParam:', userId);
-      }
-
-      if (!userId) {
-        console.error('❌ [Subscription Creation] Failed to extract userId from all sources', {
-          merchantOrderId,
-          userIdFromPayment,
-          additionalInfo
-        });
-      }
-
+      
       if (userId) {
-        // First, ensure user exists in public.users table
-        const { data: existingUser, error: userCheckError } = await supabase
-          .from('users')
-          .select('id, role, tenant_id')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (!existingUser) {
-          // User doesn't exist in public.users, create it
-          console.log(`⚠️ User ${userId} not found in public.users, creating profile...`);
-          const userEmail = additionalInfo.email || customerEmail || '';
-          const userName = additionalInfo.name || 'User';
-
-          const { error: createUserError } = await supabase
-            .from('users')
-            .insert({
-              id: userId,
-              email: userEmail.toLowerCase().trim(),
-              name: userName,
-              role: 'owner',
-              tenant_id: userId
-            });
-
-          if (createUserError) {
-            console.error('❌ Failed to create user profile in callback:', createUserError);
-            // Don't return here - try to create subscription anyway
-          } else {
-            console.log(`✅ User profile created for ${userId}`);
-          }
-        } else {
-          console.log(`✅ User profile exists for ${userId}`);
-        }
-
         // For cashiers, use the owner's ID for subscription
         let effectiveUserId = userId;
-
+        
         // Get user data to check if user is a cashier
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('role, tenant_id')
           .eq('id', userId)
-          .maybeSingle();
-
+          .single();
+          
         if (!userError && userData && userData.role === 'cashier') {
           effectiveUserId = userData.tenant_id;
           console.log(`User ${userId} is a cashier, using tenant_id ${effectiveUserId} for subscription`);
         }
-
+        
         // Get payment record to access product details
         let paymentRecord: any = null;
         let isHPPActivation = false;
@@ -419,22 +327,22 @@ Deno.serve(async (req: Request) => {
             .select('amount, product_details')
             .eq('id', paymentId)
             .single();
-
+          
           if (!paymentError && data) {
             paymentRecord = data;
             // Check if this is HPP activation payment
-            isHPPActivation = paymentRecord.product_details?.includes('HPP') ||
-              paymentRecord.product_details?.includes('Aktivasi HPP') ||
-              paymentRecord.product_details?.toLowerCase().includes('hpp') ||
-              false;
+            isHPPActivation = paymentRecord.product_details?.includes('HPP') || 
+                             paymentRecord.product_details?.includes('Aktivasi HPP') ||
+                             paymentRecord.product_details?.toLowerCase().includes('hpp') ||
+                             false;
             console.log(`[HPP Activation Check] product_details: "${paymentRecord.product_details}", isHPPActivation: ${isHPPActivation}`);
           }
         }
-
+        
         // Get the payment amount to determine extension period
         let extensionMonths = 1; // Default fallback
         const amountNum = typeof amount === 'string' ? parseInt(amount) : amount;
-
+        
         // Determine extension period and plan name based on amount and product details
         let planName = '1_month';
         if (amountNum === 50000) {
@@ -450,38 +358,20 @@ Deno.serve(async (req: Request) => {
           extensionMonths = 12;
           planName = '12_months';
         }
-
-        console.log(`💰 Payment amount: ${amountNum}, Extension: ${extensionMonths} months, Plan: ${planName}`);
-
+        
         // Find existing subscription or create new one
-        console.log('🔍 [Subscription Creation] Looking for existing subscription for user:', effectiveUserId);
         const { data: existingSubscription, error: subError } = await supabase
           .from('subscriptions')
           .select('*')
           .eq('user_id', effectiveUserId)
           .order('created_at', { ascending: false })
           .limit(1)
-          .maybeSingle();
-
-        if (subError && subError.code !== 'PGRST116') { // PGRST116 = no rows returned
-          console.error('❌ [Subscription Creation] Error checking existing subscription:', subError);
-        } else {
-          console.log('🔍 [Subscription Creation] Existing subscription check result:', existingSubscription ? 'Found' : 'Not found');
-        }
-
-        // Always create subscription for registration payments (ORD- prefix)
-        // Don't extend existing subscription for new registrations
-        const isNewRegistration = merchantOrderId?.startsWith('ORD-');
-        if (isNewRegistration && existingSubscription) {
-          console.log('🔍 [Subscription Creation] New registration detected, will create new subscription instead of extending');
-        }
+          .single();
 
         const newEndDate = new Date();
-
-        // For new registrations (ORD-), always create new subscription
-        // For renewals (RENEWAL-), extend existing subscription
-        if (existingSubscription && !isNewRegistration) {
-          // Extend existing subscription (renewal case)
+        
+        if (existingSubscription) {
+          // Extend existing subscription
           const currentEndDate = new Date(existingSubscription.end_date);
           // If current end date is in the past, start from today
           if (currentEndDate < new Date()) {
@@ -490,105 +380,62 @@ Deno.serve(async (req: Request) => {
             // Extend from current end date
             newEndDate.setTime(currentEndDate.getTime() + (extensionMonths * 30 * 24 * 60 * 60 * 1000));
           }
-
-          console.log(`🔄 [Subscription Extension] Extending subscription ${existingSubscription.id} from ${existingSubscription.end_date} to ${newEndDate.toISOString().split('T')[0]}`);
-
+          
+          // Determine status based on end_date
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const subscriptionStatus = newEndDate >= today ? 'active' : 'expired';
+          
           const { error: updateError } = await supabase
             .from('subscriptions')
             .update({
               end_date: newEndDate.toISOString().split('T')[0],
-              status: 'active',
+              status: subscriptionStatus,
               updated_at: new Date().toISOString()
             })
             .eq('id', existingSubscription.id);
 
           if (updateError) {
-            console.error('❌ [Subscription Creation] Error updating subscription:', updateError);
+            console.error('Error updating subscription:', updateError);
           } else {
-            console.log(`✅ [Subscription Creation] Subscription ${existingSubscription.id} extended by ${extensionMonths} months`);
+            console.log(`Subscription ${existingSubscription.id} extended by ${extensionMonths} months, status: ${subscriptionStatus}`);
           }
         } else {
           // Create new subscription
           newEndDate.setDate(newEndDate.getDate() + (extensionMonths * 30));
-
-          console.log('🔍 [Subscription Creation] Creating new subscription', {
-            user_id: effectiveUserId,
-            plan_name: planName,
-            duration: extensionMonths,
-            start_date: new Date().toISOString().split('T')[0],
-            end_date: newEndDate.toISOString().split('T')[0],
-            status: 'active'
-          });
-
-          const { data: newSubscription, error: insertError } = await supabase
+          
+          // Determine status - new subscriptions should be active
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const subscriptionStatus = newEndDate >= today ? 'active' : 'expired';
+          
+          const { error: insertError } = await supabase
             .from('subscriptions')
             .insert({
               user_id: effectiveUserId,
-              plan_name: planName,
-              duration: extensionMonths,
               start_date: new Date().toISOString().split('T')[0],
               end_date: newEndDate.toISOString().split('T')[0],
-              status: 'active'
-            })
-            .select()
-            .single();
+              status: subscriptionStatus
+            });
 
           if (insertError) {
-            console.error('❌ [Subscription Creation] Error creating subscription:', insertError);
-            console.error('❌ [Subscription Creation] Insert error details:', {
-              code: insertError.code,
-              message: insertError.message,
-              details: insertError.details,
-              hint: insertError.hint
-            });
+            console.error('Error creating subscription:', insertError);
           } else {
-            console.log(`✅ [Subscription Creation] New subscription created for user ${effectiveUserId}`, {
-              subscriptionId: newSubscription?.id,
-              validUntil: newEndDate.toISOString().split('T')[0],
-              planName,
-              duration: extensionMonths
-            });
+            console.log(`New subscription created for user ${effectiveUserId}, valid until ${newEndDate.toISOString().split('T')[0]}, status: ${subscriptionStatus}`);
           }
         }
-
-        // Auto-confirm user email and set payment completed on successful payment
-        // CRITICAL: Handle both OAuth and non-OAuth users
-        const { data: authUser, error: getUserError } = await supabase.auth.admin.getUserById(userId);
-
-        if (getUserError) {
-          console.error(`Failed to get auth user ${userId}:`, getUserError);
+        
+        // Auto-confirm user email on successful payment
+        const { error: confirmError } = await supabase.auth.admin.updateUserById(userId, {
+          email_confirm: true
+        });
+        
+        if (confirmError) {
+          console.error(`Failed to auto-confirm email for user ${userId}:`, confirmError);
         } else {
-          const isOAuthUser = authUser?.user?.user_metadata?.oauth_provider !== undefined;
-
-          const updateData: any = {
-            email_confirm: true,
-            user_metadata: {
-              ...authUser?.user?.user_metadata,
-              payment_completed: true,
-              is_trial_user: false
-            }
-          };
-
-          // For OAuth users, ensure OAuth metadata is preserved
-          if (isOAuthUser) {
-            updateData.user_metadata.oauth_provider = authUser.user.user_metadata.oauth_provider;
-            if (authUser.user.user_metadata.oauth_user_id) {
-              updateData.user_metadata.oauth_user_id = authUser.user.user_metadata.oauth_user_id;
-            }
-            console.log(`Updating OAuth user ${userId} with payment metadata`);
-          } else {
-            console.log(`Updating regular user ${userId} with payment metadata`);
-          }
-
-          const { error: confirmError } = await supabase.auth.admin.updateUserById(userId, updateData);
-
-          if (confirmError) {
-            console.error(`Failed to update user ${userId} payment status:`, confirmError);
-          } else {
-            console.log(`✅ User ${userId} payment status updated (OAuth: ${isOAuthUser})`);
-          }
+          console.log(`Auto-confirmed email for user ${userId}`);
         }
-
+        
         // If this is HPP activation payment, enable HPP feature
         if (isHPPActivation) {
           console.log(`[HPP Activation] Enabling HPP feature for user ${effectiveUserId}...`);
@@ -600,11 +447,11 @@ Deno.serve(async (req: Request) => {
               .eq('user_id', effectiveUserId)
               .eq('setting_key', 'hpp_enabled')
               .maybeSingle();
-
+            
             if (settingCheckError) {
               console.error('[HPP Activation] Error checking existing setting:', settingCheckError);
             }
-
+            
             if (existingSetting) {
               // Update existing setting
               console.log(`[HPP Activation] Updating existing setting (id: ${existingSetting.id})...`);
@@ -616,7 +463,7 @@ Deno.serve(async (req: Request) => {
                 })
                 .eq('id', existingSetting.id)
                 .select();
-
+              
               if (updateSettingError) {
                 console.error('[HPP Activation] Error updating HPP setting:', updateSettingError);
               } else {
@@ -633,7 +480,7 @@ Deno.serve(async (req: Request) => {
                   setting_value: { enabled: true }
                 })
                 .select();
-
+              
               if (insertSettingError) {
                 console.error('[HPP Activation] Error creating HPP setting:', insertSettingError);
               } else {
@@ -651,28 +498,28 @@ Deno.serve(async (req: Request) => {
 
     // Return success response
     return new Response(
-      JSON.stringify({
-        success: true,
+      JSON.stringify({ 
+        success: true, 
         message: 'Callback processed successfully',
         paymentId,
         status: paymentStatus
       }),
-      {
+      { 
         headers: corsHeaders,
         status: 200
       }
     );
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error processing Duitku callback:', error);
-
+    
     return new Response(
-      JSON.stringify({
-        success: false,
+      JSON.stringify({ 
+        success: false, 
         message: 'Internal server error processing callback',
         error: error.message
       }),
-      {
+      { 
         headers: corsHeaders,
         status: 500
       }
