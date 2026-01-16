@@ -103,16 +103,39 @@ export default function RegisterPage() {
           }
         } else {
           // Extract user from registration result
-          // auth-register returns: { user, token, session, message }
-          user = registrationResult.data.user || registrationResult.data;
+          // auth-register can return different structures:
+          // 1. { user: { id, email, ... } } - full user object
+          // 2. { userId: "...", message: "..." } - just userId
+          const responseData = registrationResult.data;
+
+          console.log('Registration response data:', responseData);
+
+          // Try to extract user object or construct from userId
+          if (responseData.user && responseData.user.id) {
+            user = responseData.user;
+          } else if (responseData.userId) {
+            // Construct user object from userId
+            user = {
+              id: responseData.userId,
+              email: email,
+              name: name,
+              role: 'owner'
+            };
+          } else if (responseData.id) {
+            // Response is the user object itself
+            user = responseData;
+          } else {
+            console.error('Invalid user object:', responseData);
+            console.error('Full registration result:', registrationResult);
+            throw new Error('Registration succeeded but user data is invalid. Please try logging in.');
+          }
 
           console.log('Extracted user:', user);
 
           // Verify user has id
           if (!user || !user.id) {
-            console.error('Invalid user object:', user);
-            console.error('Full registration result:', registrationResult);
-            throw new Error('Registration succeeded but user data is invalid. Please try logging in.');
+            console.error('User validation failed:', user);
+            throw new Error('Registration succeeded but user ID is missing. Please try logging in.');
           }
         }
 
