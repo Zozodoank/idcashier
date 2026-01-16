@@ -4,7 +4,6 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from '@supabase/supabase-js'
 import { getCorsHeaders } from '../_shared/cors.ts'
 
-// @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin') || '';
   const corsHeaders = getCorsHeaders(origin);
@@ -26,59 +25,32 @@ Deno.serve(async (req) => {
     const normalizedEmail = email.trim().toLowerCase()
 
     const supabaseAdmin = createClient(
-      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_URL')!,
-      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
     
     const supabaseAnon = createClient(
-      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_URL')!,
-      // @ts-ignore: Deno is available at runtime
       Deno.env.get('SUPABASE_ANON_KEY')!
     )
 
-    const isWhitelistAccount = normalizedEmail === 'demo@idcashier.com' || 
+    const isWhitelistAccount = normalizedEmail === 'demo@idcashier.my.id' || 
                                normalizedEmail === 'jho.j80@gmail.com';
     
-    // Background auto-confirm for whitelist (non-blocking) - improved with better error handling
+    // Background auto-confirm for whitelist (non-blocking)
     if (isWhitelistAccount) {
-      (async () => {
-        try {
-          const { data: publicUser, error: selectError } = await supabaseAdmin
-            .from('users')
-            .select('id')
-            .eq('email', normalizedEmail)
-            .maybeSingle();
-            
-          if (selectError) {
-            console.error('Error fetching whitelist user:', selectError);
-            return;
-          }
+      supabaseAdmin.from('users').select('id').eq('email', normalizedEmail).maybeSingle()
+        .then(async ({ data: publicUser }) => {
           if (publicUser?.id) {
-            try {
-              const { data: authUserResult } = await supabaseAdmin.auth.admin.getUserById(publicUser.id);
-              if (authUserResult?.user) {
-                // Always confirm email for whitelist accounts
-                await supabaseAdmin.auth.admin.updateUserById(publicUser.id, {
-                  email_confirm: true,
-                  user_metadata: { 
-                    ...authUserResult.user.user_metadata, 
-                    email_verified: true,
-                    whitelisted: true
-                  }
-                });
-                console.log(`✅ Whitelist account ${normalizedEmail} auto-confirmed`);
-              }
-            } catch (updateError) {
-              console.error('Error confirming whitelist user:', updateError);
+            const { data: authUserResult } = await supabaseAdmin.auth.admin.getUserById(publicUser.id);
+            if (authUserResult?.user && !authUserResult.user.email_confirmed_at) {
+              await supabaseAdmin.auth.admin.updateUserById(publicUser.id, {
+                email_confirm: true,
+                user_metadata: { ...authUserResult.user.user_metadata, email_verified: true }
+              });
             }
           }
-        } catch (e: any) {
-          console.error('Auto-confirm error:', e);
-        }
-      })();
+        }).catch(e => console.error('Auto-confirm error:', e));
     }
 
     // Parallelize Auth and User Profile Fetch to improve speed
