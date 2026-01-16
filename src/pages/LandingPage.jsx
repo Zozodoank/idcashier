@@ -12,7 +12,6 @@ import {
   Smartphone, CreditCard, BarChart3, Users, Shield, Zap,
   Menu, X, Globe, HeadphonesIcon, Calculator, Check, Star
 } from 'lucide-react';
-import PaymentMethodSelector from '@/components/PaymentMethodSelector';
 
 const LandingPage = () => {
   const { t, language, setLanguage } = useLanguage();
@@ -23,8 +22,6 @@ const LandingPage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDemoLoading, setIsDemoLoading] = useState(false);
   const [locale, setLocale] = useState('id');
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState(null);
 
   // Handle Supabase Auth Redirects (Fallback if server redirect config is missing)
   useEffect(() => {
@@ -120,7 +117,7 @@ const LandingPage = () => {
     setIsDuitkuProcessing(true);
     try {
       // Create payment request to our edge function
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
+      const response = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/duitku-payment-request', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -533,6 +530,9 @@ const LandingPage = () => {
                   <CardTitle className="text-xl">{plan.name}</CardTitle>
                   <div className="text-3xl font-bold mt-4">
                     {pricing.currency}{plan.price.toLocaleString('id-ID')}
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {t('landingPerMonth')}
+                    </span>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -550,9 +550,8 @@ const LandingPage = () => {
                     className="w-full"
                     variant={plan.popular ? "default" : "outline"}
                     onClick={() => {
-                      // Open payment method selector
-                      setSelectedPlan(plan);
-                      setIsPaymentModalOpen(true);
+                      // For new registration (price card), always redirect to register page
+                      navigate(`/register?plan=${plan.name}&price=${plan.price}&duration=${plan.duration}`);
                     }}
                   >
                     {t('landingSubscribe')}
@@ -649,18 +648,6 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
-
-      <PaymentMethodSelector
-        isOpen={isPaymentModalOpen}
-        onClose={setIsPaymentModalOpen}
-        amount={selectedPlan?.price || 0}
-        onSelect={(method) => {
-          setIsPaymentModalOpen(false);
-          if (selectedPlan) {
-            navigate(`/register?plan=${selectedPlan.name}&price=${selectedPlan.price}&duration=${selectedPlan.duration}&paymentMethod=${method}`);
-          }
-        }}
-      />
 
     </div>
   );

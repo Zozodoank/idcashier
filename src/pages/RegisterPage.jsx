@@ -29,12 +29,10 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-
+  
   const planName = searchParams.get('plan');
   const planPrice = searchParams.get('price');
   const planDuration = searchParams.get('duration');
-  const rawPaymentMethod = searchParams.get('paymentMethod');
-  const paymentMethodFromUrl = (rawPaymentMethod && rawPaymentMethod !== 'undefined' && rawPaymentMethod !== 'null') ? rawPaymentMethod : null;
   const isPaymentMode = !!planName;
 
   // Use the custom logo.png file
@@ -50,11 +48,7 @@ export default function RegisterPage() {
 
     setAuthMethod('email');
     if (isPaymentMode) {
-      if (paymentMethodFromUrl) {
-        processRegistration(paymentMethodFromUrl);
-      } else {
-        setIsPaymentModalOpen(true);
-      }
+      setIsPaymentModalOpen(true);
     } else {
       processRegistration();
     }
@@ -62,23 +56,8 @@ export default function RegisterPage() {
 
   const handleGoogleClick = async () => {
     if (isPaymentMode) {
-      // If payment method already selected from LandingPage, use it directly
-      if (paymentMethodFromUrl) {
-        setAuthMethod('google');
-        await performGoogleOAuth({
-          planName,
-          planPrice,
-          planDuration,
-          paymentMethod: paymentMethodFromUrl,
-          t,
-          toast,
-          mode: 'signup'
-        });
-      } else {
-        // Show payment method selector only if not already selected
-        setAuthMethod('google');
-        setIsPaymentModalOpen(true);
-      }
+      setAuthMethod('google');
+      setIsPaymentModalOpen(true);
     } else {
       await performGoogleOAuth({ t, toast, mode: 'signup' });
     }
@@ -90,8 +69,6 @@ export default function RegisterPage() {
       if (isPaymentMode) {
         // Payment Flow: Register without trial, then pay
         let user;
-        let token;
-
         // Register user WITHOUT trial - explicitly set skipTrial flag
         const registrationResult = await mcpRegisterClient.registerUser({
           name: name,
@@ -106,14 +83,13 @@ export default function RegisterPage() {
         if (!registrationResult.success) {
           // Handle "already registered" case - try to login if password matches
           if (registrationResult.error && (
-            registrationResult.error.includes('already been registered') ||
-            registrationResult.error.includes('already registered')
-          )) {
+              registrationResult.error.includes('already been registered') || 
+              registrationResult.error.includes('already registered')
+            )) {
             // Try to login
             const loginResult = await login(email, password);
             if (loginResult.success && loginResult.user) {
               user = loginResult.user;
-              token = loginResult.token || loginResult.session?.access_token;
               // If we logged in, we can proceed to payment.
               // Note: user object might differ slightly in structure, ensure user.id exists
             } else {
@@ -124,119 +100,49 @@ export default function RegisterPage() {
             throw new Error(registrationResult.error || t('registrationFailed'));
           }
         } else {
-          // Registration successful, but auth-register doesn't return token
-          // So we need to login to get session
-          console.log('✅ Registration successful, logging in to get session...');
-          const loginResult = await login(email, password);
-          
-          if (!loginResult.success || !loginResult.user) {
-            throw new Error('Registrasi berhasil, tapi gagal login. Silakan coba login manual.');
-          }
-          
-          user = loginResult.user;
-          token = loginResult.token || localStorage.getItem('idcashier_token');
-          
-          console.log('✅ Login successful after registration, user ID:', user.id);
+          user = registrationResult.data.user;
         }
 
         // Call Payment Gateway
-        const headers = {
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : undefined
-        };
+        const paymentResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentAmount: parseInt(planPrice, 10),
+            productDetails: planName,
+            customerVaName: name,
+            email: email,
+            userId: user.id,
+            // Gunakan metode yang dipilih user. Jika tidak ada (seharusnya tidak terjadi
+            // karena user memilih dari PaymentMethodSelector), biarkan kosong agar
+            // edge function yang memutuskan fallback.
+            paymentMethod: paymentMethodCode || undefined,
+            isRegistration: true
+          })
+        });
 
-        console.log('💳 Calling Duitku payment request with user:', user.id);
+        const paymentData = await paymentResponse.json();
+        if (!paymentResponse.ok) throw new Error(paymentData.error || t('paymentRequestFailed'));
 
-        // Add timeout to prevent hanging forever
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        if (paymentData.paymentUrl) {
+           // Save pending registration data for callback
+           const duration = planDuration ? parseInt(planDuration, 10) : 1;
+           console.log('Saving pending registration with duration:', duration);
+           
+           localStorage.setItem('pendingRegistration', JSON.stringify({
+             name,
+             email,
+             password,
+             planDuration: duration,
+             merchantOrderId: paymentData.merchantOrderId,
+             useHPP: false, // Default
+             role: 'owner'
+           }));
 
-        try {
-          const paymentResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({
-              paymentAmount: parseInt(planPrice, 10),
-              productDetails: planName,
-              customerVaName: name,
-              email: email,
-              userId: user.id,
-              // Gunakan metode yang dipilih user. Jika tidak ada (seharusnya tidak terjadi
-              // karena user memilih dari PaymentMethodSelector), biarkan kosong agar
-              // edge function yang memutuskan fallback.
-              paymentMethod: paymentMethodCode || undefined,
-              isRegistration: true
-            }),
-            signal: controller.signal
-          });
-
-          clearTimeout(timeoutId);
-
-          console.log('💳 Payment response status:', paymentResponse.status);
-
-          const responseText = await paymentResponse.text();
-          console.log('💳 Payment response body:', responseText);
-
-          let paymentData;
-          try {
-            paymentData = JSON.parse(responseText);
-          } catch (e) {
-            console.error('❌ Failed to parse payment response:', responseText);
-            throw new Error('Server mengembalikan response tidak valid. Silakan coba lagi.');
-          }
-
-          // Check response status FIRST before using data
-          if (!paymentResponse.ok) {
-            console.error('❌ Payment request failed:', paymentData);
-            const errorMsg = paymentData.error || paymentData.message || t('paymentRequestFailed');
-            throw new Error(errorMsg);
-          }
-
-          if (paymentData.paymentUrl) {
-            // Save pending registration data for callback
-            const duration = planDuration ? parseInt(planDuration, 10) : 1;
-            console.log('✅ Payment URL received, saving pending registration with duration:', duration);
-
-            localStorage.setItem('pendingRegistration', JSON.stringify({
-              name,
-              email,
-              password,
-              planDuration: duration,
-              merchantOrderId: paymentData.merchantOrderId,
-              useHPP: false, // Default
-              role: 'owner'
-            }));
-
-            // Save token to localStorage before redirect
-            if (token) {
-              localStorage.setItem('idcashier_token', token);
-              console.log('✅ Token saved to localStorage before payment redirect');
-            }
-
-            // Also save session if available
-            try {
-              const { data: { session } } = await supabase.auth.getSession();
-              if (session) {
-                localStorage.setItem('idcashier_token', session.access_token);
-                console.log('✅ Session saved to localStorage before payment redirect');
-              }
-            } catch (sessionError) {
-              console.warn('⚠️ Could not save session:', sessionError);
-            }
-
-            window.location.href = paymentData.paymentUrl;
-          } else {
-            const errorMessage = paymentData.Message || paymentData.statusMessage || t('paymentUrlNotReceived');
-            throw new Error(`Payment Gateway Error: ${errorMessage}`);
-          }
-        } catch (fetchError) {
-          // Handle timeout or network errors
-          if (fetchError.name === 'AbortError') {
-            console.error('❌ Payment request timeout');
-            throw new Error('Permintaan pembayaran timeout. Silakan coba lagi.');
-          }
-          // Re-throw other errors
-          throw fetchError;
+           window.location.href = paymentData.paymentUrl;
+        } else {
+           const errorMessage = paymentData.Message || paymentData.statusMessage || t('paymentUrlNotReceived');
+           throw new Error(`Payment Gateway Error: ${errorMessage}`);
         }
 
       } else {
@@ -254,12 +160,12 @@ export default function RegisterPage() {
 
         // Check if email verification is needed (trial users need verification)
         const needsVerification = registrationResult.data?.emailVerificationSent === true;
-
+        
         if (needsVerification) {
-          toast({
-            title: t('verifyEmailRequired'),
+          toast({ 
+            title: t('verifyEmailRequired'), 
             description: t('verifyEmailDesc'),
-            duration: 5000
+            duration: 5000 
           });
 
           // Redirect to login after delay
@@ -268,10 +174,10 @@ export default function RegisterPage() {
           }, 2000);
         } else {
           // User is already verified (shouldn't happen for trial, but just in case)
-          toast({
-            title: t('registrationSuccessful'),
+          toast({ 
+            title: t('registrationSuccessful'), 
             description: t('loginSuccess'),
-            duration: 3000
+            duration: 3000 
           });
 
           setTimeout(() => {
@@ -281,10 +187,10 @@ export default function RegisterPage() {
       }
     } catch (error) {
       console.error('Registration error:', error);
-      toast({
-        title: t('error'),
+      toast({ 
+        title: t('error'), 
         description: error.message || t('registrationFailedTryAgain'),
-        variant: 'destructive'
+        variant: 'destructive' 
       });
     } finally {
       setIsLoading(false);
@@ -297,7 +203,7 @@ export default function RegisterPage() {
         <title>{t('register')} - idCashier</title>
         <meta name="description" content={t('registerMetaDesc')} />
       </Helmet>
-
+      
       <div className="min-h-screen gradient-bg flex flex-col">
         <header className="p-4 flex justify-between items-center">
           <LanguageSelector />
@@ -325,8 +231,8 @@ export default function RegisterPage() {
                     e.target.style.display = 'none';
                     e.target.nextSibling.style.display = 'flex';
                   }} />
-                  <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white font-bold text-2xl mx-auto"
-                    style={{ display: 'none' }}>
+                  <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white font-bold text-2xl mx-auto" 
+                       style={{ display: 'none' }}>
                     IC
                   </div>
                 </motion.div>
@@ -424,8 +330,8 @@ export default function RegisterPage() {
               <div className="mt-6 text-center">
                 <p className="text-sm text-white/80">
                   {t('alreadyHaveAccount')}{' '}
-                  <Link
-                    to="/login"
+                  <Link 
+                    to="/login" 
                     className="text-white hover:text-white underline transition-colors"
                   >
                     {t('login')}
@@ -443,14 +349,14 @@ export default function RegisterPage() {
           onSelect={(method) => {
             setIsPaymentModalOpen(false);
             if (authMethod === 'google') {
-              performGoogleOAuth({
-                planName,
-                planPrice,
-                planDuration,
+              performGoogleOAuth({ 
+                planName, 
+                planPrice, 
+                planDuration, 
                 paymentMethod: method,
-                t,
-                toast,
-                mode: 'signup'
+                t, 
+                toast, 
+                mode: 'signup' 
               });
             } else {
               processRegistration(method);

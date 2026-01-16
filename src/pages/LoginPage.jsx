@@ -36,7 +36,7 @@ const LoginPage = () => {
     const params = new URLSearchParams(window.location.search);
     const hasError = window.location.hash.includes('error=') || params.get('error');
     const isVerification = params.get('verificationPending') || params.get('verified');
-    
+
     // Safety delay to ensure state is stable
     const timer = setTimeout(() => {
       if (isAuthenticated && !hasError && !isVerification) {
@@ -44,7 +44,7 @@ const LoginPage = () => {
         navigate('/dashboard', { replace: true });
       }
     }, 100);
-    
+
     return () => clearTimeout(timer);
   }, [isAuthenticated, navigate]);
 
@@ -53,24 +53,24 @@ const LoginPage = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const hash = window.location.hash;
-    
+
     // Handle Hash Errors (Supabase returns errors in hash)
     if (hash && hash.includes('error=')) {
       const hashParams = new URLSearchParams(hash.substring(1));
       const error = hashParams.get('error');
-  // Remove automatic redirect to prevent double redirect issues
-  // User will be redirected manually after successful login
-  // useEffect(() => {
-  //   if (isAuthenticated) {
-  //     navigate('/dashboard', { replace: true });
-  //   }
-  // }, [isAuthenticated, navigate]);
+      // Remove automatic redirect to prevent double redirect issues
+      // User will be redirected manually after successful login
+      // useEffect(() => {
+      //   if (isAuthenticated) {
+      //     navigate('/dashboard', { replace: true });
+      //   }
+      // }, [isAuthenticated, navigate]);
       const errorDescription = hashParams.get('error_description');
       const errorCode = hashParams.get('error_code');
 
       if (error) {
         let description = errorDescription?.replace(/\+/g, ' ') || t('errorVerification');
-        
+
         // Translate common error codes (email verification is now disabled)
         if (errorCode === 'otp_expired') {
           description = t('errorOtpExpired');
@@ -85,13 +85,13 @@ const LoginPage = () => {
           description: description,
           variant: "destructive"
         });
-        
+
         // Clear URL but stay on login page
         navigate('/login', { replace: true });
         return; // Stop further processing
       }
     }
-    
+
     if (params.get('verificationPending') === 'true') {
       setVerificationPending(true);
       // Clear param using navigate to ensure router state is clean
@@ -105,25 +105,25 @@ const LoginPage = () => {
         variant: "default",
         className: "bg-green-600 text-white border-green-600"
       });
-      
+
       // Clean up URL immediately via navigate
       navigate('/login', { replace: true });
     }
   }, []); // Empty dependency array to run once on mount
-  
+
   // Use the custom logo.png file
   const logoUrl = "/logo.png";
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       // Normalize email on client side
       const normalizedEmail = email.trim().toLowerCase();
-      
+
       const result = await login(normalizedEmail, password);
-      
+
       // Check for subscription expired
       if (!result.success && result.subscriptionExpired) {
         toast({
@@ -131,15 +131,15 @@ const LoginPage = () => {
           description: result.error || t('subscriptionExpiredDesc'),
           variant: 'destructive',
         });
-        
+
         // Redirect to renewal page after 2 seconds
-                setTimeout(() => {
+        setTimeout(() => {
           navigate(`/renewal?email=${encodeURIComponent(normalizedEmail)}`);
         }, 2000);
-        
+
         return;
       }
-      
+
       if (result.success) {
         toast({
           title: `${t('welcome')} ${result.user.name || result.user.email}!`,
@@ -158,10 +158,10 @@ const LoginPage = () => {
       } else {
         // Add hint for user if login fails
         const errorMessage = result.error || '';
-        const errorDescription = errorMessage.includes('password') 
+        const errorDescription = errorMessage.includes('password')
           ? `${errorMessage} ${t('loginHint')}`
           : errorMessage;
-          
+
         // Email verification is no longer required - all users are auto-verified
         // Removed email verification error handling
 
@@ -173,7 +173,7 @@ const LoginPage = () => {
       }
     } catch (error) {
       const errorMessage = error.message || '';
-      
+
       // If it's an invalid credentials error, we might want to show a more specific message
       if (errorMessage.includes('Invalid login credentials')) {
         toast({
@@ -184,7 +184,7 @@ const LoginPage = () => {
       } else {
         // Email verification is no longer required - all users are auto-verified
         // Removed email verification error handling
-        
+
         toast({
           title: t('loginFailed'),
           description: errorMessage || t('loginFailedDesc'),
@@ -207,7 +207,7 @@ const LoginPage = () => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(normalizedEmail)) {
@@ -223,9 +223,9 @@ const LoginPage = () => {
     try {
       // Get the current site URL from environment or use default
       const siteUrl = import.meta.env.VITE_SITE_URL || 'https://idcashier.com';
-      
+
       console.log('Attempting to resend verification for:', normalizedEmail);
-      
+
       // For existing users, use the signup type to resend confirmation
       const { data, error } = await supabase.auth.resend({
         type: 'signup',
@@ -241,7 +241,7 @@ const LoginPage = () => {
       }
 
       console.log('Verification email resent successfully');
-      
+
       toast({
         title: t('verificationSent'),
         description: t('verificationSentDesc'),
@@ -251,10 +251,10 @@ const LoginPage = () => {
       setShowResend(false);
     } catch (error) {
       console.error('Failed to resend verification:', error);
-      
+
       // Provide specific error messages
       let errorMessage = t('verificationSendFailed');
-      
+
       if (error.message?.includes('rate_limit') || error.message?.includes('Too many requests')) {
         errorMessage = t('errorTooManyRequests');
       } else if (error.message?.includes('email_not_found') || error.message?.includes('not found')) {
@@ -265,7 +265,7 @@ const LoginPage = () => {
       } else if (error.message?.includes('email address')) {
         errorMessage = t('errorEmailInvalid');
       }
-      
+
       toast({
         title: t('sendFailed'),
         description: errorMessage,
@@ -284,9 +284,9 @@ const LoginPage = () => {
       // Normalize demo email on client side
       const demoEmail = 'demo@idcashier.com';
       const normalizedDemoEmail = demoEmail.trim().toLowerCase();
-      
+
       const result = await login(normalizedDemoEmail, 'Demo2025');
-      
+
       if (result.success) {
         toast({
           title: `${t('welcome')} ${result.user.name || result.user.email}!`,
@@ -320,7 +320,7 @@ const LoginPage = () => {
         <title>{t('login')} - idCashier</title>
         <meta name="description" content={t('loginMetaDesc')} />
       </Helmet>
-      
+
       <div className="min-h-screen gradient-bg flex flex-col">
         <header className="p-4 flex justify-between items-center">
           <LanguageSelector />
@@ -348,8 +348,8 @@ const LoginPage = () => {
                     e.target.style.display = 'none';
                     e.target.nextSibling.style.display = 'flex';
                   }} />
-                  <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white font-bold text-2xl mx-auto" 
-                       style={{ display: 'none' }}>
+                  <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white font-bold text-2xl mx-auto"
+                    style={{ display: 'none' }}>
                     IC
                   </div>
                 </motion.div>
@@ -410,8 +410,8 @@ const LoginPage = () => {
                     </button>
                   </div>
                   <div className="text-right">
-                    <Link 
-                      to="/reset-password" 
+                    <Link
+                      to="/reset-password"
                       className="text-sm text-white/80 hover:text-white transition-colors"
                     >
                       {t('forgotPassword')}?
