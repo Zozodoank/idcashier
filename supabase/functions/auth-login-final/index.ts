@@ -39,8 +39,9 @@ Deno.serve(async (req) => {
 
     // Background auto-confirm for whitelist (non-blocking)
     if (isWhitelistAccount) {
-      supabaseAdmin.from('users').select('id').eq('email', normalizedEmail).maybeSingle()
-        .then(async ({ data: publicUser }) => {
+      (async () => {
+        try {
+          const { data: publicUser } = await supabaseAdmin.from('users').select('id').eq('email', normalizedEmail).maybeSingle();
           if (publicUser?.id) {
             const { data: authUserResult } = await supabaseAdmin.auth.admin.getUserById(publicUser.id);
             if (authUserResult?.user && !authUserResult.user.email_confirmed_at) {
@@ -50,7 +51,10 @@ Deno.serve(async (req) => {
               });
             }
           }
-        }).catch(e => console.error('Auto-confirm error:', e));
+        } catch (e: any) {
+          console.error('Auto-confirm error:', e);
+        }
+      })();
     }
 
     // Parallelize Auth and User Profile Fetch to improve speed

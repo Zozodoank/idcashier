@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
       userData = data
     } catch (fetchError) {
       console.error('User profile fetch error:', fetchError)
-      if (fetchError.name === 'AbortError') {
+      if ((fetchError as any).name === 'AbortError') {
         return new Response(
           JSON.stringify({ error: 'User profile fetch timeout - check RLS policies' }),
           {
