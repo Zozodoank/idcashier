@@ -98,9 +98,9 @@ localStorage.setItem('pendingRegistration', JSON.stringify({
 6. ✅ `DashboardLayout.jsx` - Subscription banners
 
 ### **Domain Migration** ✅
-- ✅ All `demo@idcashier.my.id` → `demo@idcashier.com`
-- ✅ All `testing@idcashier.my.id` → `testing@idcashier.com`
-- ✅ All `https://idcashier.my.id` → `https://idcashier.com`
+- ✅ All `demo@idcashier.com` → `demo@idcashier.com`
+- ✅ All `testing@idcashier.com` → `testing@idcashier.com`
+- ✅ All `https://idcashier.com` → `https://idcashier.com`
 
 ### **Database** ✅
 - ✅ `payments` table: result_code, result_message

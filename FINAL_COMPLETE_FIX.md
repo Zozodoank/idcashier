@@ -14,7 +14,7 @@ Setelah analisis mendalam terhadap folder `idcashier test` yang berhasil, saya t
 
 1. ✅ **Mengidentifikasi semua file yang berbeda**
 2. ✅ **Meng-copy file yang benar dari test folder**
-3. ✅ **Mengganti domain lama (idcashier.my.id) dengan idcashier.com**
+3. ✅ **Mengganti domain lama (idcashier.com) dengan idcashier.com**
 4. ✅ **Deploy semua Edge Functions**
 5. ✅ **Memperbaiki TypeScript lint errors**
 6. ✅ **Build frontend**
@@ -104,14 +104,14 @@ Setelah analisis mendalam terhadap folder `idcashier test` yang berhasil, saya t
 ### **Files Updated:**
 
 1. ✅ `supabase/functions/subscriptions-get-current-user/index.ts`
-   - `testing@idcashier.my.id` → `testing@idcashier.com`
-   - `demo@idcashier.my.id` → `demo@idcashier.com`
+   - `testing@idcashier.com` → `testing@idcashier.com`
+   - `demo@idcashier.com` → `demo@idcashier.com`
 
 2. ✅ `supabase/functions/auth-login-final/index.ts`
-   - `demo@idcashier.my.id` → `demo@idcashier.com`
+   - `demo@idcashier.com` → `demo@idcashier.com`
 
 3. ✅ `supabase/functions/auth-login/index.ts`
-   - `demo@idcashier.my.id` → `demo@idcashier.com`
+   - `demo@idcashier.com` → `demo@idcashier.com`
 
 ### **Special Accounts:**
 
@@ -271,7 +271,7 @@ ORDER BY created_at DESC LIMIT 1;
 |--------|------------------|----------|
 | **Scope** | Only 1-2 components | ALL components |
 | **Source** | Manual editing | Copied from WORKING test folder |
-| **Domain** | Not checked | ✅ Fixed idcashier.my.id → idcashier.com |
+| **Domain** | Not checked | ✅ Fixed idcashier.com → idcashier.com |
 | **Functions** | Missed auth-login-final | ✅ Fixed ALL login functions |
 | **Verification** | Assumed correct | ✅ Compared with test folder |
 | **Lint Errors** | Ignored | ✅ Fixed |
@@ -337,7 +337,7 @@ Expected: `payment_completed: true`
 
 1. ✅ **All backend functions deployed** - No need to redeploy
 2. ✅ **Database schema updated** - No need to run migrations again
-3. ✅ **Domain migration complete** - All references to idcashier.my.id replaced
+3. ✅ **Domain migration complete** - All references to idcashier.com replaced
 4. ✅ **TypeScript errors fixed** - Code is clean
 5. ⚠️ **Frontend NOT uploaded yet** - User must upload `dist/` folder
 

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const OLD_DOMAIN = 'idcashier.my.id';
+const OLD_DOMAIN = 'idcashier.com';
 const NEW_DOMAIN = 'idcashier.com';
 
 // Directories to skip
