@@ -21,6 +21,7 @@ interface RegisterRequest {
     userId?: string; // Optional: provided for OAuth sync
     oauthProvider?: string; // Optional: to indicate OAuth flow
     paymentCompleted?: boolean;
+    planDuration?: number; // Subscription duration in months
 }
 
 // @ts-ignore: Deno is available in Supabase Edge Functions runtime
@@ -41,7 +42,8 @@ Deno.serve(async (req) => {
             skipTrial = false,
             userId: providedUserId,
             oauthProvider,
-            paymentCompleted
+            paymentCompleted,
+            planDuration = 1
         }: RegisterRequest = await req.json();
 
         // Validate input
@@ -177,15 +179,70 @@ Deno.serve(async (req) => {
         }
 
         // Handle Subscription
-        // Only create trial subscription if NOT from price card AND not skipped
-        if (!isPriceCardRegistration && !skipTrial) {
-            // Check if subscription exists first
-            const { data: existingSub } = await supabase
-                .from('subscriptions')
-                .select('id')
-                .eq('user_id', userId)
-                .maybeSingle();
+        // Check if subscription exists first
+        const { data: existingSub } = await supabase
+            .from('subscriptions')
+            .select('id, end_date, status')
+            .eq('user_id', userId)
+            .maybeSingle();
 
+        if (paymentCompleted) {
+            // PAYMENT COMPLETED: Create or update subscription with selected duration
+            const startDate = new Date();
+            const endDate = new Date();
+
+            // Calculate end date based on plan duration (default 1 month = 30 days)
+            const durationMonths = planDuration || 1;
+            endDate.setDate(endDate.getDate() + (durationMonths * 30));
+
+            console.log(`Creating/updating subscription for paid user: ${userId}, duration: ${durationMonths} months`);
+
+            if (existingSub) {
+                // Update existing subscription
+                const { error: updateSubError } = await supabase
+                    .from('subscriptions')
+                    .update({
+                        start_date: startDate.toISOString().split('T')[0],
+                        end_date: endDate.toISOString().split('T')[0],
+                        status: 'active',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existingSub.id);
+
+                if (updateSubError) {
+                    console.error('Error updating subscription:', updateSubError);
+                } else {
+                    console.log(`Subscription updated for user ${userId} - active until ${endDate.toISOString().split('T')[0]}`);
+                }
+            } else {
+                // Create new subscription
+                const { error: subError } = await supabase
+                    .from('subscriptions')
+                    .insert({
+                        user_id: userId,
+                        start_date: startDate.toISOString().split('T')[0],
+                        end_date: endDate.toISOString().split('T')[0],
+                        status: 'active'
+                    });
+
+                if (subError) {
+                    console.error('Error creating subscription:', subError);
+                } else {
+                    console.log(`New subscription created for user ${userId} - active until ${endDate.toISOString().split('T')[0]}`);
+                }
+            }
+
+            // Also auto-confirm email for paid users
+            await supabase.auth.admin.updateUserById(userId, {
+                email_confirm: true,
+                user_metadata: {
+                    payment_completed: true,
+                    email_verified: true
+                }
+            });
+
+        } else if (!isPriceCardRegistration && !skipTrial) {
+            // TRIAL USER: Only create trial subscription if NOT from price card AND not skipped
             if (!existingSub) {
                 const startDate = new Date();
                 const endDate = new Date();
@@ -197,14 +254,17 @@ Deno.serve(async (req) => {
                         user_id: userId,
                         start_date: startDate.toISOString().split('T')[0],
                         end_date: endDate.toISOString().split('T')[0],
+                        status: 'active'
                     });
 
                 if (subError) {
                     console.error('Subscription error:', subError);
+                } else {
+                    console.log(`Trial subscription created for user ${userId}`);
                 }
             }
         } else {
-            console.log('Skipping trial subscription for price card registration');
+            console.log('Skipping trial subscription for price card registration (will be activated after payment)');
         }
 
         console.log('User synced/registered successfully:', {
