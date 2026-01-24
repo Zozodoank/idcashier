@@ -11,8 +11,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
-import { authAPI } from '@/lib/api';
-import mcpRegisterClient from '@/lib/mcpRegisterClient';
+import { supabase } from '@/lib/supabaseClient';
 import PaymentMethodSelector from '@/components/PaymentMethodSelector';
 import GoogleOAuthButton, { performGoogleOAuth } from '@/components/GoogleOAuthButton';
 
@@ -163,48 +162,76 @@ export default function RegisterPage() {
         }
 
       } else {
-        // Standard Trial Flow
-        const registrationResult = await mcpRegisterClient.registerUserWithTrial({
-          name: name,
-          email: email,
-          password: password,
-          role: 'owner'
+        // Standard Trial Flow (MUST verify email)
+        // IMPORTANT:
+        // - Use Supabase Auth signUp (anon key) so Supabase sends confirmation email automatically.
+        // - Then call auth-register ONLY to sync into public.users and create trial subscription.
+        const normalizedEmail = String(email || '').trim().toLowerCase();
+        const siteUrl =
+          (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? window.location.origin
+            : (import.meta.env.VITE_SITE_URL || window.location.origin);
+
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+          options: {
+            data: {
+              name,
+              role: 'owner'
+            },
+            emailRedirectTo: `${siteUrl}/login?verified=true`
+          }
         });
 
-        if (!registrationResult.success) {
-          throw new Error(registrationResult.error || t('registrationFailed'));
+        if (signUpError) {
+          throw new Error(signUpError.message || t('registrationFailed'));
         }
 
-        // UX improvement:
-        // - After trial registration succeeds, auto-login and go to dashboard.
-        // - Show a one-time banner/toast reminding user to verify email.
-        // This avoids the "no clear notification" issue and keeps flow consistent.
-        try {
-          localStorage.setItem('idcashier_show_verify_email', '1');
-        } catch (_) { }
-
-        // Attempt auto-login
-        const loginResult = await login(email, password);
-        if (loginResult?.success) {
-          toast({
-            title: t('registrationSuccessful'),
-            description: t('loginSuccess'),
-            duration: 2500
-          });
-          setTimeout(() => {
-            navigate('/dashboard', { replace: true });
-          }, 600);
-        } else {
-          // Fallback: send user to login page with info
-          toast({
-            title: t('verifyEmailRequired'),
-            description: t('verifyEmailDesc'),
-            duration: 5000
-          });
-          setTimeout(() => {
-            navigate('/login?verificationPending=true');
-          }, 1200);
+        const newAuthUserId = signUpData?.user?.id;
+        if (!newAuthUserId) {
+          throw new Error('Registration succeeded but user id is missing');
         }
+
+        // Sync to public tables + create trial subscription
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        const syncRes = await fetch(`${supabaseUrl}/functions/v1/auth-register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'apikey': supabaseAnonKey
+          },
+          body: JSON.stringify({
+            name,
+            email: normalizedEmail,
+            role: 'owner',
+            userId: newAuthUserId,
+            oauthProvider: 'email',
+            isPriceCardRegistration: false,
+            skipTrial: false,
+            trialDays: 7,
+            paymentCompleted: false
+          })
+        });
+
+        const syncJson = await syncRes.clone().json().catch(() => ({}));
+        if (!syncRes.ok) {
+          throw new Error(syncJson.error || syncJson.message || `Failed to setup trial (${syncRes.status})`);
+        }
+
+        toast({
+          title: t('verifyEmailRequired'),
+          description: t('verifyEmailDesc'),
+          duration: 6000
+        });
+
+        // Redirect to login screen with resend option
+        setTimeout(() => {
+          navigate('/login?verificationPending=true');
+        }, 800);
       }
     } catch (error) {
       console.error('Registration error:', error);

@@ -360,6 +360,15 @@ const LoginPage = () => {
               {/* Google OAuth Button - Above email form */}
               <GoogleOAuthButton mode="login" />
 
+              {/* Email verification pending info */}
+              {verificationPending && (
+                <Alert className="mb-4 bg-yellow-500/20 border-yellow-500/40 text-white">
+                  <AlertDescription>
+                    {t('verifyEmailDesc')}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-white/20"></div>
@@ -427,8 +436,8 @@ const LoginPage = () => {
                   {isLoading ? t('loggingIn') : t('login')}
                 </Button>
 
-                {/* Email verification resend button is disabled - all users are auto-verified */}
-                {showResend && (
+                {/* Resend verification for users who haven't confirmed email yet */}
+                {(verificationPending || showResend) && (
                   <Button
                     type="button"
                     onClick={handleResendVerification}

@@ -38,6 +38,17 @@ interface RegisterRequest {
     planDuration?: number; // Subscription duration in months
 }
 
+type RegisterResponse = {
+  success: boolean;
+  message?: string;
+  userId?: string;
+  isPriceCardRegistration?: boolean;
+  requiresEmailVerification?: boolean;
+  emailVerificationSent?: boolean;
+  error?: string;
+  details?: any;
+};
+
 // @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
     // Handle CORS preflight
@@ -83,19 +94,19 @@ Deno.serve(async (req) => {
             );
         }
 
-        // Create Supabase client with service role key
-        const supabase = createClient(
-            // @ts-ignore: Deno is available at runtime
-            Deno.env.get('SUPABASE_URL') ?? '',
-            // @ts-ignore: Deno is available at runtime
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-            {
-                auth: {
-                    autoRefreshToken: false,
-                    persistSession: false,
-                },
-            }
-        );
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+        const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+
+        // Service role client (DB writes & admin)
+        const supabase = createClient(supabaseUrl, serviceKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        });
+
+        // Anon client (needed for signUp to trigger confirmation email)
+        const supabaseAnon = createClient(supabaseUrl, anonKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        });
 
         let userId = resolvedUserId;
 
@@ -122,20 +133,55 @@ Deno.serve(async (req) => {
                 console.log('User found in public records, using existing ID:', existingPublicUser.id);
                 userId = existingPublicUser.id;
             } else {
-                // Create user in auth
-                const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+                // IMPORTANT:
+                // - For trial email registrations (non price-card, not paid), we MUST send verification email.
+                //   Using admin.createUser() does NOT send signup confirmation email.
+                // - Therefore: use anon.auth.signUp() for trial email registrations.
+                // - For paid/price-card flows we keep admin.createUser() and auto-confirm email after payment.
+
+                const isTrialEmailSignup = !isPriceCardRegistration && !paymentCompleted;
+                let authData: any = null;
+                let authError: any = null;
+                let requiresEmailVerification = false;
+
+                if (isTrialEmailSignup) {
+                  const siteUrl = Deno.env.get('SITE_URL') || Deno.env.get('VITE_SITE_URL') || 'https://idcashier.com';
+                  const { data, error } = await supabaseAnon.auth.signUp({
+                    email: email.toLowerCase().trim(),
+                    password,
+                    options: {
+                      emailRedirectTo: `${siteUrl}/login?verified=true`,
+                      data: {
+                        name,
+                        phone: phone || '',
+                        role,
+                        is_trial_user: true,
+                        payment_completed: false,
+                        is_price_card_registration: false,
+                      }
+                    }
+                  });
+                  authData = data;
+                  authError = error;
+                  // Supabase signUp returns user even if unconfirmed.
+                  requiresEmailVerification = true;
+                } else {
+                  const { data, error } = await supabase.auth.admin.createUser({
                     email: email.toLowerCase().trim(),
                     password,
                     email_confirm: paymentCompleted ? true : false,
                     user_metadata: {
-                        name,
-                        phone: phone || '',
-                        role,
-                        is_trial_user: !isPriceCardRegistration && !paymentCompleted,
-                        payment_completed: paymentCompleted || false,
-                        is_price_card_registration: isPriceCardRegistration,
+                      name,
+                      phone: phone || '',
+                      role,
+                      is_trial_user: false,
+                      payment_completed: paymentCompleted || false,
+                      is_price_card_registration: isPriceCardRegistration,
                     },
-                });
+                  });
+                  authData = data;
+                  authError = error;
+                }
 
                 if (authError) {
                     // If auth user already exists, attempt to recover by email
@@ -181,6 +227,9 @@ Deno.serve(async (req) => {
                 } else {
                     userId = authData.user.id;
                 }
+
+                // Attach verification flags to request body for response
+                (body as any).__requiresEmailVerification = requiresEmailVerification;
             }
         } else {
             // OAuth Case: User already exists in Auth, just update metadata if needed
@@ -417,19 +466,26 @@ Deno.serve(async (req) => {
             isOAuthSync: !!resolvedUserId
         });
 
+        const requiresEmailVerification = Boolean((body as any).__requiresEmailVerification);
+        const responseBody: RegisterResponse = {
+          success: true,
+          message: isPriceCardRegistration
+            ? 'Registration successful. Please complete payment to activate your account.'
+            : (requiresEmailVerification
+              ? 'Registration successful. Please check your email to verify your account.'
+              : 'Registration successful.'),
+          userId,
+          isPriceCardRegistration,
+          requiresEmailVerification,
+          emailVerificationSent: requiresEmailVerification
+        };
+
         return new Response(
-            JSON.stringify({
-                success: true,
-                message: isPriceCardRegistration
-                    ? 'Registration successful. Please complete payment to activate your account.'
-                    : 'Registration successful. Please check your email to verify your account.',
-                userId,
-                isPriceCardRegistration,
-            }),
-            {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 201,
-            }
+          JSON.stringify(responseBody),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 201,
+          }
         );
     } catch (error: any) {
         console.error('Registration error:', error);
