@@ -175,31 +175,35 @@ export default function RegisterPage() {
           throw new Error(registrationResult.error || t('registrationFailed'));
         }
 
-        // Check if email verification is needed (trial users need verification)
-        const needsVerification = registrationResult.data?.emailVerificationSent === true;
+        // UX improvement:
+        // - After trial registration succeeds, auto-login and go to dashboard.
+        // - Show a one-time banner/toast reminding user to verify email.
+        // This avoids the "no clear notification" issue and keeps flow consistent.
+        try {
+          localStorage.setItem('idcashier_show_verify_email', '1');
+        } catch (_) { }
 
-        if (needsVerification) {
+        // Attempt auto-login
+        const loginResult = await login(email, password);
+        if (loginResult?.success) {
+          toast({
+            title: t('registrationSuccessful'),
+            description: t('loginSuccess'),
+            duration: 2500
+          });
+          setTimeout(() => {
+            navigate('/dashboard', { replace: true });
+          }, 600);
+        } else {
+          // Fallback: send user to login page with info
           toast({
             title: t('verifyEmailRequired'),
             description: t('verifyEmailDesc'),
             duration: 5000
           });
-
-          // Redirect to login after delay
           setTimeout(() => {
             navigate('/login?verificationPending=true');
-          }, 2000);
-        } else {
-          // User is already verified (shouldn't happen for trial, but just in case)
-          toast({
-            title: t('registrationSuccessful'),
-            description: t('loginSuccess'),
-            duration: 3000
-          });
-
-          setTimeout(() => {
-            navigate('/login');
-          }, 1500);
+          }, 1200);
         }
       }
     } catch (error) {

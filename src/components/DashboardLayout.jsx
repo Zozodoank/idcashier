@@ -88,6 +88,25 @@ const DashboardLayout = () => {
   const [subscriptionInactive, setSubscriptionInactive] = useState(false);
   const [subscriptionData, setSubscriptionData] = useState(null);
 
+  // One-time reminder after register-trial flow
+  useEffect(() => {
+    try {
+      const flag = localStorage.getItem('idcashier_show_verify_email');
+      if (flag === '1') {
+        localStorage.removeItem('idcashier_show_verify_email');
+        toast({
+          title: t?.('verifyEmailRequired') || 'Verifikasi Email Diperlukan',
+          description: t?.('verifyEmailDesc') || 'Akun berhasil dibuat. Silakan cek email Anda untuk verifikasi.',
+          duration: 6000
+        });
+      }
+    } catch (_) {
+      // ignore
+    }
+    // toast and t are stable enough; this is a one-time mount effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Simplified state initialization without localStorage access
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuItems, setMenuItems] = useState([]);
