@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useEffect } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import GoogleOAuthButton from '@/components/GoogleOAuthButton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -24,6 +25,7 @@ const LoginPage = () => {
   const [verificationPending, setVerificationPending] = useState(false);
   const [showResend, setShowResend] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
   const { t } = useLanguage();
   const { toast } = useToast();
   const { login, logout, isAuthenticated } = useAuth();
@@ -94,6 +96,7 @@ const LoginPage = () => {
 
     if (params.get('verificationPending') === 'true') {
       setVerificationPending(true);
+      setShowVerifyModal(true);
       // Clear param using navigate to ensure router state is clean
       navigate('/login', { replace: true });
     }
@@ -479,6 +482,35 @@ const LoginPage = () => {
           </p>
         </footer>
       </div>
+
+      {/* Clear popup/modal to guide user */}
+      <Dialog open={showVerifyModal} onOpenChange={setShowVerifyModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('verifyEmailRequired')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p>{t('verifyEmailDesc')}</p>
+            <p className="text-sm text-muted-foreground">
+              Jika tidak menemukan email, cek folder Spam/Promotions.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="bg-yellow-500 hover:bg-yellow-600 text-white"
+              onClick={handleResendVerification}
+              disabled={resendLoading || isLoading}
+            >
+              {resendLoading ? t('resending') : t('resendVerification')}
+            </Button>
+            <Button type="button" onClick={() => setShowVerifyModal(false)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

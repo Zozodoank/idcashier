@@ -334,9 +334,57 @@ const AuthCallbackPage = () => {
               throw new Error(data.error || `Auth-register failed (${response.status})`);
             }
           } else {
-            // Non-price-card OAuth flow should also ensure public.users + trial subscription exist.
-            // Previously we allowed proceeding with a stub profile when getCurrentUser failed,
-            // which leads to "expired" because no subscription row exists.
+            // Non-price-card OAuth:
+            // Always best-effort sync via auth-register to ensure:
+            // - public.users exists
+            // - trial subscription exists (7 days)
+            // Why: previously we only called auth-register when profile missing.
+            // If profile existed but subscription missing, user became "expired".
+
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+            const functionUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/auth-register`;
+
+            const requestBody = {
+              name: name,
+              email: email,
+              password: null, // OAuth
+              role: 'owner',
+              paymentCompleted: false,
+              oauthProvider: 'google',
+              oauthUserId: user.id,
+              isPriceCardRegistration: false,
+              skipTrial: false,
+              trialDays: 7
+            };
+
+            try {
+              const resp = await withTimeout(
+                fetch(functionUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseAnonKey}`,
+                    'apikey': supabaseAnonKey
+                  },
+                  body: JSON.stringify(requestBody)
+                }),
+                10000,
+                'auth-register-oauth-trial'
+              );
+
+              const data = await resp.clone().json().catch(() => ({}));
+              console.log('📩 auth-register (oauth trial) response:', { status: resp.status, body: data });
+
+              if (!resp.ok && resp.status !== 422) {
+                throw new Error(data.error || `Auth-register oauth trial failed (${resp.status})`);
+              }
+            } catch (e) {
+              console.warn('⚠️ auth-register oauth trial best-effort failed:', e.message);
+              // Continue anyway; user may already have subscription.
+            }
+
+            // Fetch profile after sync (best-effort)
             try {
               console.log('🔍 Fetching user profile...');
               const fetchedProfile = await withTimeout(
@@ -349,58 +397,7 @@ const AuthCallbackPage = () => {
                 console.log('✅ Existing user profile found:', userProfile.id);
               }
             } catch (e) {
-              console.log('ℹ️ User profile not found. Creating/syncing via auth-register for trial user...', e.message);
-
-              const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-              const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-              const functionUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/auth-register`;
-
-              const requestBody = {
-                name: name,
-                email: email,
-                password: null, // OAuth
-                role: 'owner',
-                paymentCompleted: false,
-                oauthProvider: 'google',
-                oauthUserId: user.id,
-                isPriceCardRegistration: false,
-                skipTrial: false,
-                trialDays: 7
-              };
-
-              const resp = await withTimeout(
-                fetch(functionUrl, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${supabaseAnonKey}`,
-                    'apikey': supabaseAnonKey
-                  },
-                  body: JSON.stringify(requestBody)
-                }),
-                10000,
-                'auth-register-trial'
-              );
-
-              const data = await resp.clone().json().catch(() => ({}));
-              console.log('📩 auth-register (trial) response:', { status: resp.status, body: data });
-
-              if (!resp.ok && resp.status !== 422) {
-                throw new Error(data.error || `Auth-register trial failed (${resp.status})`);
-              }
-
-              // Fetch profile again after sync (best-effort)
-              try {
-                await new Promise(r => setTimeout(r, 800));
-                const fetchedProfile2 = await withTimeout(
-                  authAPI.getCurrentUser(token),
-                  4000,
-                  'getCurrentUserAfterTrialRegister'
-                );
-                if (fetchedProfile2) userProfile = fetchedProfile2;
-              } catch (e2) {
-                console.warn('⚠️ Could not fetch profile after trial register; using stub:', e2.message);
-              }
+              console.warn('⚠️ Could not fetch profile after oauth trial sync; using stub:', e.message);
             }
           }
 
