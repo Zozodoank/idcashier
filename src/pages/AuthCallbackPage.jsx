@@ -56,6 +56,7 @@ const AuthCallbackPage = () => {
           name: user.user_metadata?.name || '',
           email: user.email,
           password: null, // OAuth - no password
+            oauthUserId: user.id,
           planDuration: duration,
           merchantOrderId: paymentData.merchantOrderId,
           useHPP: false,
@@ -133,28 +134,61 @@ const AuthCallbackPage = () => {
     };
 
     const handleAuthCallback = async () => {
-      const start = Date.now();
       let finished = false;
-      const failSafe = setTimeout(() => {
+      let token = null;
+      let pendingPlan = null;
+      let isFromPriceCardFlag = false;
+      let stubUser = null;
+      const failSafe = setTimeout(async () => {
         if (!finished) {
           console.error('⚠️ Auth callback failsafe triggered (timeout).');
+          // If this is price-card flow and we have token + plan, attempt direct payment
+          if (isFromPriceCardFlag && token && pendingPlan && stubUser) {
+            try {
+              await processDuitkuPayment(pendingPlan, stubUser, token, pendingPlan.paymentMethod);
+              return;
+            } catch (e) {
+              console.error('Failsafe payment attempt failed:', e);
+            }
+          }
           setStatus('error');
           toast({
             title: t('loginFailed'),
             description: 'Authentication timeout. Please try again.',
             variant: 'destructive',
           });
-          navigate('/login');
+          const params = new URLSearchParams();
+          if (pendingPlan?.planName) params.append('plan', pendingPlan.planName);
+          if (pendingPlan?.planPrice) params.append('price', pendingPlan.planPrice);
+          if (pendingPlan?.planDuration) params.append('duration', pendingPlan.planDuration);
+          window.location.href = params.toString() ? `/register?${params.toString()}` : '/login';
         }
-      }, 15000);
+      }, 20000);
       try {
-        // For OAuth callback, we need to handle the URL hash first
-        // Supabase OAuth redirects with session in URL hash
+        // Handle both implicit (hash) and PKCE (code) flows
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const urlParams = new URLSearchParams(window.location.search);
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
+        const code = urlParams.get('code');
+        const state = urlParams.get('state');
+        const errorParam = urlParams.get('error');
 
-        // If we have tokens in URL hash, set the session first
+        console.log('🔍 OAuth callback params:', {
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          hasCode: !!code,
+          state,
+          errorParam,
+          hash: window.location.hash,
+          search: window.location.search
+        });
+
+        if (errorParam) {
+          throw new Error(`OAuth error: ${errorParam}`);
+        }
+
+        // Implicit flow: tokens in hash
         if (accessToken && refreshToken) {
           console.log('🔐 Setting session from URL hash...');
           const { data: sessionData, error: sessionSetError } = await supabase.auth.setSession({
@@ -168,6 +202,23 @@ const AuthCallbackPage = () => {
           }
 
           console.log('✅ Session set from URL hash');
+        }
+
+        // PKCE flow: code + state in query
+        if (!accessToken && code) {
+          console.log('🔐 Exchanging PKCE code for session...');
+          const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            console.error('❌ Failed to exchange code:', exchangeError);
+            throw exchangeError;
+          }
+          console.log('✅ Session set from code exchange');
+        }
+
+        // If neither tokens nor code exist, don't fail yet because
+        // Supabase detectSessionInUrl may have already consumed them.
+        if (!accessToken && !refreshToken && !code) {
+          console.warn('⚠️ OAuth callback has no tokens/code; will attempt getSession()');
         }
 
         // Get the session from the URL hash
@@ -194,15 +245,17 @@ const AuthCallbackPage = () => {
         const user = session.user;
         const email = user.email;
         const name = user.user_metadata?.full_name || user.user_metadata?.name || email?.split('@')[0] || 'User';
+        token = session.access_token;
 
         // Build a stub profile immediately to avoid blocking
         let userProfile = { id: user.id, email, name, role: 'owner', user_metadata: user.user_metadata };
+        stubUser = userProfile;
 
         // 🔧 FIXED: Cek apakah ini alur registrasi berbayar via price card
         // Enhanced check dengan multiple sources untuk memastikan price card detection
         const pendingOAuthPlan = localStorage.getItem('pendingOAuthPlan');
-        const urlParams = new URLSearchParams(window.location.search);
         const isFromPriceCard = urlParams.get('plan') !== null || !!pendingOAuthPlan;
+        isFromPriceCardFlag = isFromPriceCard;
 
         console.log('🔍 Debug - URL params:', Object.fromEntries(urlParams));
         console.log('🔍 Debug - pendingOAuthPlan:', pendingOAuthPlan);
@@ -210,7 +263,6 @@ const AuthCallbackPage = () => {
 
         // Check if user exists in public.users
         try {
-          const token = session.access_token;
           const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
           const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -228,22 +280,75 @@ const AuthCallbackPage = () => {
             console.warn('Failed to set Supabase session:', e);
           }
 
-          // Try to get user profile
-          let profileFetchError = null;
-          try {
-            console.log('🔍 Fetching user profile...');
-            const fetchedProfile = await withTimeout(
-              authAPI.getCurrentUser(token),
-              4000,
-              'getCurrentUser'
-            );
-            if (fetchedProfile) {
-              userProfile = fetchedProfile;
-              console.log('✅ Existing user profile found:', userProfile.id);
+          // For price-card OAuth, force register immediately to ensure account exists
+          if (isFromPriceCard) {
+            const functionUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/auth-register`;
+            const requestBody = {
+              name: name,
+              email: email,
+              password: null,
+              role: 'owner',
+              paymentCompleted: false,
+              oauthProvider: 'google',
+              oauthUserId: user.id,
+              isPriceCardRegistration: true,
+              skipTrial: true,
+              trialDays: 0
+            };
+
+            pendingPlan = {
+              planName: urlParams.get('plan'),
+              planPrice: urlParams.get('price'),
+              planDuration: urlParams.get('duration'),
+              paymentMethod: urlParams.get('paymentMethod')
+            };
+
+            const storedPlan = JSON.parse(pendingOAuthPlan || '{}');
+            if (!pendingPlan.planName) pendingPlan.planName = storedPlan.planName;
+            if (!pendingPlan.planPrice) pendingPlan.planPrice = storedPlan.planPrice;
+            if (!pendingPlan.planDuration) pendingPlan.planDuration = storedPlan.planDuration;
+            if (!pendingPlan.paymentMethod) pendingPlan.paymentMethod = storedPlan.paymentMethod;
+
+            if (pendingPlan.planDuration) {
+              requestBody.planDuration = parseInt(pendingPlan.planDuration, 10);
             }
-          } catch (e) {
-            profileFetchError = e;
-            console.log('ℹ️ User profile not found (new user or error, will continue with stub):', e.message);
+
+            const response = await withTimeout(
+              fetch(functionUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseAnonKey}`,
+                  'apikey': supabaseAnonKey
+                },
+                body: JSON.stringify(requestBody)
+              }),
+              10000,
+              'auth-register'
+            );
+
+            const data = await response.clone().json().catch(() => ({}));
+            console.log('📩 auth-register response:', { status: response.status, body: data });
+
+            if (!response.ok && response.status !== 422) {
+              throw new Error(data.error || `Auth-register failed (${response.status})`);
+            }
+          } else {
+            // Try to get user profile for non-price-card flows
+            try {
+              console.log('🔍 Fetching user profile...');
+              const fetchedProfile = await withTimeout(
+                authAPI.getCurrentUser(token),
+                4000,
+                'getCurrentUser'
+              );
+              if (fetchedProfile) {
+                userProfile = fetchedProfile;
+                console.log('✅ Existing user profile found:', userProfile.id);
+              }
+            } catch (e) {
+              console.log('ℹ️ User profile not found (new user or error, will continue with stub):', e.message);
+            }
           }
 
           // If profile found, proceed to login

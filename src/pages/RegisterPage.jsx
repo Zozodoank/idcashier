@@ -67,75 +67,56 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       if (isPaymentMode) {
-        // Payment Flow: Register without trial, then pay
+        // Payment Flow: register via auth-register directly for consistency
         let user;
-        // Register user WITHOUT trial - explicitly set skipTrial flag
-        const registrationResult = await mcpRegisterClient.registerUser({
-          name: name,
-          email: email,
-          password: password,
-          role: 'owner',
-          skipTrial: true,
-          isPriceCardRegistration: true,
-          planDuration: planDuration ? parseInt(planDuration, 10) : 1
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        const registrationResponse = await fetch(`${supabaseUrl}/functions/v1/auth-register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'apikey': supabaseAnonKey
+          },
+          body: JSON.stringify({
+            name,
+            email,
+            password,
+            role: 'owner',
+            skipTrial: true,
+            isPriceCardRegistration: true,
+            planDuration: planDuration ? parseInt(planDuration, 10) : 1
+          })
         });
 
-        console.log('Registration result:', registrationResult);
+        let registrationData = {};
+        try {
+          registrationData = await registrationResponse.json();
+        } catch (e) {
+          registrationData = {};
+        }
 
-        if (!registrationResult.success) {
-          // Handle "already registered" case - try to login if password matches
-          if (registrationResult.error && (
-            registrationResult.error.includes('already been registered') ||
-            registrationResult.error.includes('already registered')
-          )) {
-            // Try to login
+        if (!registrationResponse.ok) {
+          // Handle already registered: try login
+          const msg = registrationData.error || registrationData.message || '';
+          if (msg.toLowerCase().includes('already')) {
             const loginResult = await login(email, password);
             if (loginResult.success && loginResult.user) {
               user = loginResult.user;
-              // If we logged in, we can proceed to payment.
-              // Note: user object might differ slightly in structure, ensure user.id exists
             } else {
-              // Login failed (wrong password or other issue)
               throw new Error(t('emailAlreadyRegistered'));
             }
           } else {
-            throw new Error(registrationResult.error || t('registrationFailed'));
+            throw new Error(msg || t('registrationFailed'));
           }
         } else {
-          // Extract user from registration result
-          // auth-register can return different structures:
-          // 1. { user: { id, email, ... } } - full user object
-          // 2. { userId: "...", message: "..." } - just userId
-          const responseData = registrationResult.data;
-
-          console.log('Registration response data:', responseData);
-
-          // Try to extract user object or construct from userId
-          if (responseData.user && responseData.user.id) {
-            user = responseData.user;
-          } else if (responseData.userId) {
-            // Construct user object from userId
-            user = {
-              id: responseData.userId,
-              email: email,
-              name: name,
-              role: 'owner'
-            };
-          } else if (responseData.id) {
-            // Response is the user object itself
-            user = responseData;
+          if (registrationData.user && registrationData.user.id) {
+            user = registrationData.user;
+          } else if (registrationData.userId) {
+            user = { id: registrationData.userId, email, name, role: 'owner' };
           } else {
-            console.error('Invalid user object:', responseData);
-            console.error('Full registration result:', registrationResult);
             throw new Error('Registration succeeded but user data is invalid. Please try logging in.');
-          }
-
-          console.log('Extracted user:', user);
-
-          // Verify user has id
-          if (!user || !user.id) {
-            console.error('User validation failed:', user);
-            throw new Error('Registration succeeded but user ID is missing. Please try logging in.');
           }
         }
 

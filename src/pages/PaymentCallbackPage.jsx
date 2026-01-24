@@ -88,10 +88,31 @@ export default function PaymentCallbackPage() {
             // Call auth-register dengan paymentCom pleted=true untuk aktivasi subscription
             // Error "already registered" akan diabaikan karena memang sudah diregister sebelumnya
             try {
+              const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+              const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+              if (!supabaseUrl || !supabaseAnonKey) {
+                throw new Error('Supabase configuration missing');
+              }
+
+              // For OAuth registrations, we must send oauthUserId/userId because password is null.
+              // auth-register validates: (password OR userId) must exist.
+              let oauthUserId = pendingRegistration.oauthUserId;
+              if (!oauthUserId) {
+                try {
+                  const { data: { user: authUser } } = await supabase.auth.getUser();
+                  oauthUserId = authUser?.id || null;
+                } catch (e) {
+                  oauthUserId = null;
+                }
+              }
+
               const registerRequestBody = {
                 name: pendingRegistration.name,
                 email: pendingRegistration.email,
                 password: pendingRegistration.password,
+                // Send oauth user id for OAuth activations
+                oauthUserId: oauthUserId || undefined,
                 planDuration: pendingRegistration.planDuration,
                 useHPP: pendingRegistration.useHPP || false,
                 merchantOrderId: pendingRegistration.merchantOrderId,
@@ -104,11 +125,12 @@ export default function PaymentCallbackPage() {
 
               console.log('📝 Calling auth-register to activate subscription...');
 
-              const registerRes = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/auth-register', {
+              const registerRes = await fetch(`${supabaseUrl}/functions/v1/auth-register`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                  'Authorization': `Bearer ${supabaseAnonKey}`,
+                  'apikey': supabaseAnonKey
                 },
                 body: JSON.stringify(registerRequestBody)
               });

@@ -303,6 +303,58 @@ Deno.serve(async (req: Request) => {
       }
       
       if (userId) {
+        // --- CRITICAL FIX ---
+        // In price-card OAuth flow, it's possible that Supabase Auth user exists but public.users row
+        // hasn't been created yet when Duitku callback arrives.
+        // Since subscriptions.user_id has FK to public.users, inserting subscription will fail.
+        // Previously this failure was only logged and the callback still returned 200, leaving users "expired".
+        // Fix: ensure public.users row exists BEFORE any subscription upsert.
+        try {
+          const ensuredEmail = targetEmail;
+          // Create minimal public.users if missing
+          const { data: existingPublicUser, error: existingUserErr } = await supabase
+            .from('users')
+            .select('id, email, role, tenant_id')
+            .eq('id', userId)
+            .maybeSingle();
+
+          if (existingUserErr) {
+            console.warn('Error checking existing public.users:', existingUserErr);
+          }
+
+          if (!existingPublicUser) {
+            console.log('🧩 public.users missing for paid user. Creating public.users before subscription...', { userId, ensuredEmail });
+            const insertPayload: any = {
+              id: userId,
+              name: (ensuredEmail ? ensuredEmail.split('@')[0] : 'User'),
+              email: ensuredEmail || `unknown-${userId}@invalid.local`,
+              role: 'owner',
+              tenant_id: userId
+            };
+
+            const { error: insertUserErr } = await supabase
+              .from('users')
+              .insert(insertPayload);
+
+            if (insertUserErr) {
+              // If duplicate due to race, ignore. Otherwise throw to stop silently-success response.
+              const msg = (insertUserErr as any)?.message || '';
+              if (msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('already') || (insertUserErr as any)?.code === '23505') {
+                console.log('public.users already created by race, continuing.');
+              } else {
+                console.error('❌ Failed to create public.users before subscription:', insertUserErr);
+                throw insertUserErr;
+              }
+            }
+          }
+        } catch (ensureUserErr) {
+          console.error('❌ Failed to ensure public.users exists; aborting subscription update to avoid silent success:', ensureUserErr);
+          return new Response(
+            JSON.stringify({ success: false, message: 'Failed to ensure user profile exists before subscription update' }),
+            { headers: corsHeaders, status: 500 }
+          );
+        }
+
         // For cashiers, use the owner's ID for subscription
         let effectiveUserId = userId;
         

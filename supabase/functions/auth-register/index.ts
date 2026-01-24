@@ -19,6 +19,7 @@ interface RegisterRequest {
     isPriceCardRegistration?: boolean;
     skipTrial?: boolean;
     userId?: string; // Optional: provided for OAuth sync
+    oauthUserId?: string; // Legacy OAuth field
     oauthProvider?: string; // Optional: to indicate OAuth flow
     paymentCompleted?: boolean;
     planDuration?: number; // Subscription duration in months
@@ -32,7 +33,7 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const body = (await req.json()) as RegisterRequest & { oauthUserId?: string };
+        const body = (await req.json()) as RegisterRequest;
         const {
             email,
             password,
@@ -47,14 +48,20 @@ Deno.serve(async (req) => {
             planDuration = 1
         } = body;
 
-        const resolvedUserId = providedUserId || body.oauthUserId;
+        const resolvedUserId = providedUserId || body.oauthUserId || (body as any).user_id;
 
         // Validate input
         if (!email || (!password && !resolvedUserId) || !name) {
             return new Response(
                 JSON.stringify({
                     success: false,
-                    error: 'Email, name, and (password OR userId) are required'
+                    error: 'Email, name, and (password OR userId) are required',
+                    received: {
+                        email: !!email,
+                        name: !!name,
+                        hasPassword: !!password,
+                        resolvedUserId: resolvedUserId || null
+                    }
                 }),
                 {
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -118,19 +125,49 @@ Deno.serve(async (req) => {
                 });
 
                 if (authError) {
-                    console.error('Auth error:', authError);
-                    return new Response(
-                        JSON.stringify({
-                            success: false,
-                            error: authError.message
-                        }),
-                        {
-                            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                            status: 400,
+                    // If auth user already exists, attempt to recover by email
+                    const message = authError.message?.toLowerCase() || '';
+                    if (message.includes('already') || message.includes('exists') || message.includes('duplicate')) {
+                        console.warn('Auth user already exists. Attempting recovery by email...');
+                        const { data: listData, error: listError } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+                        if (listError) {
+                            console.error('List users error:', listError);
+                            return new Response(
+                                JSON.stringify({
+                                    success: false,
+                                    error: 'User already exists but could not recover auth user',
+                                    details: listError.message
+                                }),
+                                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+                            );
                         }
-                    );
+                        const foundUser = listData?.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase().trim());
+                        if (!foundUser) {
+                            return new Response(
+                                JSON.stringify({
+                                    success: false,
+                                    error: 'User already exists but could not find auth user'
+                                }),
+                                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+                            );
+                        }
+                        userId = foundUser.id;
+                    } else {
+                        console.error('Auth error:', authError);
+                        return new Response(
+                            JSON.stringify({
+                                success: false,
+                                error: authError.message
+                            }),
+                            {
+                                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                                status: 400,
+                            }
+                        );
+                    }
+                } else {
+                    userId = authData.user.id;
                 }
-                userId = authData.user.id;
             }
         } else {
             // OAuth Case: User already exists in Auth, just update metadata if needed
@@ -178,15 +215,11 @@ Deno.serve(async (req) => {
 
             if (userError) {
                 console.error('User table error:', userError);
-                // Only delete Auth user if we just created it (not for OAuth sync)
-                if (!providedUserId) {
-                    await supabase.auth.admin.deleteUser(userId!);
-                }
-
                 return new Response(
                     JSON.stringify({
                         success: false,
-                        error: 'Failed to create user profile'
+                        error: 'Failed to create user profile',
+                        details: userError.message
                     }),
                     {
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -315,6 +348,7 @@ Deno.serve(async (req) => {
             JSON.stringify({
                 success: false,
                 error: error instanceof Error ? error.message : 'Unknown error occurred',
+                stack: error?.stack || null
             }),
             {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },

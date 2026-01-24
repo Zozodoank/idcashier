@@ -117,9 +117,22 @@ Deno.serve(async (req: Request) => {
     }
 
     const subscription = subscriptions[0];
+
+    // IMPORTANT:
+    // end_date in DB is stored as YYYY-MM-DD (date-only).
+    // When parsed as Date, it becomes local time 00:00:00. If we compare it to "now",
+    // the subscription will appear expired for the entire end date after midnight.
+    // Fix: Compare dates at start-of-day and make end_date inclusive by adding 1 day.
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const endDate = new Date(subscription.end_date);
-    const isActive = endDate >= today;
+    if (!isNaN(endDate.getTime())) {
+      endDate.setHours(0, 0, 0, 0);
+      endDate.setDate(endDate.getDate() + 1); // inclusive
+    }
+
+    const isActive = !isNaN(endDate.getTime()) && endDate > today;
 
     return createResponse({
       ...subscription,

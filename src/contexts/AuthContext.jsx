@@ -563,15 +563,79 @@ export const AuthProvider = ({ children }) => {
       let userData;
 
       if (!Array.isArray(userArray) || userArray.length === 0) {
-        console.warn('⚠️ User authenticated but not found in database - cleaning up session');
-        // Auto-logout to clean up orphaned session
-        await supabase.auth.signOut();
-        setToken(null);
-        setUser(null);
-        return;
+        console.warn('⚠️ User authenticated but not found in public.users. Attempting recovery via auth-register...');
+
+        // Recovery strategy:
+        // 1) Call auth-register to sync OAuth user into public.users (id/email).
+        // 2) Wait briefly for DB propagation.
+        // 3) Retry fetching profile once.
+        try {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+          if (supabaseUrl && supabaseAnonKey && authUser?.id && authUser?.email) {
+            const functionUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/auth-register`;
+            const requestBody = {
+              name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
+              email: authUser.email,
+              password: null,
+              role: 'owner',
+              oauthProvider: 'google',
+              oauthUserId: authUser.id,
+              paymentCompleted: false,
+              // Not necessarily price card here; we just want to ensure profile exists.
+              isPriceCardRegistration: false,
+              skipTrial: true
+            };
+
+            const regRes = await fetch(functionUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseAnonKey}`,
+                'apikey': supabaseAnonKey
+              },
+              body: JSON.stringify(requestBody)
+            });
+
+            const regJson = await regRes.clone().json().catch(() => ({}));
+            console.log('📩 AuthContext recovery auth-register:', { status: regRes.status, body: regJson });
+
+            // Small delay to let DB insert commit
+            await new Promise(r => setTimeout(r, 800));
+
+            // Retry fetch once
+            const retryResponse = await fetch(urlWithApiKey, {
+              method: 'GET',
+              headers: {
+                'apikey': supabaseAnonKey,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (retryResponse.ok) {
+              const retryArray = await retryResponse.json();
+              if (Array.isArray(retryArray) && retryArray.length > 0) {
+                userData = retryArray[0];
+              }
+            }
+          }
+        } catch (recoveryError) {
+          console.warn('AuthContext recovery failed:', recoveryError);
+        }
+
+        // If still no user profile, do NOT signOut immediately.
+        // Let AuthCallbackPage/payment flows handle registration.
+        if (!userData) {
+          console.warn('⚠️ Profile still missing after recovery attempt. Keeping session (no auto-signOut).');
+          return;
+        }
       }
 
-      userData = userArray[0];
+      if (!userData) {
+        userData = userArray[0];
+      }
 
       if (userData) {
         const userWithTenantId = {

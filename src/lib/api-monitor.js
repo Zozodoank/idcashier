@@ -44,7 +44,7 @@ window.fetch = async function(url, options = {}) {
       // If there's an error, log more details
       if (!response.ok) {
         try {
-          const errorText = await response.text();
+          const errorText = await response.clone().text();
           console.error('🔍 API MONITOR - Error Response:', {
             status: response.status,
             statusText: response.statusText,
