@@ -366,7 +366,7 @@ Deno.serve(async (req: Request) => {
           .eq('user_id', effectiveUserId)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         const newEndDate = new Date();
         
@@ -391,7 +391,9 @@ Deno.serve(async (req: Request) => {
             .update({
               end_date: newEndDate.toISOString().split('T')[0],
               status: subscriptionStatus,
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              plan_name: paymentRecord?.product_details || planName,
+              duration: extensionMonths
             })
             .eq('id', existingSubscription.id);
 
@@ -415,7 +417,9 @@ Deno.serve(async (req: Request) => {
               user_id: effectiveUserId,
               start_date: new Date().toISOString().split('T')[0],
               end_date: newEndDate.toISOString().split('T')[0],
-              status: subscriptionStatus
+              status: subscriptionStatus,
+              plan_name: paymentRecord?.product_details || planName,
+              duration: extensionMonths
             });
 
           if (insertError) {
@@ -427,13 +431,32 @@ Deno.serve(async (req: Request) => {
         
         // Auto-confirm user email on successful payment
         const { error: confirmError } = await supabase.auth.admin.updateUserById(userId, {
-          email_confirm: true
+          email_confirm: true,
+          user_metadata: {
+            payment_completed: true,
+            email_verified: true,
+            is_trial_user: false
+          }
         });
         
         if (confirmError) {
           console.error(`Failed to auto-confirm email for user ${userId}:`, confirmError);
         } else {
-          console.log(`Auto-confirmed email for user ${userId}`);
+          console.log(`Auto-confirmed email for user ${userId} and updated payment_completed to true`);
+        }
+
+        // Also update user profile in public.users table
+        const { error: userUpdateError } = await supabase
+          .from('users')
+          .update({
+            email: targetEmail || undefined
+          })
+          .eq('id', userId);
+
+        if (userUpdateError) {
+          console.error(`Failed to update user profile:`, userUpdateError);
+        } else {
+          console.log(`Updated user profile for user ${userId}`);
         }
         
         // If this is HPP activation payment, enable HPP feature

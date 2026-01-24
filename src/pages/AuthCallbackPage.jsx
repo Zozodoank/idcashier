@@ -124,7 +124,29 @@ const AuthCallbackPage = () => {
   };
 
   useEffect(() => {
+    const withTimeout = (promise, ms, label) => {
+      let timeoutId;
+      const timeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      });
+      return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+    };
+
     const handleAuthCallback = async () => {
+      const start = Date.now();
+      let finished = false;
+      const failSafe = setTimeout(() => {
+        if (!finished) {
+          console.error('⚠️ Auth callback failsafe triggered (timeout).');
+          setStatus('error');
+          toast({
+            title: t('loginFailed'),
+            description: 'Authentication timeout. Please try again.',
+            variant: 'destructive',
+          });
+          navigate('/login');
+        }
+      }, 15000);
       try {
         // For OAuth callback, we need to handle the URL hash first
         // Supabase OAuth redirects with session in URL hash
@@ -149,7 +171,11 @@ const AuthCallbackPage = () => {
         }
 
         // Get the session from the URL hash
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await withTimeout(
+          supabase.auth.getSession(),
+          8000,
+          'getSession'
+        );
 
         if (sessionError) {
           console.error('❌ Session error:', sessionError);
@@ -168,6 +194,9 @@ const AuthCallbackPage = () => {
         const user = session.user;
         const email = user.email;
         const name = user.user_metadata?.full_name || user.user_metadata?.name || email?.split('@')[0] || 'User';
+
+        // Build a stub profile immediately to avoid blocking
+        let userProfile = { id: user.id, email, name, role: 'owner', user_metadata: user.user_metadata };
 
         // 🔧 FIXED: Cek apakah ini alur registrasi berbayar via price card
         // Enhanced check dengan multiple sources untuk memastikan price card detection
@@ -200,15 +229,21 @@ const AuthCallbackPage = () => {
           }
 
           // Try to get user profile
-          let userProfile = null;
           let profileFetchError = null;
           try {
             console.log('🔍 Fetching user profile...');
-            userProfile = await authAPI.getCurrentUser(token);
-            console.log('✅ Existing user profile found:', userProfile.id);
+            const fetchedProfile = await withTimeout(
+              authAPI.getCurrentUser(token),
+              4000,
+              'getCurrentUser'
+            );
+            if (fetchedProfile) {
+              userProfile = fetchedProfile;
+              console.log('✅ Existing user profile found:', userProfile.id);
+            }
           } catch (e) {
             profileFetchError = e;
-            console.log('ℹ️ User profile not found (new user or error):', e.message);
+            console.log('ℹ️ User profile not found (new user or error, will continue with stub):', e.message);
           }
 
           // If profile found, proceed to login
@@ -261,15 +296,19 @@ const AuthCallbackPage = () => {
 
             console.log('📋 Request body:', requestBody);
 
-            const response = await fetch(functionUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseAnonKey}`,
-                'apikey': supabaseAnonKey
-              },
-              body: JSON.stringify(requestBody)
-            });
+            const response = await withTimeout(
+              fetch(functionUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseAnonKey}`,
+                  'apikey': supabaseAnonKey
+                },
+                body: JSON.stringify(requestBody)
+              }),
+              10000,
+              'auth-register'
+            );
 
             // Clone response to avoid "body stream already read" error
             const responseClone = response.clone();
@@ -282,14 +321,18 @@ const AuthCallbackPage = () => {
               data = await responseClone.json();
             }
 
+            console.log('📩 auth-register response:', { status: response.status, body: data });
+
             if (!response.ok) {
               // Ignore "already registered" errors for OAuth - this means race condition or temporary fetch failure
               if (response.status !== 422 &&
                 !data.error?.includes('already registered') &&
                 !data.error?.includes('already exists')) {
-                throw new Error(data.error || 'Failed to create user profile');
+                throw new Error(data.error || `Auth-register failed (${response.status})`);
               }
               console.log('ℹ️ User likely already exists (backend handled conflict)');
+            } else if (data?.success === false) {
+              throw new Error(data.error || 'Auth-register returned success=false');
             } else {
               console.log('✅ Registration successful:', data);
             }
@@ -299,13 +342,19 @@ const AuthCallbackPage = () => {
             // But we'll do a quick check to set userProfile for consistency, but won't block on it.
             try {
               // Wait a moment for DB propagation
-              await new Promise(r => setTimeout(r, 1000));
-              userProfile = await authAPI.getCurrentUser(token);
+              await new Promise(r => setTimeout(r, 800));
+              const fetchedProfile = await withTimeout(
+                authAPI.getCurrentUser(token),
+                3000,
+                'getCurrentUserAfterRegister'
+              );
+              if (fetchedProfile) {
+                userProfile = fetchedProfile;
+              }
             } catch (e) {
               console.warn('⚠️ Could not fetch profile immediately after reg, but proceeding:', e.message);
-              // Create a dummy profile object to satisfy the check below,
-              // since we know auth-register succeeded.
-              userProfile = { id: user.id, email: email, name: name, role: 'owner' };
+              // Keep stub profile; auth-register already succeeded
+              userProfile = userProfile || { id: user.id, email: email, name: name, role: 'owner' };
             }
           }
 
@@ -395,9 +444,11 @@ const AuthCallbackPage = () => {
               description: `Welcome, ${name}!`,
             });
 
+            finished = true;
+            clearTimeout(failSafe);
             setTimeout(() => {
               window.location.href = '/dashboard';
-            }, 1000);
+            }, 800);
           } else {
             throw new Error('Failed to complete authentication flow.');
           }
@@ -422,9 +473,11 @@ const AuthCallbackPage = () => {
             variant: 'destructive',
           });
 
+          finished = true;
+          clearTimeout(failSafe);
           setTimeout(() => {
             navigate('/login');
-          }, 2000);
+          }, 1500);
         }
       } catch (error) {
         console.error('Auth callback error:', error);
@@ -445,9 +498,11 @@ const AuthCallbackPage = () => {
           variant: 'destructive',
         });
 
+        finished = true;
+        clearTimeout(failSafe);
         setTimeout(() => {
           navigate('/login');
-        }, 2000);
+        }, 1500);
       }
     };
 

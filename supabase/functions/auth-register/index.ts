@@ -32,6 +32,7 @@ Deno.serve(async (req) => {
     }
 
     try {
+        const body = (await req.json()) as RegisterRequest & { oauthUserId?: string };
         const {
             email,
             password,
@@ -44,10 +45,12 @@ Deno.serve(async (req) => {
             oauthProvider,
             paymentCompleted,
             planDuration = 1
-        }: RegisterRequest = await req.json();
+        } = body;
+
+        const resolvedUserId = providedUserId || body.oauthUserId;
 
         // Validate input
-        if (!email || (!password && !providedUserId) || !name) {
+        if (!email || (!password && !resolvedUserId) || !name) {
             return new Response(
                 JSON.stringify({
                     success: false,
@@ -74,7 +77,7 @@ Deno.serve(async (req) => {
             }
         );
 
-        let userId = providedUserId;
+        let userId = resolvedUserId;
 
         // If userId is NOT provided, we need to create the auth user
         if (!userId) {
@@ -88,35 +91,47 @@ Deno.serve(async (req) => {
                 );
             }
 
-            // Create user in auth
-            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-                email: email.toLowerCase().trim(),
-                password,
-                email_confirm: paymentCompleted ? true : false,
-                user_metadata: {
-                    name,
-                    phone: phone || '',
-                    role,
-                    is_trial_user: !isPriceCardRegistration && !paymentCompleted,
-                    payment_completed: paymentCompleted || false,
-                    is_price_card_registration: isPriceCardRegistration,
-                },
-            });
+            // First check if user already exists in public users table (linked to Auth)
+            const { data: existingPublicUser } = await supabase
+                .from('users')
+                .select('id')
+                .eq('email', email.toLowerCase().trim())
+                .maybeSingle();
 
-            if (authError) {
-                console.error('Auth error:', authError);
-                return new Response(
-                    JSON.stringify({
-                        success: false,
-                        error: authError.message
-                    }),
-                    {
-                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                        status: 400,
-                    }
-                );
+            if (existingPublicUser) {
+                console.log('User found in public records, using existing ID:', existingPublicUser.id);
+                userId = existingPublicUser.id;
+            } else {
+                // Create user in auth
+                const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+                    email: email.toLowerCase().trim(),
+                    password,
+                    email_confirm: paymentCompleted ? true : false,
+                    user_metadata: {
+                        name,
+                        phone: phone || '',
+                        role,
+                        is_trial_user: !isPriceCardRegistration && !paymentCompleted,
+                        payment_completed: paymentCompleted || false,
+                        is_price_card_registration: isPriceCardRegistration,
+                    },
+                });
+
+                if (authError) {
+                    console.error('Auth error:', authError);
+                    return new Response(
+                        JSON.stringify({
+                            success: false,
+                            error: authError.message
+                        }),
+                        {
+                            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                            status: 400,
+                        }
+                    );
+                }
+                userId = authData.user.id;
             }
-            userId = authData.user.id;
         } else {
             // OAuth Case: User already exists in Auth, just update metadata if needed
             console.log(`Syncing existing user ${userId} to public tables`);
@@ -133,6 +148,11 @@ Deno.serve(async (req) => {
                     oauth_provider: oauthProvider
                 }
             });
+        }
+
+        // Ensure userId is defined
+        if (!userId) {
+            throw new Error('User ID is required');
         }
 
         // Check if public profile already exists to avoid duplicate key error
@@ -272,7 +292,7 @@ Deno.serve(async (req) => {
             email,
             isPriceCardRegistration,
             skipTrial,
-            isOAuthSync: !!providedUserId
+            isOAuthSync: !!resolvedUserId
         });
 
         return new Response(

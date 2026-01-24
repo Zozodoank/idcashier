@@ -99,6 +99,100 @@ Deno.serve(async (req: Request) => {
             console.error('Error updating metadata:', metadataError);
         }
 
+        // Check if user has completed payments and activate subscription
+        // Use service role to avoid RLS issues
+        const { data: completedPayments, error: paymentsError } = await supabaseAdmin
+            .from('payments')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('status', 'completed')
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        if (!paymentsError && completedPayments && completedPayments.length > 0) {
+            // User has completed payment, ensure subscription is active
+            const payment = completedPayments[0];
+            
+            // Calculate subscription duration based on payment_amount (more accurate than amount)
+            // payment_amount contains the actual payment amount
+        const paymentAmount = parseFloat(payment.amount) || 0;
+            let durationMonths = 1; // default
+            
+            if (paymentAmount >= 50000 && paymentAmount < 100000) durationMonths = 1;
+            else if (paymentAmount >= 100000 && paymentAmount < 200000) durationMonths = 3;
+            else if (paymentAmount >= 200000 && paymentAmount < 400000) durationMonths = 6;
+            else if (paymentAmount >= 400000) durationMonths = 12;
+            
+            // Use subscription dates from payment if available, otherwise calculate
+            let startDate = payment.subscription_start_date ? new Date(payment.subscription_start_date) : new Date();
+            let endDate = payment.subscription_end_date ? new Date(payment.subscription_end_date) : new Date();
+            
+            // If dates are not set in payment, calculate them
+            if (!payment.subscription_start_date || !payment.subscription_end_date) {
+                endDate.setMonth(startDate.getMonth() + durationMonths);
+            }
+            
+            // Check if user already has a subscription
+            const { data: existingSub, error: existingSubError } = await supabaseAdmin
+                .from('subscriptions')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            
+            if (existingSub) {
+                // Update existing subscription with payment info
+                const { error: updateSubError } = await supabaseAdmin
+                    .from('subscriptions')
+                    .update({
+                        start_date: startDate.toISOString().split('T')[0],
+                        end_date: endDate.toISOString().split('T')[0],
+                        status: 'active',
+                        updated_at: new Date().toISOString(),
+                        plan_name: payment.product_details || existingSub.plan_name,
+                        duration: durationMonths
+                    })
+                    .eq('id', existingSub.id);
+                
+                if (updateSubError) {
+                    console.error('Error updating subscription:', updateSubError);
+                }
+            } else {
+                // Create new subscription
+                const { error: insertSubError } = await supabaseAdmin
+                    .from('subscriptions')
+                    .insert({
+                        user_id: user.id,
+                        start_date: startDate.toISOString().split('T')[0],
+                        end_date: endDate.toISOString().split('T')[0],
+                        status: 'active',
+                        plan_name: payment.product_details,
+                        duration: durationMonths
+                    });
+                
+                if (insertSubError) {
+                    console.error('Error creating subscription:', insertSubError);
+                }
+            }
+        } else {
+            // Check if there are any pending or paid payments that might become completed later
+            const { data: pendingPaymentsCheck } = await supabaseAdmin
+                .from('payments')
+                .select('*')
+                .eq('user_id', user.id)
+                .in('status', ['pending', 'paid'])
+                .order('created_at', { ascending: false })
+                .limit(1);
+            
+            if (pendingPaymentsCheck && pendingPaymentsCheck.length > 0) {
+                // User has pending/paid payments, they will be processed by the callback
+                console.log('User has pending/paid payments, subscription will be activated by payment callback');
+            } else {
+                console.log('No completed payments found for user:', user.id);
+            }
+        }
+
         return new Response(
             JSON.stringify({
                 success: true,
