@@ -30,6 +30,7 @@ interface RegisterRequest {
     role?: string;
     isPriceCardRegistration?: boolean;
     skipTrial?: boolean;
+    trialDays?: number; // Optional: explicit trial duration requested by client
     userId?: string; // Optional: provided for OAuth sync
     oauthUserId?: string; // Legacy OAuth field
     oauthProvider?: string; // Optional: to indicate OAuth flow
@@ -247,7 +248,7 @@ Deno.serve(async (req) => {
         // Check if subscription exists first
         const { data: existingSub } = await supabase
             .from('subscriptions')
-            .select('id, end_date, status')
+            .select('id, end_date, status, plan_name, duration')
             .eq('user_id', userId)
             .maybeSingle();
 
@@ -313,12 +314,32 @@ Deno.serve(async (req) => {
             });
 
         } else if (!isPriceCardRegistration && !skipTrial) {
-            // TRIAL USER: Only create trial subscription if NOT from price card AND not skipped
-            if (!existingSub) {
-                const startDate = new Date();
-                const endDate = new Date();
-                endDate.setDate(endDate.getDate() + 7);
+            // TRIAL USER: Always ensure user gets a fresh trial window.
+            // Previously: trial was only created if no subscription existed.
+            // This caused "expired" for users who had an old/expired subscription (e.g. previous failed attempt).
+            // New behavior:
+            // - If no subscription exists: insert trial
+            // - If subscription exists but expired: update to new trial window from today
+            // - If subscription exists and still active (e.g. paid): do not override
 
+            const requestedTrialDays = typeof body.trialDays === 'number' ? body.trialDays : 7;
+            const trialDays = requestedTrialDays > 0 ? requestedTrialDays : 7;
+
+            const startDate = new Date();
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() + trialDays);
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const existingEnd = existingSub?.end_date ? new Date(existingSub.end_date) : null;
+            if (existingEnd && !isNaN(existingEnd.getTime())) {
+                existingEnd.setHours(0, 0, 0, 0);
+            }
+
+            const isExistingExpired = !existingSub || !existingEnd || existingEnd < today || existingSub.status === 'expired';
+
+            if (!existingSub) {
                 const newId = generateUuid();
                 if (!newId) {
                     console.error('❌ Failed to generate UUID for trial subscription insert');
@@ -332,14 +353,40 @@ Deno.serve(async (req) => {
                         user_id: userId,
                         start_date: startDate.toISOString().split('T')[0],
                         end_date: endDate.toISOString().split('T')[0],
-                        status: 'active'
+                        status: 'active',
+                        plan_name: 'trial',
+                        duration: trialDays
                     });
 
                 if (subError) {
                     console.error('Subscription error:', subError);
                 } else {
-                    console.log(`Trial subscription created for user ${userId}`);
+                    console.log(`Trial subscription created for user ${userId} (${trialDays} days)`);
                 }
+            } else if (isExistingExpired) {
+                const { error: updateTrialError } = await supabase
+                    .from('subscriptions')
+                    .update({
+                        start_date: startDate.toISOString().split('T')[0],
+                        end_date: endDate.toISOString().split('T')[0],
+                        status: 'active',
+                        plan_name: (existingSub as any)?.plan_name || 'trial',
+                        duration: (existingSub as any)?.duration || trialDays,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existingSub.id);
+
+                if (updateTrialError) {
+                    console.error('❌ Error updating trial subscription:', updateTrialError);
+                } else {
+                    console.log(`✅ Trial subscription refreshed for user ${userId} (${trialDays} days)`);
+                }
+            } else {
+                console.log('ℹ️ Existing subscription still active; not overriding with trial', {
+                    userId,
+                    existingEndDate: existingSub.end_date,
+                    existingStatus: existingSub.status
+                });
             }
         } else {
             console.log('Skipping trial subscription for price card registration (will be activated after payment)');
