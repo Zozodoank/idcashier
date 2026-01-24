@@ -2,6 +2,18 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from '@supabase/supabase-js';
 
+// Supabase subscriptions table uses `id` as NOT NULL without default in this project.
+// Always generate an ID when inserting new subscriptions to avoid silent failures.
+const generateUuid = () => {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    // Fallback for older runtimes
+    // @ts-ignore
+    return (globalThis as any).crypto?.randomUUID?.() || null;
+  }
+};
+
 // CORS headers
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -269,9 +281,15 @@ Deno.serve(async (req) => {
                 }
             } else {
                 // Create new subscription
+                const newId = generateUuid();
+                if (!newId) {
+                    console.error('❌ Failed to generate UUID for subscription insert');
+                    throw new Error('Failed to generate subscription id');
+                }
                 const { error: subError } = await supabase
                     .from('subscriptions')
                     .insert({
+                        id: newId,
                         user_id: userId,
                         start_date: startDate.toISOString().split('T')[0],
                         end_date: endDate.toISOString().split('T')[0],
@@ -301,9 +319,16 @@ Deno.serve(async (req) => {
                 const endDate = new Date();
                 endDate.setDate(endDate.getDate() + 7);
 
+                const newId = generateUuid();
+                if (!newId) {
+                    console.error('❌ Failed to generate UUID for trial subscription insert');
+                    throw new Error('Failed to generate subscription id');
+                }
+
                 const { error: subError } = await supabase
                     .from('subscriptions')
                     .insert({
+                        id: newId,
                         user_id: userId,
                         start_date: startDate.toISOString().split('T')[0],
                         end_date: endDate.toISOString().split('T')[0],

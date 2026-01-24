@@ -466,6 +466,9 @@ Deno.serve(async (req: Request) => {
           const { error: insertError } = await supabase
             .from('subscriptions')
             .insert({
+              // IMPORTANT: subscriptions.id is NOT NULL and has no default in this project.
+              // Always provide id to avoid silent failures where payment is completed but subscription is missing.
+              id: crypto.randomUUID(),
               user_id: effectiveUserId,
               start_date: new Date().toISOString().split('T')[0],
               end_date: newEndDate.toISOString().split('T')[0],
@@ -475,7 +478,11 @@ Deno.serve(async (req: Request) => {
             });
 
           if (insertError) {
-            console.error('Error creating subscription:', insertError);
+            console.error('❌ Error creating subscription:', insertError);
+            return new Response(
+              JSON.stringify({ success: false, message: 'Failed to create subscription', error: (insertError as any)?.message || insertError }),
+              { headers: corsHeaders, status: 500 }
+            );
           } else {
             console.log(`New subscription created for user ${effectiveUserId}, valid until ${newEndDate.toISOString().split('T')[0]}, status: ${subscriptionStatus}`);
           }
