@@ -360,6 +360,14 @@ Deno.serve(async (req) => {
 
                 if (subError) {
                     console.error('Subscription error:', subError);
+                    return new Response(
+                      JSON.stringify({
+                        success: false,
+                        error: 'Failed to create trial subscription',
+                        details: (subError as any)?.message || subError
+                      }),
+                      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+                    );
                 } else {
                     console.log(`Trial subscription created for user ${userId} (${trialDays} days)`);
                 }
@@ -370,14 +378,23 @@ Deno.serve(async (req) => {
                         start_date: startDate.toISOString().split('T')[0],
                         end_date: endDate.toISOString().split('T')[0],
                         status: 'active',
-                        plan_name: (existingSub as any)?.plan_name || 'trial',
-                        duration: (existingSub as any)?.duration || trialDays,
+                        // When refreshing trial we always reset to trial metadata
+                        plan_name: 'trial',
+                        duration: trialDays,
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', existingSub.id);
 
                 if (updateTrialError) {
                     console.error('❌ Error updating trial subscription:', updateTrialError);
+                    return new Response(
+                      JSON.stringify({
+                        success: false,
+                        error: 'Failed to refresh trial subscription',
+                        details: (updateTrialError as any)?.message || updateTrialError
+                      }),
+                      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+                    );
                 } else {
                     console.log(`✅ Trial subscription refreshed for user ${userId} (${trialDays} days)`);
                 }
