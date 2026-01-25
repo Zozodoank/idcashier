@@ -1,3 +1,4 @@
+// @supabase/verify-jwt false
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders } from '../_shared/cors.ts';
@@ -10,6 +11,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Simple auth gate so this endpoint isn't public.
+    // Accept either:
+    // - Authorization: Bearer <SUPABASE_ANON_KEY or VITE_SUPABASE_ANON_KEY>
+    // - apikey: <SUPABASE_ANON_KEY or VITE_SUPABASE_ANON_KEY>
+    const authHeader = req.headers.get('authorization') || '';
+    const apikeyHeader = req.headers.get('apikey') || '';
+    // @ts-ignore: Deno is available at runtime
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('VITE_SUPABASE_ANON_KEY') || '';
+
+    const bearer = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
+
+    if (!anonKey || (bearer !== anonKey && apikeyHeader !== anonKey)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401
+      });
+    }
+
     // Get environment variables
     // @ts-ignore: Deno is available at runtime
     const supabaseUrl = Deno.env.get('SUPABASE_URL');

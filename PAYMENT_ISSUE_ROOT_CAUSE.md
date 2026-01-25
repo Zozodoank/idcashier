@@ -132,7 +132,7 @@ ORDER BY ordinal_position;
 2. Pilih paket (misal: 1 Bulan - Rp 50.000)
 3. Pilih metode pembayaran
 4. Register dengan Google atau Email
-5. Bayar di Duitku Sandbox
+5. Bayar di Duitku Production
 6. Verify redirect ke /store-setup ✅
 ```
 
@@ -277,7 +277,7 @@ LIMIT 5;
 
 1. **Existing Subscriptions**: Subscriptions created before migration will have NULL values for new columns. They need to be updated manually or via script.
 
-2. **Duitku Sandbox**: Make sure to use Duitku sandbox credentials for testing.
+2. **Duitku Production**: Pastikan memakai credentials production dan endpoint `https://passport.duitku.com/webapi`.
 
 3. **Callback URL**: Ensure Duitku is configured with correct callback URL:
    ```

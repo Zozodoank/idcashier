@@ -117,7 +117,7 @@ const LandingPage = () => {
     setIsDuitkuProcessing(true);
     try {
       // Create payment request to our edge function
-      const response = await fetch('https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/duitku-payment-request', {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/duitku-payment-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

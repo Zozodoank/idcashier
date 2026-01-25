@@ -56,7 +56,7 @@ POST https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/register-with-payment
    - Integrates with Duitku.com payment gateway
    - Supports multiple payment methods
    - Generates secure signatures for API communication
-   - Handles both sandbox and production environments
+   - Production setup notes
 
 3. **Data Validation**
    - Comprehensive validation for user registration data
@@ -83,11 +83,11 @@ POST https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/register-with-payment
 
 The function requires the following environment variables to be set in Supabase:
 
-- `DUITKU_ENVIRONMENT` - Either 'sandbox' or 'production'
-- `DUITKU_SANDBOX_MERCHANT_CODE` - Merchant code for sandbox environment
-- `DUITKU_SANDBOX_API_KEY` - API key for sandbox environment
-- `DUITKU_SANDBOX_BASE_URL` - Base URL for sandbox environment (https://sandbox.duitku.com)
-- `DUITKU_PRODUCTION_MERCHANT_CODE` - Merchant code for production environment
+- `DUITKU_ENVIRONMENT` - Use `production`
+- `DUITKU_MERCHANT_CODE` - Merchant code for production environment
+- `DUITKU_API_KEY` - API key for production environment
+- `DUITKU_BASE_URL` - Base URL for production environment (https://passport.duitku.com)
+- `DUITKU_WEBAPI_BASE_URL` - WebAPI base URL (https://passport.duitku.com/webapi)
 - `DUITKU_PRODUCTION_API_KEY` - API key for production environment
 - `DUITKU_PRODUCTION_BASE_URL` - Base URL for production environment (https://passport.duitku.com)
 

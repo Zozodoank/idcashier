@@ -237,6 +237,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // 4) Konfigurasi Duitku dari ENV
+    // Production-only runtime (no sandbox)
     // @ts-ignore: Deno is available at runtime
     const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
     // @ts-ignore: Deno is available at runtime
@@ -309,7 +310,8 @@ Deno.serve(async (req: Request) => {
       }
     };
 
-    const additionalParam = JSON.stringify({ userId: userData.id, email: userData.email });
+    // NOTE (Duitku spec): additionalParam should be URL-encoded.
+    const additionalParam = encodeURIComponent(JSON.stringify({ userId: userData.id, email: userData.email }));
 
     const duitkuPayload = {
       merchantCode: DUITKU_MERCHANT_CODE,
@@ -330,9 +332,7 @@ Deno.serve(async (req: Request) => {
     };
 
     // 7) Endpoint Duitku
-    const PROD_BASE_URL = 'https://passport.duitku.com';
-    const SANDBOX_BASE_URL = 'https://sandbox.duitku.com';
-    const DUITKU_BASE_URL = ENV === 'sandbox' ? SANDBOX_BASE_URL : PROD_BASE_URL;
+    const DUITKU_BASE_URL = 'https://passport.duitku.com';
 
     console.log(`Using Duitku Env: ${ENV} (${DUITKU_BASE_URL})`);
     const DUITKU_URL = `${DUITKU_BASE_URL}/webapi/api/merchant/v2/inquiry`;

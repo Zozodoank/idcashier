@@ -2,6 +2,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // Fixed import to use standard package mapped in deno.json
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from "node:crypto";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient, getUserIdFromToken } from '../_shared/auth.ts';
 
@@ -114,11 +115,8 @@ const createDuitkuPayment = async (
     // @ts-ignore: Deno is available at runtime
     const DUITKU_MERCHANT_KEY = Deno.env.get('DUITKU_API_KEY')?.trim() || Deno.env.get('DUITKU_MERCHANT_KEY')?.trim() || '';
 
-    // Derive base URL from environment
-    // Derive base URL from environment
-    const PROD_BASE_URL = 'https://passport.duitku.com';
-    const SANDBOX_BASE_URL = 'https://sandbox.duitku.com';
-    const DUITKU_BASE_URL = ENV === 'sandbox' ? SANDBOX_BASE_URL : PROD_BASE_URL;
+    // Production-only runtime (no sandbox)
+    const DUITKU_BASE_URL = 'https://passport.duitku.com';
 
     console.log(`Using Duitku Env: ${ENV} (${DUITKU_BASE_URL})`);
 
@@ -153,12 +151,9 @@ const createDuitkuPayment = async (
       returnUrl: `${FRONTEND_URL}/payment-callback?renewal=1`
     };
 
+    // Duitku inquiry v2 signature (official): MD5(merchantCode + merchantOrderId + paymentAmount + apiKey)
     const signatureString = ACTIVE_MERCHANT + merchantOrderId + paymentAmount + ACTIVE_API_KEY;
-    const encoder = new TextEncoder();
-    const data = encoder.encode(signatureString);
-    const hashBuffer = await crypto.subtle.digest('SHA-266', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    const signature = createHash('md5').update(signatureString).digest('hex');
 
     duitkuRequestData.signature = signature;
     duitkuRequestData.expiryPeriod = 60;

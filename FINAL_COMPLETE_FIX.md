@@ -181,7 +181,7 @@ if ((fetchError as any).name === 'AbortError') {
 1. ✅ Open website in Incognito Mode
 2. ✅ Select plan (e.g., "1 Bulan - Rp 50.000")
 3. ✅ Fill registration form with **NEW EMAIL**
-4. ✅ Complete payment in Duitku Sandbox
+4. ✅ Complete payment in Duitku Production
 5. **Expected Results:**
    - ✅ Redirected to `/store-setup` (NOT `/login`)
    - ✅ Can complete store setup without login

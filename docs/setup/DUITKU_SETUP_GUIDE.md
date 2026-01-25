@@ -11,7 +11,7 @@
 ❌ **Yang perlu dilakukan:**
 - Set secrets Duitku di Supabase
 - Deploy fungsi yang sudah diperbaiki
-- Test dengan credentials sandbox
+- Untuk produksi, gunakan credentials **Production**
 
 ---
 
@@ -19,7 +19,7 @@
 
 ### Sandbox (untuk testing)
 
-1. Daftar/login ke [Duitku Sandbox](https://sandbox.duitku.com)
+1. Daftar/login ke [Duitku Production](https://passport.duitku.com)
 2. Buka **Dashboard** → **Settings**
 3. Catat:
    - **Merchant Code** (contoh: DS12345)
@@ -46,8 +46,9 @@
 6. Tambahkan secrets berikut:
 
 ```
-DUITKU_BASE_URL=https://sandbox.duitku.com
-DUITKU_MERCHANT_CODE=DS12345
+DUITKU_BASE_URL=https://passport.duitku.com
+DUITKU_WEBAPI_BASE_URL=https://passport.duitku.com/webapi
+DUITKU_MERCHANT_CODE=<your_production_merchant_code>
 DUITKU_MERCHANT_KEY=your_merchant_key_here
 ```
 
@@ -68,8 +69,9 @@ CALLBACK_URL=https://eypfeiqtvfxxiimhtycc.supabase.co/functions/v1/duitku-callba
 
 ```bash
 # Set secrets via Supabase CLI
-supabase secrets set DUITKU_BASE_URL=https://sandbox.duitku.com
-supabase secrets set DUITKU_MERCHANT_CODE=DS12345
+supabase secrets set DUITKU_BASE_URL=https://passport.duitku.com
+supabase secrets set DUITKU_WEBAPI_BASE_URL=https://passport.duitku.com/webapi
+supabase secrets set DUITKU_MERCHANT_CODE=<your_production_merchant_code>
 supabase secrets set DUITKU_MERCHANT_KEY=your_merchant_key_here
 
 # Optional
@@ -180,8 +182,7 @@ Script ini akan:
 **Solusi:**
 1. Verifikasi merchant code dari Duitku dashboard
 2. Pastikan base URL sesuai:
-   - Sandbox: `https://sandbox.duitku.com`
-   - Production: `https://passport.duitku.com`
+   - Production: `https://passport.duitku.com` (WebAPI: `https://passport.duitku.com/webapi`)
 3. Update secrets dan redeploy
 
 ### Error 502 terus menerus
@@ -212,7 +213,7 @@ Script ini akan:
 
 ## Checklist Setup
 
-- [ ] Dapatkan credentials Duitku sandbox
+- [ ] Dapatkan credentials Duitku production
 - [ ] Set secrets di Supabase Dashboard
 - [ ] Deploy edge function
 - [ ] Run `node test-duitku-payment.js`
@@ -226,7 +227,7 @@ Script ini akan:
 
 ## Production Deployment
 
-Setelah sandbox berhasil:
+Setelah konfigurasi production selesai:
 
 1. **Dapatkan production credentials** dari Duitku
 2. **Update secrets** dengan production values:
@@ -259,7 +260,8 @@ Jika masih ada masalah setelah mengikuti panduan ini:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DUITKU_BASE_URL` | No | `https://sandbox.duitku.com` | Duitku API base URL |
+| `DUITKU_BASE_URL` | No | `https://passport.duitku.com` | Duitku API base URL |
+| `DUITKU_WEBAPI_BASE_URL` | No | `https://passport.duitku.com/webapi` | Duitku WebAPI base URL |
 | `DUITKU_MERCHANT_CODE` | **Yes** | - | Merchant code dari Duitku |
 | `DUITKU_MERCHANT_KEY` | **Yes** | - | API key dari Duitku |
 | `DUITKU_SIGNATURE_ALGO` | No | `sha256` | Signature algorithm (md5/sha256) |

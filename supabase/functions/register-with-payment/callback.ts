@@ -16,6 +16,9 @@ const logger = {
   info: (message: string, data?: any) => {
     console.log(`[INFO] ${new Date().toISOString()} - ${message}`, data || '');
   },
+  warn: (message: string, data?: any) => {
+    console.warn(`[WARN] ${new Date().toISOString()} - ${message}`, data || '');
+  },
   error: (message: string, error?: any) => {
     console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, error || '');
   }
@@ -32,15 +35,21 @@ const normalizeKeys = (data: Record<string, any>) => {
 };
 
 // Signature verification utility
-const verifySignature = async (
+// Duitku v2 inquiry spec uses MD5(merchantCode + merchantOrderId + amount + apiKey).
+// Callback signature ordering can differ depending on integration.
+// To be robust, accept BOTH:
+// - MD5(merchantCode + merchantOrderId + amount + apiKey)
+// - MD5(merchantCode + amount + merchantOrderId + apiKey)
+import { createHash } from "node:crypto";
+
+const verifySignature = (
   merchantCode: string,
   merchantOrderId: string,
   amount: string | number,
   signature: string,
   apiKey: string
-): Promise<boolean> => {
+): boolean => {
   try {
-    const toHex = (buf: ArrayBuffer) => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
     const timingSafeEqual = (a: string, b: string) => {
       const aBytes = new TextEncoder().encode(a);
       const bBytes = new TextEncoder().encode(b);
@@ -52,11 +61,14 @@ const verifySignature = async (
       return result === 0 && a.length === b.length;
     };
 
-    const rawString = `${merchantCode}${merchantOrderId}${amount}${apiKey}`;
-    const enc = new TextEncoder();
-    const digest = await crypto.subtle.digest('SHA-256', enc.encode(rawString));
-    const expected = toHex(digest);
-    return timingSafeEqual(expected, String(signature).toLowerCase());
+    const amt = String(amount);
+    const s1 = `${merchantCode}${merchantOrderId}${amt}${apiKey}`;
+    const s2 = `${merchantCode}${amt}${merchantOrderId}${apiKey}`;
+    const expected1 = createHash('md5').update(s1).digest('hex');
+    const expected2 = createHash('md5').update(s2).digest('hex');
+
+    const provided = String(signature || '').toLowerCase();
+    return timingSafeEqual(expected1.toLowerCase(), provided) || timingSafeEqual(expected2.toLowerCase(), provided);
   } catch (error) {
     logger.error('Signature verification error', error);
     return false;
@@ -154,11 +166,9 @@ Deno.serve(async (req) => {
     const resultMessage = (callbackData.resultMessage || callbackData['resultmessage']) as string | undefined;
     const signature = (callbackData.signature || callbackData['x-signature'] || callbackData['Signature']) as string | undefined;
 
-    // Load API key from env according to environment
-    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'sandbox').toLowerCase();
-    const SANDBOX_API_KEY = Deno.env.get('DUITKU_SANDBOX_API_KEY') || '';
-    const PROD_API_KEY = Deno.env.get('DUITKU_API_KEY') || '';
-    const ACTIVE_API_KEY = ENV === 'production' ? PROD_API_KEY : SANDBOX_API_KEY;
+    // Production-only runtime (no sandbox)
+    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
+    const ACTIVE_API_KEY = Deno.env.get('DUITKU_API_KEY') || '';
 
     // Validate required fields
     if (!merchantCode || !merchantOrderId || !amount) {
@@ -179,7 +189,7 @@ Deno.serve(async (req) => {
     if (!ACTIVE_API_KEY) {
       logger.warn('Duitku API key not set in environment, skipping signature verification');
     } else {
-      const isValidSignature = await verifySignature(
+    const isValidSignature = verifySignature(
         merchantCode,
         merchantOrderId,
         amount,

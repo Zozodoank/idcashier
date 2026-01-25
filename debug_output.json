@@ -13,7 +13,7 @@
       "payment_method": null,
       "reference": "DS2574625FKR8X70IY5O4VBF",
       "status": "pending",
-      "payment_url": "https://sandbox.duitku.com/topup/topupdirectv2.aspx?ref=GQ25E0P13SBJAFWRPA4",
+      "payment_url": "https://passport.duitku.com/topup/topupdirectv2.aspx?ref=GQ25E0P13SBJAFWRPA4",
       "created_at": "2025-12-12T19:13:58.607508+00:00",
       "updated_at": "2025-12-12T19:13:58.607508+00:00"
     },
@@ -29,7 +29,7 @@
       "payment_method": null,
       "reference": "DS25746254NE4GCSBQG64A7Y",
       "status": "pending",
-      "payment_url": "https://sandbox.duitku.com/topup/topupdirectv2.aspx?ref=GQ25NHKT21BNRTZKJPO",
+      "payment_url": "https://passport.duitku.com/topup/topupdirectv2.aspx?ref=GQ25NHKT21BNRTZKJPO",
       "created_at": "2025-12-12T19:13:58.358548+00:00",
       "updated_at": "2025-12-12T19:13:58.358548+00:00"
     },
@@ -45,7 +45,7 @@
       "payment_method": null,
       "reference": "DS2574625DXZB140WF1K435Z",
       "status": "pending",
-      "payment_url": "https://sandbox.duitku.com/topup/topupdirectv2.aspx?ref=GQ2510NSJA1ZQ58RYLD",
+      "payment_url": "https://passport.duitku.com/topup/topupdirectv2.aspx?ref=GQ2510NSJA1ZQ58RYLD",
       "created_at": "2025-12-12T19:07:51.264252+00:00",
       "updated_at": "2025-12-12T19:07:51.264252+00:00"
     },
@@ -61,7 +61,7 @@
       "payment_method": null,
       "reference": "DS2574625XC7UNX1ODSP8YFM",
       "status": "pending",
-      "payment_url": "https://sandbox.duitku.com/topup/topupdirectv2.aspx?ref=GQ25VM7K50AWH7CZ1H2",
+      "payment_url": "https://passport.duitku.com/topup/topupdirectv2.aspx?ref=GQ25VM7K50AWH7CZ1H2",
       "created_at": "2025-12-12T18:56:47.5557+00:00",
       "updated_at": "2025-12-12T18:56:47.5557+00:00"
     },
@@ -77,7 +77,7 @@
       "payment_method": null,
       "reference": "DS25746257BKXT7Z887WLXDR",
       "status": "pending",
-      "payment_url": "https://sandbox.duitku.com/topup/topupdirectv2.aspx?ref=GQ25VJ8XBZDNNIEGJH5",
+      "payment_url": "https://passport.duitku.com/topup/topupdirectv2.aspx?ref=GQ25VJ8XBZDNNIEGJH5",
       "created_at": "2025-12-12T18:45:04.785879+00:00",
       "updated_at": "2025-12-12T18:45:04.785879+00:00"
     }

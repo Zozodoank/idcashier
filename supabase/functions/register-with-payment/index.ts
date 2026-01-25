@@ -1,6 +1,7 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js@2.5.0/edge-runtime.d.ts";
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from "node:crypto";
 
 // CORS headers for Supabase Edge Functions
 const corsHeaders = {
@@ -118,10 +119,8 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
     // @ts-ignore: Deno is available at runtime
     const ACTIVE_API_KEY = Deno.env.get('DUITKU_API_KEY') || '';
 
-    const PROD_BASE_URL = 'https://passport.duitku.com';
-    const SANDBOX_BASE_URL = 'https://sandbox.duitku.com';
-
-    const ACTIVE_BASE_URL = ENV === 'sandbox' ? SANDBOX_BASE_URL : PROD_BASE_URL;
+    // Production-only runtime (no sandbox)
+    const ACTIVE_BASE_URL = 'https://passport.duitku.com';
 
     console.log(`Using Duitku Env: ${ENV} (${ACTIVE_BASE_URL}) for Merchant: ${ACTIVE_MERCHANT}`);
 
@@ -143,12 +142,9 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
     };
 
     // Generate signature
+    // Duitku inquiry v2 signature (official): MD5(merchantCode + merchantOrderId + paymentAmount + apiKey)
     const signatureString = ACTIVE_MERCHANT + paymentData.merchantOrderId + paymentData.paymentAmount + ACTIVE_API_KEY;
-    const encoder = new TextEncoder();
-    const data = encoder.encode(signatureString);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    const signature = createHash('md5').update(signatureString).digest('hex');
 
     duitkuRequestData.signature = signature;
 

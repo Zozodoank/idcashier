@@ -229,19 +229,27 @@ Deno.serve(async (req: Request) => {
     }
 
     // Fallback: Check additionalParam for userId and email (Most Reliable Fallback)
+    // NOTE (Duitku spec): additionalParam is expected to be URL-encoded.
     let additionalInfo: any = {};
     if (!userIdFromPayment && additionalParam) {
+      try {
+        let decoded = additionalParam;
         try {
-           additionalInfo = JSON.parse(additionalParam);
-           console.log('Parsed additionalParam:', additionalInfo);
-           
-           if (additionalInfo.userId) {
-              userIdFromPayment = additionalInfo.userId;
-              console.log('User found via additionalParam userId:', userIdFromPayment);
-           }
-        } catch (e) {
-           console.error('Error parsing additionalParam:', e);
+          decoded = decodeURIComponent(additionalParam);
+        } catch {
+          // If it's not URI encoded, keep original
         }
+
+        additionalInfo = JSON.parse(decoded);
+        console.log('Parsed additionalParam:', additionalInfo);
+
+        if (additionalInfo.userId) {
+          userIdFromPayment = additionalInfo.userId;
+          console.log('User found via additionalParam userId:', userIdFromPayment);
+        }
+      } catch (e) {
+        console.error('Error parsing additionalParam:', e);
+      }
     }
 
     // Fallback: If payment not found, find user by email (from additionalParam or callback)

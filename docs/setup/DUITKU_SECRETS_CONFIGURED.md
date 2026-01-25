@@ -6,8 +6,9 @@
 |----------|-------|--------|
 | `DUITKU_MERCHANT_CODE` | `your_merchant_code` | ✅ Set |
 | `DUITKU_MERCHANT_KEY` | `your_merchant_key` | ✅ Set |
-| `DUITKU_ENVIRONMENT` | `sandbox` | ✅ Set |
-| `DUITKU_BASE_URL` | `https://sandbox.duitku.com` | ✅ Set |
+| `DUITKU_ENVIRONMENT` | `production` | ✅ Set |
+| `DUITKU_BASE_URL` | `https://passport.duitku.com` | ✅ Set |
+| `DUITKU_WEBAPI_BASE_URL` | `https://passport.duitku.com/webapi` | ✅ Set |
 
 ## ✅ Verifikasi
 
@@ -15,8 +16,9 @@ Secrets sudah di-set menggunakan Supabase CLI:
 ```bash
 npx supabase secrets set DUITKU_MERCHANT_CODE=your_merchant_code
 npx supabase secrets set DUITKU_MERCHANT_KEY=your_merchant_key
-npx supabase secrets set DUITKU_ENVIRONMENT=sandbox
-npx supabase secrets set DUITKU_BASE_URL=https://sandbox.duitku.com
+npx supabase secrets set DUITKU_ENVIRONMENT=production
+npx supabase secrets set DUITKU_BASE_URL=https://passport.duitku.com
+npx supabase secrets set DUITKU_WEBAPI_BASE_URL=https://passport.duitku.com/webapi
 ```
 
 ## 🔍 Edge Functions yang Menggunakan Secrets
@@ -52,12 +54,8 @@ npx supabase secrets set DUITKU_BASE_URL=https://sandbox.duitku.com
 
 ## ⚠️ Notes
 
-- **Environment**: Saat ini menggunakan **SANDBOX**
-- **Production**: Saat siap production, update:
-  - `DUITKU_ENVIRONMENT=production`
-  - `DUITKU_MERCHANT_CODE` (dengan production merchant code)
-  - `DUITKU_MERCHANT_KEY` (dengan production API key)
-  - `DUITKU_BASE_URL=https://passport.duitku.com`
+- **Environment**: Saat ini menggunakan **PRODUCTION**
+- Jika Anda masih punya environment sandbox terpisah untuk testing, pastikan file secrets & docs tidak tercampur.
 
 ## 🔒 Security
 

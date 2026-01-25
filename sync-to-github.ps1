@@ -5,7 +5,7 @@
 Write-Host "Starting synchronization with GitHub repository..." -ForegroundColor Green
 
 # Navigate to project directory
-Set-Location "c:\xampp\htdocs\idcashier"
+Set-Location "c:\Users\LENOVO\Documents\POS\idcashier"
 
 # Check current Git status
 Write-Host "Checking Git status..." -ForegroundColor Yellow

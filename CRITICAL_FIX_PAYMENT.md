@@ -103,7 +103,7 @@ Upload semua file dari folder `dist/` ke hosting Anda.
 2. Pilih paket (misal: 1 Bulan - Rp 50.000)
 3. Pilih metode pembayaran
 4. Register dengan email baru
-5. Bayar di Duitku Sandbox
+5. Bayar di Duitku Production
 6. ✅ EXPECTED: Redirect ke /store-setup
 7. ✅ EXPECTED: User punya subscription active
 ```

@@ -159,7 +159,7 @@ email_confirm: paymentCompleted ? true : false,  // Auto-confirm if paid
 2. Click "Pilih Paket" → Select "1 Bulan - Rp 50.000"
 3. Fill registration form with **NEW EMAIL**
 4. Select payment method
-5. Complete payment in Duitku Sandbox
+5. Complete payment in Duitku Production
 6. **Verify:**
    - ✅ Redirected to `/store-setup` (NOT `/login`)
    - ✅ Can complete store setup without login

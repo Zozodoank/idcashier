@@ -39,15 +39,12 @@ Deno.serve(async (req) => {
 
         console.log('Fetching payment methods from Duitku...');
 
+        // Production-only runtime (no sandbox)
         // @ts-ignore: Deno is available at runtime
         const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
+        const DUITKU_BASE_URL = 'https://passport.duitku.com';
 
-        // Determine Base URL
-        const DUITKU_BASE_URL = ENV === 'sandbox'
-            ? 'https://sandbox.duitku.com'
-            : 'https://passport.duitku.com';
-
-        console.log(`Using Duitku Environment: ${ENV}`);
+        console.log(`Using Duitku Environment: ${ENV} (${DUITKU_BASE_URL})`);
 
         const apiUrl = `${DUITKU_BASE_URL}/webapi/api/merchant/paymentmethod/getpaymentmethod`;
 

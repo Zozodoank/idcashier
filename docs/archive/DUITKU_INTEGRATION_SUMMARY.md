@@ -16,7 +16,7 @@ A new Supabase Edge Function has been deployed that handles the complete registr
 - Transaction management with rollback mechanisms
 - Secure storage of transaction data
 - Detailed logging for audit and debugging
-- Support for both sandbox and production environments
+- Production configuration summary
 
 **Endpoints:**
 - Main registration endpoint: `POST /functions/v1/register-with-payment`
@@ -77,11 +77,11 @@ A new Supabase Edge Function has been deployed that handles the complete registr
 The following environment variables need to be configured in Supabase:
 
 ```
-DUITKU_ENVIRONMENT=sandbox|production
-DUITKU_SANDBOX_MERCHANT_CODE=your_sandbox_merchant_code
-DUITKU_SANDBOX_API_KEY=your_sandbox_api_key
-DUITKU_SANDBOX_BASE_URL=https://sandbox.duitku.com
-DUITKU_PRODUCTION_MERCHANT_CODE=your_production_merchant_code
+DUITKU_ENVIRONMENT=production
+DUITKU_MERCHANT_CODE=<your_production_merchant_code>
+DUITKU_API_KEY=<your_production_api_key>
+DUITKU_BASE_URL=https://passport.duitku.com
+DUITKU_WEBAPI_BASE_URL=https://passport.duitku.com/webapi
 DUITKU_PRODUCTION_API_KEY=your_production_api_key
 DUITKU_PRODUCTION_BASE_URL=https://passport.duitku.com
 ```
@@ -130,4 +130,4 @@ Common issues and solutions:
 3. **Duitku API errors**:
    - Verify that all Duitku environment variables are correctly set
    - Check that your merchant credentials are valid
-   - Ensure you're using the correct environment (sandbox vs production)
+   - Ensure you're using the correct environment (production)

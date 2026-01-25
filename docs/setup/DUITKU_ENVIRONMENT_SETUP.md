@@ -6,10 +6,11 @@ The following environment variables need to be configured in your Supabase proje
 
 ### Sandbox Environment (for testing)
 
-1. `DUITKU_ENVIRONMENT` = "sandbox"
-2. `DUITKU_SANDBOX_MERCHANT_CODE` = "your_sandbox_merchant_code"
-3. `DUITKU_SANDBOX_API_KEY` = "your_sandbox_api_key"
-4. `DUITKU_SANDBOX_BASE_URL` = "https://sandbox.duitku.com"
+1. `DUITKU_ENVIRONMENT` = "production"
+2. `DUITKU_MERCHANT_CODE` = "<your_production_merchant_code>"
+3. `DUITKU_API_KEY` = "<your_production_api_key>"
+4. `DUITKU_BASE_URL` = "https://passport.duitku.com"
+5. `DUITKU_WEBAPI_BASE_URL` = "https://passport.duitku.com/webapi"
 
 ### Production Environment (for live transactions)
 
@@ -39,5 +40,5 @@ After setting the environment variables, you can test the configuration by:
 
 - Never commit sensitive information like API keys to version control
 - Rotate your API keys regularly for security
-- Use the sandbox environment for testing before going live
+- Gunakan sandbox hanya untuk testing terpisah. Untuk go-live, pastikan environment ini production.
 - Monitor your Duitku dashboard for transaction status

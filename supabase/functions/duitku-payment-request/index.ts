@@ -113,11 +113,12 @@ Deno.serve(async (req) => {
     }
 
     // Include userId and email in additionalParam for callback to find user
+    // NOTE (Duitku spec): additionalParam should be URL-encoded.
     const additionalParamData = {
       userId: userId,
       email: email
     };
-    const additionalParam = JSON.stringify(additionalParamData);
+    const additionalParam = encodeURIComponent(JSON.stringify(additionalParamData));
 
     const duitkuPayload: any = {
       merchantCode,
@@ -147,15 +148,11 @@ Deno.serve(async (req) => {
 
     // Duitku Endpoint Configuration
     // @ts-ignore: Deno is available at runtime
-    // FORCE DEFAULT TO SANDBOX for safety during development if env var is missing
-    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'sandbox').toLowerCase();
+    // Production-safe default: if env var is missing, assume production (never sandbox)
+    const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
 
-    // Determine Base URL based on environment
-    // Sandbox: https://sandbox.duitku.com
-    // Production: https://passport.duitku.com
-    const DUITKU_BASE_URL = ENV === 'sandbox'
-      ? 'https://sandbox.duitku.com'
-      : 'https://passport.duitku.com';
+    // Determine Base URL based on environment (sandbox support removed from runtime)
+    const DUITKU_BASE_URL = 'https://passport.duitku.com';
 
     console.log(`Using Duitku Environment: ${ENV} (${DUITKU_BASE_URL})`);
 
