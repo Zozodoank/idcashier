@@ -28,7 +28,8 @@ const SelectContent = React.forwardRef(({ className, children, position = 'poppe
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        'relative z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-80',
+        // Ensure select dropdown is always above dialogs/modals and can scroll on small screens
+        'relative z-[100] min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-80',
         position === 'popper' && 'translate-y-1',
         className
       )}
@@ -37,9 +38,10 @@ const SelectContent = React.forwardRef(({ className, children, position = 'poppe
     >
       <SelectPrimitive.Viewport
         className={cn(
-          'p-1',
-          position === 'popper' &&
-            'h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]'
+          // NOTE: Previously used trigger-height as viewport height, which could clip items.
+          // Use a max-height with scrolling so all items remain accessible.
+          'p-1 max-h-[60vh] overflow-y-auto',
+          position === 'popper' && 'w-full min-w-[var(--radix-select-trigger-width)]'
         )}
       >
         {children}
