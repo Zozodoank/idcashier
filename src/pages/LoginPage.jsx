@@ -26,6 +26,7 @@ const LoginPage = () => {
   const [showResend, setShowResend] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [showVerifiedModal, setShowVerifiedModal] = useState(false);
   const { t } = useLanguage();
   const { toast } = useToast();
   const { login, logout, isAuthenticated } = useAuth();
@@ -104,10 +105,13 @@ const LoginPage = () => {
     if (params.get('verified') === 'true') {
       toast({
         title: t('verificationSuccess'),
-        description: t('verificationSuccessDesc'),
+        description: `${t('verificationSuccessDesc')} Silahkan login kembali.`,
         variant: "default",
         className: "bg-green-600 text-white border-green-600"
       });
+
+      // Show explicit modal so users understand next step
+      setShowVerifiedModal(true);
 
       // Clean up URL immediately via navigate
       navigate('/login', { replace: true });
@@ -506,6 +510,24 @@ const LoginPage = () => {
               {resendLoading ? t('resending') : t('resendVerification')}
             </Button>
             <Button type="button" onClick={() => setShowVerifyModal(false)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* After user clicks verification link */}
+      <Dialog open={showVerifiedModal} onOpenChange={setShowVerifiedModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('verificationSuccess')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p>{t('verificationSuccessDesc')}</p>
+            <p className="font-medium">Silahkan login kembali.</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setShowVerifiedModal(false)}>
               OK
             </Button>
           </DialogFooter>
