@@ -322,6 +322,16 @@ export const AuthProvider = ({ children }) => {
         };
       }
 
+      // Price-card payment pending
+      if (result.error && result.paymentPending) {
+        console.warn('💳 Payment pending');
+        return {
+          success: false,
+          error: result.error,
+          paymentPending: true
+        };
+      }
+
       if (result.token && result.user) {
         console.log('✅ Login successful, setting user and token');
 

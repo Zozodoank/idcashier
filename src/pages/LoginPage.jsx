@@ -131,6 +131,22 @@ const LoginPage = () => {
 
       const result = await login(normalizedEmail, password);
 
+      // Payment pending (price-card registration not completed)
+      if (!result.success && result.paymentPending) {
+        toast({
+          title: 'Akun belum aktif',
+          description: result.error || 'Silakan selesaikan pembayaran untuk mengaktifkan akun.',
+          variant: 'destructive',
+        });
+
+        // Redirect to renewal/payment page to complete payment
+        setTimeout(() => {
+          navigate(`/renewal?email=${encodeURIComponent(normalizedEmail)}`);
+        }, 1500);
+
+        return;
+      }
+
       // Check for subscription expired
       if (!result.success && result.subscriptionExpired) {
         toast({

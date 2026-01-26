@@ -29,7 +29,7 @@ npx supabase functions deploy ... --project-ref eypfeiqtvfxxiimhtycc; if ($LASTE
 ```
 
 ### Catatan penting tentang verify_jwt di code
-- Jika sebuah function memiliki marker `// @supabase/verify-jwt false` (misalnya saat ini `create-renewal-payment`), maka **meskipun Anda deploy tanpa `--no-verify-jwt`**, function itu tetap public.
+- Jika sebuah function memiliki marker `// @supabase/verify-jwt false`, maka **meskipun Anda deploy tanpa `--no-verify-jwt`**, function itu tetap public.
 - Jadi untuk mengubahnya menjadi protected, harus **ubah marker di file** lalu redeploy.
 
 **Removed functions** (no index.ts file):

@@ -1,4 +1,3 @@
-// @supabase/verify-jwt false
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // Fixed import to use standard package mapped in deno.json
 import { createClient } from '@supabase/supabase-js';
@@ -97,6 +96,14 @@ const PLAN_MAPPING: Record<string, PlanData> = {
   '12_months': { duration: 12, amount: 500000, productDetails: 'Perpanjangan Langganan 12 Bulan' }
 };
 
+function splitName(fullName: string) {
+  const name = (fullName || 'Customer').trim();
+  const parts = name.split(' ').filter(Boolean);
+  const firstName = parts[0] || 'Customer';
+  const lastName = parts.length > 1 ? parts.slice(1).join(' ') : firstName;
+  return { firstName, lastName };
+}
+
 // Duitku API integration
 const createDuitkuPayment = async (
   merchantOrderId: string,
@@ -104,7 +111,13 @@ const createDuitkuPayment = async (
   productDetails: string,
   customerVaName: string,
   customerEmail: string,
-  customerPhone: string
+  customerPhone: string,
+  opts?: {
+    paymentMethod?: string;
+    additionalParam?: string;
+    itemDetails?: Array<{ name: string; price: number; quantity: number }>;
+    customerDetail?: any;
+  }
 ): Promise<DuitkuResponse> => {
   try {
     // Resolve Duitku configuration from environment (sandbox or production)
@@ -138,6 +151,10 @@ const createDuitkuPayment = async (
     // @ts-ignore: Deno is available at runtime
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 
+    // Per spec, paymentMethod should be a specific channel code.
+    // If merchant doesn't allow ALL, fallback to a commonly enabled VA.
+    const paymentMethod = (opts?.paymentMethod && String(opts.paymentMethod).trim()) || 'M2';
+
     const duitkuRequestData: any = {
       merchantCode: ACTIVE_MERCHANT,
       merchantOrderId,
@@ -146,9 +163,13 @@ const createDuitkuPayment = async (
       customerVaName,
       customerEmail,
       customerPhone,
-      paymentMethod: 'ALL',
+      paymentMethod,
+      additionalParam: opts?.additionalParam || '',
       callbackUrl: `${SUPABASE_URL}/functions/v1/duitku-callback`,
-      returnUrl: `${FRONTEND_URL}/payment-callback?renewal=1`
+      returnUrl: `${FRONTEND_URL}/payment-callback?renewal=1`,
+      // Optional but recommended by spec examples
+      itemDetails: opts?.itemDetails,
+      customerDetail: opts?.customerDetail
     };
 
     // Duitku inquiry v2 signature (official): MD5(merchantCode + merchantOrderId + paymentAmount + apiKey)
@@ -166,11 +187,19 @@ const createDuitkuPayment = async (
       body: JSON.stringify(duitkuRequestData),
     });
 
-    const responseData = await response.json();
+    const rawText = await response.text();
+    let responseData: any = null;
+    try {
+      responseData = JSON.parse(rawText);
+    } catch {
+      responseData = { rawText };
+    }
 
     if (!response.ok) {
       logger.error('Duitku API error response', { status: response.status, data: responseData });
-      return { success: false, errorMessage: `Duitku API error: ${responseData.errorMessage || 'Unknown error'}` };
+      const msg = responseData?.statusMessage || responseData?.StatusMessage || responseData?.message || responseData?.Message || responseData?.errorMessage || responseData?.error || 'Unknown error';
+      const code = responseData?.statusCode || responseData?.StatusCode || response.status;
+      return { success: false, errorMessage: `Duitku API error: [${code}] ${msg}` };
     }
 
     logger.info('Duitku payment created successfully', { reference: responseData.reference });
@@ -210,8 +239,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { plan_id: raw_plan_id, email: unauthenticatedEmailRaw } = body || {};
-    const unauthenticatedEmail = typeof unauthenticatedEmailRaw === 'string' ? unauthenticatedEmailRaw.trim().toLowerCase() : unauthenticatedEmailRaw;
+    const { plan_id: raw_plan_id, email: unauthenticatedEmailRaw, hppActivation, paymentMethod } = body || {};
     const plan_id = raw_plan_id ?? body?.plan;
 
     if (!plan_id) {
@@ -249,20 +277,10 @@ Deno.serve(async (req) => {
       userData = data;
       logger.info('User data fetched via token', { email: maskSensitiveString(userData.email) });
 
-    } else if (unauthenticatedEmail) {
-      logger.info('Using email-based authentication for unauthenticated user');
-      const { data, error: userError } = await supabase.from('users').select('id, name, email, phone').eq('email', unauthenticatedEmail).single();
-
-      if (userError || !data) {
-        logger.error('User fetch by email failed', { email: maskSensitiveString(unauthenticatedEmail), error: userError?.message });
-        return new Response(JSON.stringify({ success: false, error: 'User not found for the provided email', code: 404 }), { headers: corsHeaders, status: 404 });
-      }
-      userId = data.id;
-      userData = data;
-      logger.info('User data fetched via email', { email: maskSensitiveString(userData.email) });
     } else {
-      logger.warn('Missing authorization header or email');
-      return new Response(JSON.stringify({ success: false, error: 'Missing authorization header or email' }), { headers: corsHeaders, status: 401 });
+      // This function is intended to be PROTECTED (verify_jwt=true). Only allow token-based calls.
+      logger.warn('Missing authorization header');
+      return new Response(JSON.stringify({ success: false, error: 'Missing authorization header' }), { headers: corsHeaders, status: 401 });
     }
 
     logger.info('Plan selected and user authenticated', { plan_id, userId: '[REDACTED]' });
@@ -270,9 +288,51 @@ Deno.serve(async (req) => {
     const planData = PLAN_MAPPING[plan_id];
     logger.info('Plan data retrieved', { plan_id, amount: planData.amount });
 
+    // If HPP activation, annotate product details for callback logic
+    const finalProductDetails = hppActivation
+      ? `Aktivasi HPP - ${planData.productDetails}`
+      : planData.productDetails;
+
+    // Duitku merchantOrderId length limit: max 50 chars.
+    // Use shortened userId to ensure it never exceeds the limit.
     const timestamp = Date.now();
-    const merchantOrderId = `RENEWAL-${userId}-${timestamp}`;
+    const shortUserId = String(userId).replace(/-/g, '').slice(0, 10);
+    const merchantOrderId = `RENEWAL-${shortUserId}-${timestamp}`;
     logger.info('Merchant order ID generated', { orderIdPrefix: `RENEWAL-[USER_ID]-[TIMESTAMP]` });
+
+    // additionalParam should be URL-encoded per spec
+    const additionalParam = encodeURIComponent(JSON.stringify({ userId, email: userData.email }));
+
+    const itemDetails = [
+      { name: finalProductDetails, price: planData.amount, quantity: 1 }
+    ];
+
+    const { firstName, lastName } = splitName(userData.name || 'Customer');
+    const phone = userData.phone || '081234567890';
+    const customerDetail = {
+      firstName,
+      lastName,
+      email: userData.email,
+      phoneNumber: phone,
+      billingAddress: {
+        firstName,
+        lastName,
+        address: 'Indonesia',
+        city: 'Jakarta',
+        postalCode: '12345',
+        phone,
+        countryCode: 'ID'
+      },
+      shippingAddress: {
+        firstName,
+        lastName,
+        address: 'Indonesia',
+        city: 'Jakarta',
+        postalCode: '12345',
+        phone,
+        countryCode: 'ID'
+      }
+    };
 
     const { data: paymentRecord, error: paymentError } = await supabase
       .from('payments')
@@ -280,11 +340,11 @@ Deno.serve(async (req) => {
         user_id: userId,
         amount: planData.amount,
         merchant_order_id: merchantOrderId,
-        product_details: planData.productDetails,
+        product_details: finalProductDetails,
         customer_va_name: userData.name,
         customer_email: userData.email,
         customer_phone: userData.phone || '081234567890',
-        payment_method: 'ALL',
+        payment_method: (paymentMethod && String(paymentMethod).trim()) || 'M2',
         status: 'pending'
       })
       .select('id')
@@ -296,7 +356,20 @@ Deno.serve(async (req) => {
     }
     logger.info('Payment record created', { paymentId: paymentRecord.id });
 
-    const paymentResult = await createDuitkuPayment(merchantOrderId, planData.amount, planData.productDetails, userData.name, userData.email, userData.phone || '081234567890');
+    const paymentResult = await createDuitkuPayment(
+      merchantOrderId,
+      planData.amount,
+      finalProductDetails,
+      userData.name,
+      userData.email,
+      userData.phone || '081234567890',
+      {
+        paymentMethod: (paymentMethod && String(paymentMethod).trim()) || 'M2',
+        additionalParam,
+        itemDetails,
+        customerDetail
+      }
+    );
 
     if (!paymentResult.success) {
       logger.error('Duitku payment failed', { errorMessage: paymentResult.errorMessage });

@@ -144,7 +144,7 @@ const HPPSettings = () => {
         throw new Error('Invalid plan selected');
       }
 
-      // Use renew-subscription-payment edge function (same as RenewalPage)
+      // Use create-renewal-payment edge function (protected; requires user token)
       const { invokeFn } = await import('@/lib/invokeFn');
       const requestBody = {
         plan_id: selectedPlan,
@@ -155,7 +155,7 @@ const HPPSettings = () => {
       };
 
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-      const result = await invokeFn('renew-subscription-payment', requestBody, {
+      const result = await invokeFn('create-renewal-payment', requestBody, {
         method: 'POST',
         headers
       });
