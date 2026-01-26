@@ -914,6 +914,12 @@ import_map = "./functions/duitku-payment-request/deno.json"
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/duitku-payment-request/index.ts"
 
+[functions.duitku-get-payment-methods]
+enabled = true
+verify_jwt = false
+import_map = "./functions/import_map.json"
+entrypoint = "./functions/duitku-get-payment-methods/index.ts"
+
 [functions.register-with-payment]
 enabled = true
 verify_jwt = false

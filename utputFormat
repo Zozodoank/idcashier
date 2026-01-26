@@ -1,0 +1,20 @@
+HTTP/1.1 401 Unauthorized
+Date: Mon, 26 Jan 2026 02:02:17 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+Server: cloudflare
+CF-Ray: 9c3c6d57bdadfdaf-SIN
+CF-Cache-Status: DYNAMIC
+Access-Control-Allow-Origin: *
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Vary: Accept-Encoding
+access-control-allow-headers: authorization, x-client-info, apikey
+sb-project-ref: eypfeiqtvfxxiimhtycc
+sb-request-id: 019bf809-92db-7dfe-b548-6c3f5a6b7c05
+x-sb-edge-region: ap-southeast-1
+x-served-by: supabase-edge-runtime
+Set-Cookie: __cf_bm=fPVq23BeMTuvEze..CBjTeChb2.F2coWYFfAfoScb8w-1769392937-1.0.1.1-E0r1jY28tHcPhZosae.t9OSLMwQvGgvf_ZayuA3R0l8yJLMgDGHsvFq5T_irig2zT0KQe5i1OCMc3Te6SJ91GgJxVj_v3Wcck0vbKEAAogA; path=/; expires=Mon, 26-Jan-26 02:32:17 GMT; domain=.supabase.co; HttpOnly; Secure; SameSite=None
+alt-svc: h3=":443"; ma=86400
+
+{"code":401,"message":"Auth header is not 'Bearer {token}'"}

@@ -332,10 +332,12 @@ Deno.serve(async (req: Request) => {
     };
 
     // 7) Endpoint Duitku
-    const DUITKU_BASE_URL = 'https://passport.duitku.com';
+    // Prefer env-based WebAPI URL so we can switch without editing code.
+    // @ts-ignore: Deno is available at runtime
+    const DUITKU_WEBAPI_BASE_URL = (Deno.env.get('DUITKU_WEBAPI_BASE_URL') || 'https://passport.duitku.com/webapi').replace(/\/$/, '');
 
-    console.log(`Using Duitku Env: ${ENV} (${DUITKU_BASE_URL})`);
-    const DUITKU_URL = `${DUITKU_BASE_URL}/webapi/api/merchant/v2/inquiry`;
+    console.log(`Using Duitku Env: ${ENV} (${DUITKU_WEBAPI_BASE_URL})`);
+    const DUITKU_URL = `${DUITKU_WEBAPI_BASE_URL}/api/merchant/v2/inquiry`;
 
     logger.info('Calling Duitku inquiry', { url: DUITKU_URL });
 

@@ -1,4 +1,6 @@
 // Edge Function to get available Duitku payment methods
+// NOTE: Duitku getpaymentmethod endpoint uses SHA256 signature:
+// SHA256(merchantcode + amount + datetime + apiKey)
 import { createHash } from "node:crypto";
 import { corsHeaders } from '../_shared/cors.ts';
 
@@ -26,9 +28,9 @@ Deno.serve(async (req) => {
             .replace('T', ' ')
             .substring(0, 19);
 
-        // Signature: SHA256(merchantcode + paymentAmount + datetime + apiKey)
+        // Signature: SHA256(merchantCode + amount + datetime + apiKey)
         const signatureString = `${merchantCode}${amount}${datetime}${apiKey}`;
-        const signature = createHash("sha256").update(signatureString).digest("hex");
+        const signature = createHash('sha256').update(signatureString).digest('hex');
 
         const payload = {
             merchantcode: merchantCode,
@@ -42,11 +44,14 @@ Deno.serve(async (req) => {
         // Production-only runtime (no sandbox)
         // @ts-ignore: Deno is available at runtime
         const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
-        const DUITKU_BASE_URL = 'https://passport.duitku.com';
+        // Use WebAPI base URL from env when provided (fallback to production)
+        // Expected: https://passport.duitku.com/webapi
+        // @ts-ignore: Deno is available at runtime
+        const DUITKU_WEBAPI_BASE_URL = (Deno.env.get('DUITKU_WEBAPI_BASE_URL') || 'https://passport.duitku.com/webapi').replace(/\/$/, '');
 
-        console.log(`Using Duitku Environment: ${ENV} (${DUITKU_BASE_URL})`);
+        console.log(`Using Duitku Environment: ${ENV} (${DUITKU_WEBAPI_BASE_URL})`);
 
-        const apiUrl = `${DUITKU_BASE_URL}/webapi/api/merchant/paymentmethod/getpaymentmethod`;
+        const apiUrl = `${DUITKU_WEBAPI_BASE_URL}/api/merchant/paymentmethod/getpaymentmethod`;
 
         const response = await fetch(apiUrl, {
             method: 'POST',

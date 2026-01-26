@@ -140,23 +140,25 @@ Deno.serve(async (req) => {
       callbackUrl,
       returnUrl: finalReturnUrl,
       signature,
-      expiryPeriod: 10 // 10 minutes expiry for testing
+      // Production default
+      expiryPeriod: 60
     };
 
 
     console.log('Sending to Duitku:', JSON.stringify(duitkuPayload));
 
     // Duitku Endpoint Configuration
-    // @ts-ignore: Deno is available at runtime
     // Production-safe default: if env var is missing, assume production (never sandbox)
+    // @ts-ignore: Deno is available at runtime
     const ENV = (Deno.env.get('DUITKU_ENVIRONMENT') || 'production').toLowerCase();
+    // Prefer env-based WebAPI URL so we can switch without editing code.
+    // Expected: https://passport.duitku.com/webapi
+    // @ts-ignore: Deno is available at runtime
+    const DUITKU_WEBAPI_BASE_URL = (Deno.env.get('DUITKU_WEBAPI_BASE_URL') || 'https://passport.duitku.com/webapi').replace(/\/$/, '');
 
-    // Determine Base URL based on environment (sandbox support removed from runtime)
-    const DUITKU_BASE_URL = 'https://passport.duitku.com';
+    console.log(`Using Duitku Environment: ${ENV} (${DUITKU_WEBAPI_BASE_URL})`);
 
-    console.log(`Using Duitku Environment: ${ENV} (${DUITKU_BASE_URL})`);
-
-    const duitkuApiUrl = `${DUITKU_BASE_URL}/webapi/api/merchant/v2/inquiry`;
+    const duitkuApiUrl = `${DUITKU_WEBAPI_BASE_URL}/api/merchant/v2/inquiry`;
 
     console.log(`Using Duitku Environment: ${ENV}, URL: ${duitkuApiUrl}`);
 

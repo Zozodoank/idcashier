@@ -120,11 +120,13 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
     const ACTIVE_API_KEY = Deno.env.get('DUITKU_API_KEY') || '';
 
     // Production-only runtime (no sandbox)
-    const ACTIVE_BASE_URL = 'https://passport.duitku.com';
+    // Prefer env-based WebAPI URL so we can switch without editing code.
+    // @ts-ignore: Deno is available at runtime
+    const DUITKU_WEBAPI_BASE_URL = (Deno.env.get('DUITKU_WEBAPI_BASE_URL') || 'https://passport.duitku.com/webapi').replace(/\/$/, '');
 
-    console.log(`Using Duitku Env: ${ENV} (${ACTIVE_BASE_URL}) for Merchant: ${ACTIVE_MERCHANT}`);
+    console.log(`Using Duitku Env: ${ENV} (${DUITKU_WEBAPI_BASE_URL}) for Merchant: ${ACTIVE_MERCHANT}`);
 
-    const DUITKU_URL = `${ACTIVE_BASE_URL}/webapi/api/merchant/v2/inquiry`;
+    const DUITKU_URL = `${DUITKU_WEBAPI_BASE_URL}/api/merchant/v2/inquiry`;
 
     // Prepare data for Duitku API
     const duitkuRequestData: any = {
@@ -136,9 +138,12 @@ const createDuitkuPayment = async (paymentData: PaymentData): Promise<DuitkuResp
       customerEmail: paymentData.customerEmail,
       customerPhone: paymentData.customerPhone,
       paymentMethod: paymentData.paymentMethod || 'ALL', // ALL = All payment methods
+      // IMPORTANT:
+      // Use the central callback handler so production callback processing is consistent.
       // @ts-ignore: Deno is available at runtime
-      callbackUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/register-with-payment/callback`,
-      returnUrl: 'https://idcashier.com/registration-success'
+      callbackUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/duitku-callback`,
+      // @ts-ignore: Deno is available at runtime
+      returnUrl: `${Deno.env.get('FRONTEND_URL') || 'https://idcashier.com'}/registration-success`
     };
 
     // Generate signature

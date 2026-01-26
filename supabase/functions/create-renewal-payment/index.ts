@@ -129,13 +129,15 @@ const createDuitkuPayment = async (
     const DUITKU_MERCHANT_KEY = Deno.env.get('DUITKU_API_KEY')?.trim() || Deno.env.get('DUITKU_MERCHANT_KEY')?.trim() || '';
 
     // Production-only runtime (no sandbox)
-    const DUITKU_BASE_URL = 'https://passport.duitku.com';
+    // Prefer env-based WebAPI URL so we can switch without editing code.
+    // @ts-ignore: Deno is available at runtime
+    const DUITKU_WEBAPI_BASE_URL = (Deno.env.get('DUITKU_WEBAPI_BASE_URL') || 'https://passport.duitku.com/webapi').replace(/\/$/, '');
 
-    console.log(`Using Duitku Env: ${ENV} (${DUITKU_BASE_URL})`);
+    console.log(`Using Duitku Env: ${ENV} (${DUITKU_WEBAPI_BASE_URL})`);
 
     const ACTIVE_MERCHANT = DUITKU_MERCHANT_CODE;
     const ACTIVE_API_KEY = DUITKU_MERCHANT_KEY;
-    const DUITKU_URL = `${DUITKU_BASE_URL}/webapi/api/merchant/v2/inquiry`;
+    const DUITKU_URL = `${DUITKU_WEBAPI_BASE_URL}/api/merchant/v2/inquiry`;
 
     if (!ACTIVE_MERCHANT || !ACTIVE_API_KEY) {
       logger.error('Missing Duitku configuration', {
