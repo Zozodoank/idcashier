@@ -70,7 +70,9 @@ Deno.serve(async (req) => {
         .single()
     ]);
 
-    const { data: authData, error: authError } = authResult;
+    // Use let so we can retry login after auto-confirm (price-card flow)
+    let authData = authResult.data;
+    let authError = authResult.error;
     // We'll process userResult later after verifying auth
     const { data: userData, error: userError } = userResult;
 
@@ -78,17 +80,70 @@ Deno.serve(async (req) => {
       let errorMessage = 'Invalid email or password'
 
       if (authError.message.includes('Email not confirmed') || authError.message.includes('email_not_confirmed')) {
-        errorMessage = isWhitelistAccount
-          ? 'Email not confirmed. Please try again in 10 seconds.'
-          : 'Please confirm your email before logging in.'
+        if (isWhitelistAccount) {
+          errorMessage = 'Email not confirmed. Please try again in 10 seconds.'
+        } else {
+          // Price-card (register-with-payment) users MUST NOT be forced to verify email.
+          // They should be able to login, but app access is gated by subscription.
+          // Recovery strategy:
+          // - detect if this auth user is a price-card/pending-payment user
+          // - auto-confirm the email (admin)
+          // - retry signInWithPassword once
+          try {
+            const publicUserId = userData?.id;
+            if (publicUserId) {
+              const { data: authUserResult } = await supabaseAdmin.auth.admin.getUserById(publicUserId);
+              const meta = authUserResult?.user?.user_metadata || {};
+              const isTrialUser = Boolean((meta as any)?.is_trial_user);
+              const isPriceCardUser = Boolean((meta as any)?.is_price_card_registration || (meta as any)?.payment_pending);
+
+              if (isPriceCardUser && !isTrialUser) {
+                console.log('= Auto-confirming email for price-card user to allow login (payment pending)...', {
+                  email: normalizedEmail,
+                  userId: publicUserId
+                });
+
+                await supabaseAdmin.auth.admin.updateUserById(publicUserId, {
+                  email_confirm: true,
+                  user_metadata: { ...meta, email_verified: true }
+                });
+
+                const retry = await supabaseAnon.auth.signInWithPassword({
+                  email: normalizedEmail,
+                  password: password
+                });
+
+                if (!retry.error && retry.data?.session) {
+                  authData = retry.data;
+                  authError = null;
+                } else {
+                  // Still failed, fallback to generic message
+                  authError = retry.error || authError;
+                }
+              }
+            }
+          } catch (e: any) {
+            console.error('Price-card auto-confirm retry failed:', e?.message || e);
+          }
+
+          if (authError) {
+            // If still failing, keep a safe message.
+            errorMessage = 'Akun ini dibuat melalui proses pembayaran. Silakan coba login lagi.'
+          }
+        }
       } else if (authError.message.includes('Invalid login credentials')) {
         errorMessage = 'Invalid email or password.'
       }
 
+      // If we successfully recovered login above, continue normal flow.
+      if (!authError && authData?.session) {
+        // fall through
+      } else {
       return new Response(
         JSON.stringify({ error: errorMessage, details: authError.message }),
         { headers: corsHeaders, status: 401 }
       )
+      }
     }
 
     if (!authData.user && !authData.session) {
@@ -143,6 +198,7 @@ Deno.serve(async (req) => {
     }
 
     let subscriptionExpired = false;
+    let paymentPending = false;
 
     // Subscription check (skip for whitelist accounts)
     if (!isWhitelistAccount) {
@@ -163,6 +219,12 @@ Deno.serve(async (req) => {
 
           // Log subscription check for debugging
           console.log('Subscription check for user:', { effectiveUserId, subscription, subscriptionError });
+
+          // If there is no subscription row at all, treat it as payment pending (no app access yet)
+          if (!subscription && !subscriptionError) {
+            paymentPending = true;
+            subscriptionExpired = true;
+          }
 
           // Only check expiration if subscription exists and has end_date
           if (subscription && !subscriptionError && subscription.end_date) {
@@ -200,7 +262,8 @@ Deno.serve(async (req) => {
         user: {
           ...userData,
           tenantId: userData.tenant_id,
-          subscriptionExpired: subscriptionExpired // Inform frontend about status
+          subscriptionExpired: subscriptionExpired,
+          paymentPending: paymentPending
         },
         token: authData.session.access_token,
         session: {
@@ -210,6 +273,7 @@ Deno.serve(async (req) => {
           expires_in: authData.session.expires_in
         },
         subscriptionExpired: subscriptionExpired, // Top level also for convenience
+        paymentPending: paymentPending,
         message: subscriptionExpired ? 'Login successful (Subscription Expired)' : 'Login successful'
       }),
       { headers: corsHeaders, status: 200 }

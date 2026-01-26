@@ -169,13 +169,17 @@ Deno.serve(async (req) => {
                   const { data, error } = await supabase.auth.admin.createUser({
                     email: email.toLowerCase().trim(),
                     password,
-                    email_confirm: paymentCompleted ? true : false,
+                    // IMPORTANT:
+                    // - Trial email signup must require verification.
+                    // - Price-card/paid flow must NOT require verification (user should be able to login, but app access is gated by subscription).
+                    email_confirm: isPriceCardRegistration ? true : (paymentCompleted ? true : false),
                     user_metadata: {
                       name,
                       phone: phone || '',
                       role,
                       is_trial_user: false,
                       payment_completed: paymentCompleted || false,
+                      payment_pending: isPriceCardRegistration && !paymentCompleted,
                       is_price_card_registration: isPriceCardRegistration,
                     },
                   });
@@ -243,6 +247,7 @@ Deno.serve(async (req) => {
                     role,
                     is_trial_user: !isPriceCardRegistration && !paymentCompleted,
                     payment_completed: paymentCompleted || false,
+                    payment_pending: isPriceCardRegistration && !paymentCompleted,
                     is_price_card_registration: isPriceCardRegistration,
                     oauth_provider: oauthProvider
                 }

@@ -235,14 +235,16 @@ const createUserAndPaymentRecord = async (
           userId = authUserData.user.id;
           logger.info('Found existing OAuth user', { userId });
           
-          // Update user metadata for paid subscription
+          // IMPORTANT: Registration-with-payment is NOT ACTIVE until Duitku callback confirms payment.
+          // So we must NOT mark payment_completed=true here.
           await supabase.auth.admin.updateUserById(userId, {
             email_confirm: true,
             user_metadata: {
               name: userData.name,
               phone: userData.phone,
               role: userData.role || 'owner',
-              payment_completed: true,
+              payment_completed: false,
+              payment_pending: true,
               is_trial_user: false,
               oauth_provider: oauthProvider,
               oauth_user_id: oauthUserId
@@ -266,7 +268,9 @@ const createUserAndPaymentRecord = async (
           name: userData.name,
           phone: userData.phone,
           role: userData.role || 'owner',
-          payment_completed: true,
+          // IMPORTANT: user is not active until payment confirmed by callback
+          payment_completed: false,
+          payment_pending: true,
           is_trial_user: false
         }
       };

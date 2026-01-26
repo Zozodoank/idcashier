@@ -85,7 +85,8 @@ const DashboardLayout = () => {
   // Add logout function from useAuth hook
   const { user, token, updateUser, logout } = useAuth();
   const { hppEnabled, refreshHPPSetting } = useHPP();
-  const [subscriptionInactive, setSubscriptionInactive] = useState(false);
+  // IMPORTANT: default to true (fail-closed) to avoid giving access before we know subscription status.
+  const [subscriptionInactive, setSubscriptionInactive] = useState(true);
   const [subscriptionData, setSubscriptionData] = useState(null);
 
   // Trial users must verify email before they can login.
@@ -201,7 +202,9 @@ const DashboardLayout = () => {
         }
       } catch (e) {
         console.error('Error fetching subscription:', e);
-        setSubscriptionInactive(false);
+        // FAIL-CLOSED: if we cannot verify subscription, block access (except whitelisted)
+        setSubscriptionInactive(true);
+        setSubscriptionData(null);
       }
     };
 
@@ -423,18 +426,14 @@ const DashboardLayout = () => {
           .filter(Boolean);
         const isWhitelisted = whitelist.includes(String(user?.email || '').toLowerCase());
 
-        // Check if user is paid user
-        const isPaidUser = user?.user_metadata?.payment_completed;
-
         // Only show subscription expired if:
         // 1. User is not whitelisted
-        // 2. User is not a paid user
-        // 3. Subscription is inactive
-        // 4. User is verified (email confirmed)
+        // 2. Subscription is inactive
+        // (Do NOT trust user_metadata.payment_completed for access; subscription row is the source of truth)
         const isEmailVerified = user?.email_confirmed_at && !user?.user_metadata?.manual_verification_required;
 
         // Hide banner if renewal is pending (optimistic mode)
-        if (!isWhitelisted && !isPaidUser && subscriptionInactive && isEmailVerified && !isRenewalPending) {
+        if (!isWhitelisted && subscriptionInactive && isEmailVerified && !isRenewalPending) {
           return (
             <div className="bg-red-500 text-white px-4 py-3 text-center relative z-40">
               <div className="flex items-center justify-center gap-2">
@@ -495,17 +494,15 @@ const DashboardLayout = () => {
                 .map(e => String(e || '').trim().toLowerCase())
                 .filter(Boolean);
               const isWhitelisted = whitelist.includes(String(user?.email || '').toLowerCase());
-              const isPaidUser = user?.user_metadata?.payment_completed;
-
               // Use top-level optimistic renewal state
               const bypass = isWhitelisted || currentPage === 'subscription' || currentPage === 'developer' || isRenewalPending;
 
               // Block access if:
               // 1. Not whitelisted
-              // 2. Not a paid user
-              // 3. Subscription inactive
-              // 4. Email verification is now disabled - all users are auto-verified
-              if (!bypass && !isPaidUser && subscriptionInactive) {
+              // 2. Subscription inactive
+              // 3. Email verification is now disabled - all users are auto-verified
+              // IMPORTANT: subscription status is the source of truth; payment_completed metadata MUST NOT bypass.
+              if (!bypass && subscriptionInactive) {
                 return (
                   <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
                     <div className="max-w-md w-full p-8 rounded-xl border bg-card shadow-lg">
