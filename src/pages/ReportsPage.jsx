@@ -32,7 +32,9 @@ import { Calendar } from "@/components/ui/calendar";
 
 import { format } from "date-fns";
 
-import { cn, exportToExcel } from "@/lib/utils";
+import { cn, exportToExcel, getCurrencyFromStorage } from "@/lib/utils";
+import { calcTotals } from '@/lib/salesCalculations';
+import { computeReturnedQtyBySaleItemId } from '@/lib/returnsCalculations';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -72,6 +74,10 @@ const ReportsPage = () => {
   const { user, token } = useAuth();
   const { hppEnabled } = useHPP(); // Use HPP context instead of local state
   const permissions = usePermissions();
+
+  // Currency (fallback to IDR) - use ownerId for cashiers (tenant settings)
+  const ownerId = user?.role === 'cashier' ? user?.tenantId : user?.id;
+  const currencyCode = useMemo(() => getCurrencyFromStorage(ownerId), [ownerId]);
   
   // HPP feature state - removed local state, using context instead
   const canViewHPP = user?.permissions?.canViewHPP || false;
@@ -137,6 +143,7 @@ const ReportsPage = () => {
   const [returnType, setReturnType] = useState('stock'); // 'stock' or 'loss'
   const [returnReason, setReturnReason] = useState('');
   const [returningItems, setReturningItems] = useState([]);
+  const [returnSaleMeta, setReturnSaleMeta] = useState(null); // { discountPercent, taxPercent, currencyCode }
 
   
 
@@ -751,6 +758,13 @@ const ReportsPage = () => {
       
 
       salesData.forEach(sale => {
+        const saleItems = Array.isArray(sale.sale_items) ? sale.sale_items : [];
+        const saleTotals = calcTotals({
+          items: saleItems,
+          discountPercent: sale.discount || 0,
+          taxPercent: sale.tax || 0,
+          currencyCode,
+        });
 
         // Handle sales with no items
 
@@ -758,13 +772,11 @@ const ReportsPage = () => {
 
           // Calculate nominal discount and tax from percentages
 
-          const subtotalForSale = 0;
+          const subtotalForSale = saleTotals.subtotal;
 
-          const discountNominal = subtotalForSale * ((sale.discount || 0) / 100);
+          const discountNominal = saleTotals.discountAmount;
 
-          const taxableAmount = subtotalForSale - discountNominal;
-
-          const taxNominal = taxableAmount * ((sale.tax || 0) / 100);
+          const taxNominal = saleTotals.taxAmount;
 
           // Determine payment method and status
           const paymentMethod = (sale.payment_amount || 0) === 0 || (sale.payment_amount || 0) < sale.total_amount ? 'credit' : 'cash';
@@ -804,6 +816,8 @@ const ReportsPage = () => {
 
             payment_status: paymentStatus,
 
+            return_status: sale.return_status || 'none',
+
             subtotal: subtotalForSale,
 
             discount_amount: discountNominal,
@@ -838,29 +852,13 @@ const ReportsPage = () => {
 
         // Process each item in the sale
 
-        const itemCount = sale.sale_items.length;
+        const itemCount = saleItems.length;
 
-        let saleSubtotal = 0;
+        const saleSubtotal = saleTotals.subtotal;
 
-        
+        const discountNominal = saleTotals.discountAmount;
 
-        // Calculate total sale subtotal
-
-        sale.sale_items.forEach(item => {
-
-          saleSubtotal += (item.quantity || 0) * (item.price || 0);
-
-        });
-
-        
-
-        // Calculate nominal discount and tax from percentages
-
-        const discountNominal = saleSubtotal * ((sale.discount || 0) / 100);
-
-        const taxableAmount = saleSubtotal - discountNominal;
-
-        const taxNominal = taxableAmount * ((sale.tax || 0) / 100);
+        const taxNominal = saleTotals.taxAmount;
 
         
 
@@ -960,6 +958,8 @@ const ReportsPage = () => {
             payment_method: paymentMethod,
 
             payment_status: paymentStatus,
+
+            return_status: sale.return_status || 'none',
 
             subtotal: saleSubtotal, // Total sale subtotal for all items
 
@@ -1257,18 +1257,19 @@ const ReportsPage = () => {
 
     
 
-    const dailyData = validData.reduce((acc, sale) => {
+    const dailyData = validData.reduce((acc, row) => {
 
-      const day = format(new Date(sale.date), 'yyyy-MM-dd');
+      const day = format(new Date(row.date), 'yyyy-MM-dd');
 
       if (!acc[day]) acc[day] = { name: format(new Date(day), 'EEE'), revenue: 0, cost: 0, profit: 0, globalHPP: 0 };
 
-      acc[day].revenue += sale.total;
+      // Revenue: count once per sale (avoid double count per item row)
+      if (row.isFirstItemInSale) {
+        acc[day].revenue += row.total || 0;
+      }
 
-      // sale.cost already contains the total cost for this item in the transaction
-      acc[day].cost += sale.cost;
-
-      acc[day].profit += (sale.total - sale.cost);
+      // Cost: sum per item row (cost per unit * quantity)
+      acc[day].cost += (Number(row.cost) || 0) * (Number(row.quantity) || 0);
 
       return acc;
 
@@ -1279,7 +1280,7 @@ const ReportsPage = () => {
     
     Object.keys(dailyData).forEach(day => {
       dailyData[day].globalHPP = dailyGlobalHPP;
-      dailyData[day].profit -= dailyGlobalHPP; // Deduct global HPP from profit
+      dailyData[day].profit = dailyData[day].revenue - dailyData[day].cost - dailyGlobalHPP;
     });
 
     return Object.values(dailyData);
@@ -1937,21 +1938,52 @@ const ReportsPage = () => {
     try {
       const saleData = await salesAPI.getById(selectedTransactionForAction.saleId, token);
       
-      // Defensive check: ensure saleData and items exist
-      if (!saleData || !saleData.items || !Array.isArray(saleData.items)) {
+      // Defensive check: ensure saleData and sale_items exist
+      if (!saleData || !Array.isArray(saleData.sale_items)) {
         throw new Error(t('invalidTransactionData') || 'Data transaksi tidak valid atau tidak memiliki item');
       }
-      
-      // Initialize return items with full quantities
-      const items = saleData.items.map(item => ({
-        sale_item_id: item.id,
-        product_id: item.product_id,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        returnQuantity: item.quantity,
-        price: item.price,
-        cost: item.cost || 0
-      }));
+
+      // Load existing returns for this sale to prevent over-return across multiple returns
+      const existingReturns = await returnsAPI.getBySaleId(selectedTransactionForAction.saleId, token);
+      const allReturnItems = (existingReturns || []).flatMap(r => r.return_items || []);
+      const returnedQtyBySaleItemId = computeReturnedQtyBySaleItemId(allReturnItems);
+
+      // Initialize return items with remaining quantities (default: full remaining)
+      const items = saleData.sale_items
+        .map(item => {
+          const soldQty = item.quantity || 0;
+          const alreadyReturnedQty = returnedQtyBySaleItemId.get(item.id) || 0;
+          const remainingQty = Math.max(0, soldQty - alreadyReturnedQty);
+          const cost = item.hpp_total ?? item.cost_snapshot ?? item.product_cost ?? 0;
+
+          return {
+            sale_item_id: item.id,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            soldQuantity: soldQty,
+            alreadyReturnedQuantity: alreadyReturnedQty,
+            remainingQuantity: remainingQty,
+            returnQuantity: remainingQty,
+            price: item.price,
+            cost
+          };
+        })
+        .filter(item => item.remainingQuantity > 0);
+
+      if (items.length === 0) {
+        toast({
+          title: t('error'),
+          description: t('transactionAlreadyFullyReturned') || 'Transaksi ini sudah diretur sepenuhnya',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setReturnSaleMeta({
+        discountPercent: saleData.discount || 0,
+        taxPercent: saleData.tax || 0,
+        currencyCode,
+      });
       
       setReturningItems(items);
       setShowActionDialog(false);
@@ -1991,10 +2023,16 @@ const ReportsPage = () => {
     }
 
     try {
-      // Calculate total return amount
-      const totalAmount = itemsToReturn.reduce((sum, item) => 
-        sum + (item.price * item.returnQuantity), 0
-      );
+      // Calculate total return amount (NET: apply original sale discount & tax percentages)
+      const effectiveCurrencyCode = returnSaleMeta?.currencyCode || currencyCode || 'IDR';
+      const totals = calcTotals({
+        items: itemsToReturn.map(item => ({ price: item.price, quantity: item.returnQuantity })),
+        discountPercent: returnSaleMeta?.discountPercent || 0,
+        taxPercent: returnSaleMeta?.taxPercent || 0,
+        currencyCode: effectiveCurrencyCode,
+      });
+
+      const totalAmount = totals.total;
 
       // Create return record
       const returnData = {
@@ -2002,7 +2040,6 @@ const ReportsPage = () => {
         return_type: returnType,
         reason: returnReason,
         total_amount: totalAmount,
-        total_sale_items: returningItems.length,
         items: itemsToReturn.map(item => ({
           sale_item_id: item.sale_item_id,
           product_id: item.product_id,
@@ -2026,6 +2063,7 @@ const ReportsPage = () => {
       setShowReturnDialog(false);
       setSelectedTransactionForAction(null);
       setReturningItems([]);
+      setReturnSaleMeta(null);
       setReturnReason('');
       setReturnType('stock');
     } catch (error) {
@@ -2037,6 +2075,16 @@ const ReportsPage = () => {
       });
     }
   };
+
+  const returnPreviewTotals = useMemo(() => {
+    const effectiveCurrencyCode = returnSaleMeta?.currencyCode || currencyCode || 'IDR';
+    return calcTotals({
+      items: (returningItems || []).map(item => ({ price: item.price, quantity: item.returnQuantity })),
+      discountPercent: returnSaleMeta?.discountPercent || 0,
+      taxPercent: returnSaleMeta?.taxPercent || 0,
+      currencyCode: effectiveCurrencyCode,
+    });
+  }, [returningItems, returnSaleMeta, currencyCode]);
 
 
 
@@ -4566,13 +4614,13 @@ const ReportsPage = () => {
                               <Input
                                 type="number"
                                 min="0"
-                                max={item.quantity}
+                                max={item.remainingQuantity}
                                 value={item.returnQuantity}
                                 onChange={(e) => {
                                   const newItems = [...returningItems];
                                   newItems[index].returnQuantity = Math.min(
                                     Math.max(0, parseInt(e.target.value) || 0),
-                                    item.quantity
+                                    item.remainingQuantity
                                   );
                                   setReturningItems(newItems);
                                 }}
@@ -4597,9 +4645,7 @@ const ReportsPage = () => {
                   <div className="flex justify-between items-center">
                     <span className="font-semibold text-blue-900 dark:text-blue-100">{t('totalReturn') || 'Total Retur'}:</span>
                     <span className="text-xl font-bold text-blue-900 dark:text-blue-100">
-                      Rp {returningItems.reduce((sum, item) => 
-                        sum + (item.price * item.returnQuantity), 0
-                      ).toLocaleString()}
+                      Rp {returnPreviewTotals.total.toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -4617,6 +4663,7 @@ const ReportsPage = () => {
                     onClick={() => {
                       setShowReturnDialog(false);
                       setReturningItems([]);
+                      setReturnSaleMeta(null);
                       setReturnReason('');
                       setReturnType('stock');
                     }}

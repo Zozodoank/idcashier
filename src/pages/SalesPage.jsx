@@ -25,6 +25,8 @@ import DeliveryNote from '@/components/DeliveryNote';
 import PrintReceipt, { ReceiptContent } from '@/components/PrintReceipt';
 import CustomCostsInput from '@/components/CustomCostsInput';
 import { formatCurrency as formatCurrencyUtil, getCurrencyFromStorage, getCurrencySymbol } from '@/lib/utils';
+import { calcChange, calcHppExtraPerUnit, calcTotals } from '@/lib/salesCalculations';
+import { normalizeMoneyAmount } from '@/lib/money';
 import {
   Dialog,
   DialogContent,
@@ -606,6 +608,20 @@ const SalesPage = () => {
       const suppliersList = new Set([t('allSuppliers')]);
       
       salesData.forEach((sale, index) => {
+        const saleItems = Array.isArray(sale.sale_items) ? sale.sale_items : [];
+        const computedTotals = calcTotals({
+          items: saleItems,
+          discountPercent: sale.discount || 0,
+          taxPercent: sale.tax || 0,
+          currencyCode,
+        });
+
+        // Infer payment method when the column doesn't exist (kept for backward compatibility)
+        const totalAmount = Number(sale.total_amount) || 0;
+        const paymentAmountValue = Number(sale.payment_amount) || 0;
+        const inferredPaymentMethod = paymentAmountValue === 0 || paymentAmountValue < totalAmount ? 'credit' : 'cash';
+        const inferredPaymentStatus = sale.payment_status || (inferredPaymentMethod === 'credit' ? 'unpaid' : 'paid');
+
         // Handle sales with no items by creating a placeholder entry
         if (!sale.sale_items || sale.sale_items.length === 0) {
           console.warn('Sale has no items:', sale.id);
@@ -623,11 +639,12 @@ const SalesPage = () => {
             quantity: 0,
             price: 0,
             itemSubtotal: 0,
-            discount_amount: sale.discount_amount || 0,
-            tax_amount: sale.tax_amount || 0,
+            subtotal: computedTotals.subtotal,
+            discount_amount: computedTotals.discountAmount,
+            tax_amount: computedTotals.taxAmount,
             total: sale.total_amount || 0,
-            payment_status: sale.payment_status || 'paid',
-            payment_method: sale.payment_method || 'cash',
+            payment_status: inferredPaymentStatus,
+            payment_method: inferredPaymentMethod,
             isFirstItemInSale: true,
             cost: 0
           });
@@ -639,6 +656,8 @@ const SalesPage = () => {
         sale.sale_items.forEach((item, itemIndex) => {
           productsList.add(item.product_name || t('unknownProduct'));
           customersList.add(sale.customer?.name || t('defaultCustomer'));
+
+          const costPerUnit = item.hpp_total ?? item.cost_snapshot ?? item.product_cost ?? item.product?.cost ?? 0;
           
           flattenedData.push({
             id: sale.id + '-' + item.id,
@@ -652,13 +671,14 @@ const SalesPage = () => {
             quantity: item.quantity,
             price: item.price,
             itemSubtotal: item.price * item.quantity,
-            discount_amount: sale.discount_amount || 0,
-            tax_amount: sale.tax_amount || 0,
+            subtotal: computedTotals.subtotal,
+            discount_amount: computedTotals.discountAmount,
+            tax_amount: computedTotals.taxAmount,
             total: sale.total_amount || 0,
-            payment_status: sale.payment_status || 'paid',
-            payment_method: sale.payment_method || 'cash',
+            payment_status: inferredPaymentStatus,
+            payment_method: inferredPaymentMethod,
             isFirstItemInSale: itemIndex === 0,
-            cost: item.cost || 0
+            cost: costPerUnit
           });
         });
       });
@@ -754,12 +774,12 @@ const SalesPage = () => {
   };
 
   // Calculate cart totals
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const discountAmount = subtotal * (discount / 100);
-  const taxableAmount = subtotal - discountAmount;
-  const taxAmount = taxableAmount * (tax / 100);
-  const total = taxableAmount + taxAmount;
-  const change = paymentAmount - total;
+  const totals = calcTotals({ items: cart, discountPercent: discount, taxPercent: tax, currencyCode });
+  const subtotal = totals.subtotal;
+  const discountAmount = totals.discountAmount;
+  const taxAmount = totals.taxAmount;
+  const total = totals.total;
+  const change = calcChange({ paymentAmount, total, currencyCode, paymentMethod });
   
   // Customer for receipt (filter out default customer)
   const customerForReceipt = selectedCustomer === 'default' 
@@ -904,8 +924,20 @@ const SalesPage = () => {
       // Calculate total custom costs
       const totalCustomCosts = customCosts.reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
       
-      // Calculate total items for prorating custom costs
-      const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+      // Calculate total quantity for allocating custom costs per unit
+      const totalQty = cart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+      const hppExtraPerUnit = calcHppExtraPerUnit({ totalCustomCosts, totalQty, currencyCode });
+
+      const normalizedPaymentAmount = paymentMethod === 'credit'
+        ? 0
+        : normalizeMoneyAmount(paymentAmount, currencyCode);
+
+      const normalizedChangeAmount = calcChange({
+        paymentAmount: normalizedPaymentAmount,
+        total,
+        currencyCode,
+        paymentMethod,
+      });
       
       const saleData = {
         user_id: authUser.id, // Add the user_id to link the sale to the current user
@@ -915,18 +947,16 @@ const SalesPage = () => {
         sender_name: senderName || null,
         discount: discount,  // Changed from discountAmount to discount (percentage)
         tax: tax,            // Changed from taxAmount to tax (percentage)
-        payment_amount: paymentMethod === 'credit' ? 0 : paymentAmount,
-        change_amount: paymentMethod === 'credit' ? 0 : change,
+        payment_amount: normalizedPaymentAmount,
+        change_amount: normalizedChangeAmount,
         payment_status: paymentMethod === 'credit' ? 'unpaid' : 'paid',
         sale_items: cart.map(item => {
           // Snapshot the HPP at time of sale
-          const cost_snapshot = item.hpp || item.cost || 0;
+          const cost_snapshot = normalizeMoneyAmount(item.hpp || item.cost || 0, currencyCode);
           
-          // Calculate hpp_extra: prorate custom costs based on quantity
-          const hpp_extra = totalItems > 0 ? (totalCustomCosts * item.quantity) / totalItems : 0;
-          
-          // Calculate hpp_total
-          const hpp_total = cost_snapshot + hpp_extra;
+          // Custom costs allocation (per unit)
+          const hpp_extra = hppExtraPerUnit;
+          const hpp_total = normalizeMoneyAmount(cost_snapshot + hpp_extra, currencyCode);
           
           return {
             product_id: item.id,
@@ -969,8 +999,8 @@ const SalesPage = () => {
           discountAmount,
           taxAmount,
           total,
-          paymentAmount,
-          change,
+          paymentAmount: normalizedPaymentAmount,
+          change: normalizedChangeAmount,
           customer: customerForReceipt
         });
 
@@ -1353,14 +1383,22 @@ const SalesPage = () => {
       
       // Transform data for print components
       const items = saleData.sale_items || [];
-      const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const printTotals = calcTotals({
+        items,
+        discountPercent: saleData.discount || 0,
+        taxPercent: saleData.tax || 0,
+        currencyCode,
+      });
       
       const saleForPrint = {
         ...saleData,
         items: items,
         discount_percent: saleData.discount || 0,
         tax_percent: saleData.tax || 0,
-        subtotal: subtotal,
+        subtotal: printTotals.subtotal,
+        discount_amount: printTotals.discountAmount,
+        tax_amount: printTotals.taxAmount,
+        total_amount: saleData.total_amount ?? printTotals.total,
         // Map customer data if nested in saleData
         customer: saleData.customer ? {
           name: saleData.customer.name,

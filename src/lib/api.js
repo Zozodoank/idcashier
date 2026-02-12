@@ -1,5 +1,6 @@
 // API utility functions for idCashier
 import { supabase } from '@/lib/supabaseClient';
+import { computeReturnStatus, computeReturnedQtyBySaleItemId } from '@/lib/returnsCalculations';
 
 // Helper function to handle API responses
 const handleResponse = async (response) => {
@@ -2963,10 +2964,89 @@ export const returnsAPI = {
       // Get user data
       const userData = await authAPI.getUserData(null, token);
 
+      const requestedItems = Array.isArray(returnData?.items) ? returnData.items : [];
+      if (!returnData?.sale_id) {
+        throw new Error('Sale ID is required');
+      }
+      if (requestedItems.length === 0) {
+        throw new Error('No return items provided');
+      }
+
+      // Load sale items for validation and accurate return_status computation
+      const saleItemsResponse = await fetch(
+        `${supabaseUrl}/rest/v1/sale_items?sale_id=eq.${returnData.sale_id}&select=id,quantity,product_id,price`,
+        {
+          method: 'GET',
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!saleItemsResponse.ok) {
+        const errorText = await saleItemsResponse.text();
+        throw new Error(`Failed to fetch sale items: ${errorText}`);
+      }
+
+      const saleItems = await saleItemsResponse.json();
+      if (!Array.isArray(saleItems) || saleItems.length === 0) {
+        throw new Error('Sale items not found');
+      }
+
+      // Load existing return items (supports multi-step returns without over-return)
+      const existingReturns = await returnsAPI.getBySaleId(returnData.sale_id, token);
+      const existingReturnItems = (existingReturns || []).flatMap(r => r.return_items || []);
+      const returnedQtyBySaleItemId = computeReturnedQtyBySaleItemId(existingReturnItems);
+
+      const saleItemById = new Map(saleItems.map(item => [item.id, item]));
+
+      // Validate requested quantities against remaining quantities
+      for (const item of requestedItems) {
+        const saleItemId = item?.sale_item_id;
+        if (!saleItemId) {
+          throw new Error('Missing sale_item_id in return item');
+        }
+
+        const saleItem = saleItemById.get(saleItemId);
+        if (!saleItem) {
+          throw new Error(`Sale item not found: ${saleItemId}`);
+        }
+
+        const soldQty = Math.max(0, Math.trunc(Number(saleItem.quantity) || 0));
+        const alreadyReturnedQty = Math.max(0, Math.trunc(Number(returnedQtyBySaleItemId.get(saleItemId) || 0)));
+        const remainingQty = soldQty - alreadyReturnedQty;
+
+        const requestedQty = Math.max(0, Math.trunc(Number(item.quantity) || 0));
+        if (requestedQty <= 0) {
+          throw new Error('Invalid return quantity');
+        }
+        if (requestedQty > remainingQty) {
+          throw new Error(`Return quantity exceeds remaining quantity (remaining: ${remainingQty})`);
+        }
+
+        // Ensure product_id matches the sale item to prevent tampering
+        if (item.product_id && saleItem.product_id && item.product_id !== saleItem.product_id) {
+          throw new Error('Invalid product_id for sale_item_id');
+        }
+      }
+
+      // Compute return_status after applying this return (quantity-based)
+      const allReturnItemsAfter = [
+        ...existingReturnItems,
+        ...requestedItems.map(item => ({
+          sale_item_id: item.sale_item_id,
+          quantity: item.quantity
+        }))
+      ];
+      const statusAfterReturn = computeReturnStatus({ saleItems, allReturnItems: allReturnItemsAfter });
+
       // 1. Create return record
       const returnPayload = {
         id: crypto.randomUUID(),
         user_id: userData.id,
+        created_by: userData.id,
         sale_id: returnData.sale_id,
         return_type: returnData.return_type,
         reason: returnData.reason || '',
@@ -2996,14 +3076,14 @@ export const returnsAPI = {
       const returnRecord = returnRecordArray[0];
 
       // 2. Create return items
-      const returnItems = returnData.items.map(item => ({
+      const returnItems = requestedItems.map(item => ({
         id: crypto.randomUUID(),
         return_id: returnRecord.id,
         sale_item_id: item.sale_item_id,
         product_id: item.product_id,
-        quantity: item.quantity,
-        price: item.price,
-        cost: item.cost
+        quantity: Math.max(0, Math.trunc(Number(item.quantity) || 0)),
+        price: Number(item.price) || 0,
+        cost: Number(item.cost) || 0
       }));
 
       const itemsResponse = await fetch(
@@ -3036,7 +3116,7 @@ export const returnsAPI = {
 
       // 3. Update stock if return_type is 'stock'
       if (returnData.return_type === 'stock') {
-        for (const item of returnData.items) {
+        for (const item of requestedItems) {
           await fetch(
             `${supabaseUrl}/rest/v1/rpc/increment_stock`,
             {
@@ -3056,7 +3136,6 @@ export const returnsAPI = {
       }
 
       // 4. Update sale return_status
-      const allItemsReturned = returnData.items.length === returnData.total_sale_items;
       await fetch(
         `${supabaseUrl}/rest/v1/sales?id=eq.${returnData.sale_id}`,
         {
@@ -3066,7 +3145,7 @@ export const returnsAPI = {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ return_status: allItemsReturned ? 'full' : 'partial' })
+          body: JSON.stringify({ return_status: statusAfterReturn })
         }
       );
 
