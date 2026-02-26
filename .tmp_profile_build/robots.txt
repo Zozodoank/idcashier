@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /sales/
+Disallow: /products/
+Disallow: /reports/
+Disallow: /expenses/
+Disallow: /employees/
+Disallow: /settings/
+Disallow: /attendance/
+Disallow: /store-setup/
+Disallow: /auth/
+Disallow: /callback/
+
+Sitemap: https://idcashier.com/sitemap.xml

@@ -5,19 +5,30 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
-import { settingsAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHPP } from '@/contexts/HPPContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Users, DollarSign, CreditCard, CheckCircle, Info } from 'lucide-react';
-import PaymentMethodSelector from '@/components/PaymentMethodSelector';
+
+const LOCALE_BY_LANGUAGE = {
+  id: 'id-ID',
+  en: 'en-US',
+  zh: 'zh-CN'
+};
+
+const HPP_PLANS = [
+  { id: '1_month', months: 1, price: 50000, pricePerMonth: 50000, popular: false },
+  { id: '3_months', months: 3, price: 150000, pricePerMonth: 50000, popular: false },
+  { id: '6_months', months: 6, price: 250000, pricePerMonth: 41666, popular: true, discount: '17%' },
+  { id: '12_months', months: 12, price: 500000, pricePerMonth: 41667, popular: false, discount: '17%' }
+];
 
 const HPPSettings = () => {
   const { token, user } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
-  const { hppEnabled, loading, hppStatus, refreshHPPSetting } = useHPP();
+  const { hppEnabled, loading, hppStatus } = useHPP();
 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('3_months');
@@ -30,12 +41,55 @@ const HPPSettings = () => {
     totalBaseSalary: 0
   });
 
+  const locale = LOCALE_BY_LANGUAGE[language] || LOCALE_BY_LANGUAGE.id;
+
   useEffect(() => {
     checkSubscriptionStatus();
     loadEmployeeStats();
   }, []);
 
   // HAPUS: Tidak perlu lagi loadSettings manual HPP, cukup context!
+
+  const isWhitelistedAccount = user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com';
+
+  const createUserFacingError = (message) => {
+    const err = new Error(message);
+    err.__userFacing = true;
+    return err;
+  };
+
+  const formatDate = (value) => {
+    if (!value) return '';
+    try {
+      return new Date(value).toLocaleDateString(locale);
+    } catch {
+      return '';
+    }
+  };
+
+  const formatPlanName = (months) => {
+    const monthLabel = t('month');
+    if (language === 'zh') return `${months}${monthLabel}`;
+    if (language === 'en') return `${months} ${monthLabel}${months > 1 ? 's' : ''}`;
+    return `${months} ${monthLabel}`;
+  };
+
+  const getActivationStatusDescription = () => {
+    if (!hppEnabled) return t('hppNotActiveYet');
+
+    if (hppStatus?.isTrial) {
+      if (hppStatus.trialEndDate) {
+        return t('trialUntil').replace('{date}', formatDate(hppStatus.trialEndDate));
+      }
+      return t('activeTrial');
+    }
+
+    if (isSubscriptionActive && subscriptionData?.end_date) {
+      return t('validUntil').replace('{date}', formatDate(subscriptionData.end_date));
+    }
+
+    return t('active');
+  };
 
   const checkSubscriptionStatus = async () => {
     try {
@@ -91,27 +145,24 @@ const HPPSettings = () => {
   };
 
   const handleActivateHPP = () => {
-    // Check if user is demo or developer (whitelisted accounts)
-    const isWhitelistedAccount = user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com';
-
     if (isWhitelistedAccount) {
       toast({
-        title: 'Info',
-        description: 'Fitur HPP sudah aktif untuk akun demo dan developer.'
+        title: t('info'),
+        description: t('hppActiveForWhitelisted')
       });
       return;
     }
 
     if (hppEnabled) {
-      if (isSubscriptionActive) {
+      if (isSubscriptionActive && subscriptionData?.end_date) {
         toast({
-          title: 'Info',
-          description: `Fitur HPP aktif hingga ${new Date(subscriptionData?.end_date).toLocaleDateString('id-ID')}.`
+          title: t('info'),
+          description: t('hppActiveUntil').replace('{date}', formatDate(subscriptionData.end_date))
         });
       } else {
         toast({
-          title: 'Info',
-          description: 'Fitur HPP sudah aktif di akun Anda.'
+          title: t('info'),
+          description: t('hppAlreadyActive')
         });
       }
       return;
@@ -122,8 +173,8 @@ const HPPSettings = () => {
   const handlePayment = async () => {
     if (!paymentMethod) {
       toast({
-        title: t('paymentMethodRequired') || 'Metode Pembayaran Diperlukan',
-        description: t('pleaseSelectPaymentMethod') || 'Silakan pilih metode pembayaran terlebih dahulu.',
+        title: t('paymentMethodRequired'),
+        description: t('pleaseSelectPaymentMethod'),
         variant: 'destructive'
       });
       return;
@@ -131,17 +182,9 @@ const HPPSettings = () => {
 
     setIsProcessing(true);
     try {
-      // Use same pricing as RenewalPage
-      const plans = {
-        '1_month': { months: 1, price: 50000, name: '1 Bulan' },
-        '3_months': { months: 3, price: 150000, name: '3 Bulan' },
-        '6_months': { months: 6, price: 250000, name: '6 Bulan', popular: true, discount: '17%' },
-        '12_months': { months: 12, price: 500000, name: '12 Bulan', discount: '17%' }
-      };
-
-      const plan = plans[selectedPlan];
+      const plan = HPP_PLANS.find((p) => p.id === selectedPlan);
       if (!plan) {
-        throw new Error('Invalid plan selected');
+        throw createUserFacingError(t('paymentRequestFailed'));
       }
 
       // Use create-renewal-payment edge function (protected; requires user token)
@@ -160,14 +203,15 @@ const HPPSettings = () => {
         headers
       });
 
-      if (result.error) {
-        throw new Error(result.error || result.message || 'Failed to create payment request');
+      if (result?.error) {
+        console.error('HPP payment error response:', result);
+        throw createUserFacingError(t('paymentRequestFailed'));
       }
 
       // Save pending HPP activation flag
       localStorage.setItem('pendingHPPActivation', JSON.stringify({
         planId: selectedPlan,
-        planMonths: plan.duration,
+        planMonths: plan.months,
         userId: user.id
       }));
 
@@ -175,13 +219,13 @@ const HPPSettings = () => {
       if (result.paymentUrl) {
         window.location.href = result.paymentUrl;
       } else {
-        throw new Error('Payment URL not received');
+        throw createUserFacingError(t('paymentUrlNotReceived'));
       }
     } catch (error) {
       console.error('HPP payment error:', error);
       toast({
         title: t('error'),
-        description: error.message || 'Gagal memproses pembayaran.',
+        description: error?.__userFacing ? error.message : t('paymentRequestFailed'),
         variant: 'destructive'
       });
     } finally {
@@ -193,10 +237,10 @@ const HPPSettings = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Pengaturan HPP (Harga Pokok Penjualan)</CardTitle>
+          <CardTitle>{t('hppSettingsTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">Memuat pengaturan...</p>
+          <p className="text-sm text-muted-foreground">{t('loadingData')}</p>
         </CardContent>
       </Card>
     );
@@ -205,9 +249,9 @@ const HPPSettings = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Pengaturan HPP (Harga Pokok Penjualan)</CardTitle>
+        <CardTitle>{t('hppSettingsTitle')}</CardTitle>
         <CardDescription>
-          Aktifkan fitur ini untuk melacak biaya produksi dan menghitung profit
+          {t('hppSettingsDescription')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -217,23 +261,21 @@ const HPPSettings = () => {
             <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
             <div>
               <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                Apa itu HPP (Harga Pokok Penjualan)?
+                {t('hppWhatIsTitle')}
               </h3>
               <div className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
                 <p>
-                  <strong>HPP</strong> adalah total biaya yang dikeluarkan untuk memproduksi atau memperoleh barang yang dijual.
-                  Fitur ini membantu Anda:
+                  <strong>HPP</strong> {t('hppWhatIsDescriptionAfterHpp')}
                 </p>
                 <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li>Menghitung profit margin yang akurat</li>
-                  <li>Melacak biaya produksi per item</li>
-                  <li>Menganalisis profitabilitas produk</li>
-                  <li>Membuat keputusan harga yang tepat</li>
-                  <li>Mengelola biaya karyawan dan operasional</li>
+                  <li>{t('hppBenefitAccurateProfitMargin')}</li>
+                  <li>{t('hppBenefitTrackProductionCostPerItem')}</li>
+                  <li>{t('hppBenefitAnalyzeProductProfitability')}</li>
+                  <li>{t('hppBenefitMakePricingDecisions')}</li>
+                  <li>{t('hppBenefitManagePayrollAndOps')}</li>
                 </ul>
                 <p className="mt-3">
-                  <strong>Contoh:</strong> Jika Anda menjual kopi seharga Rp 15.000 dengan HPP Rp 8.000,
-                  maka profit Anda adalah Rp 7.000 (46.7% margin).
+                  <strong>{t('example')}:</strong> {t('hppExampleCoffee')}
                 </p>
               </div>
             </div>
@@ -250,25 +292,10 @@ const HPPSettings = () => {
             )}
             <div>
               <Label className="text-base font-medium">
-                Status Fitur HPP
+                {t('hppFeatureStatus')}
               </Label>
               <p className="text-sm text-muted-foreground">
-                {(() => {
-                  if (!hppEnabled) return 'Belum aktif';
-
-                  if (hppStatus?.isTrial) {
-                    return hppStatus.trialEndDate ?
-                      `Aktif (Trial hingga ${new Date(hppStatus.trialEndDate).toLocaleDateString('id-ID')})` :
-                      'Aktif (Trial)';
-                  }
-
-                  if (isSubscriptionActive && subscriptionData?.end_date) {
-                    return `Aktif (Berlaku hingga ${new Date(subscriptionData.end_date).toLocaleDateString('id-ID')})`;
-                  }
-
-                  const isWhitelistedAccount = user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com';
-                  return isWhitelistedAccount ? 'Aktif' : 'Sudah aktif';
-                })()}
+                {getActivationStatusDescription()}
               </p>
             </div>
           </div>
@@ -280,13 +307,12 @@ const HPPSettings = () => {
             {hppEnabled ? (
               <>
                 <CheckCircle className="w-4 h-4 mr-2" />
-                {(user?.email === 'demo@idcashier.com' || user?.email === 'jho.j80@gmail.com') ? 'Whitelist' :
-                  (isSubscriptionActive ? 'Langganan Aktif' : 'Aktif')}
+                {isWhitelistedAccount ? t('whitelist') : (isSubscriptionActive ? t('subscriptionActive') : t('active'))}
               </>
             ) : (
               <>
                 <CreditCard className="w-4 h-4 mr-2" />
-                Aktifkan HPP
+                {t('activateHPP')}
               </>
             )}
           </Button>
@@ -298,21 +324,21 @@ const HPPSettings = () => {
           <>
             <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
               <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">
-                ✨ Fitur HPP Aktif
+                <span aria-hidden>✨ </span>{t('hppFeatureActive')}
               </h3>
-              <div className="text-sm text-green-800 dark:text-green-200 space-y-1">
-                <p>• Kolom HPP tersedia di halaman Produk</p>
-                <p>• Margin profit dihitung otomatis</p>
-                <p>• Menu Karyawan dan Pengeluaran tersedia</p>
-                <p>• Laporan menampilkan analisis profit detail</p>
-                <p>• Kasir dapat menambahkan biaya kustom (jika diberi izin)</p>
-              </div>
+              <ul className="text-sm text-green-800 dark:text-green-200 list-disc list-inside space-y-1">
+                <li>{t('hppColumnInProducts')}</li>
+                <li>{t('hppProfitMarginAutoCalculated')}</li>
+                <li>{t('hppEmployeesAndExpensesMenuAvailable')}</li>
+                <li>{t('detailedProfitReports')}</li>
+                <li>{t('cashierCanAddCustomCostsWithPermission')}</li>
+              </ul>
             </div>
 
             {/* Employee Costs Summary */}
             <div className="mt-6 space-y-3">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                Biaya Karyawan Bulanan
+                {t('monthlyEmployeeCosts')}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Total Active Employees */}
@@ -320,7 +346,7 @@ const HPPSettings = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">
-                        Karyawan Aktif
+                        {t('activeEmployees')}
                       </p>
                       <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
                         {employeeStats.totalActive}
@@ -335,7 +361,7 @@ const HPPSettings = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                        Total Gaji Pokok
+                        {t('totalBaseSalary')}
                       </p>
                       <p className="text-2xl font-bold text-green-900 dark:text-green-100">
                         Rp {employeeStats.totalBaseSalary.toLocaleString('id-ID')}
@@ -346,7 +372,7 @@ const HPPSettings = () => {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                💡 Biaya karyawan ini akan dimasukkan ke dalam perhitungan HPP Global bulanan
+                <span aria-hidden>💡 </span>{t('employeeCostsIncludedInGlobalHppHint')}
               </p>
             </div>
           </>
@@ -357,21 +383,16 @@ const HPPSettings = () => {
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{t('activateHPPFeature') || 'Activate HPP Feature'}</DialogTitle>
+            <DialogTitle>{t('activateHPPFeature')}</DialogTitle>
             <DialogDescription>
-              {t('selectSubscriptionPackageToActivate') || 'Select a subscription package to activate HPP feature'}
+              {t('selectSubscriptionPackageToActivate')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             {/* Plan Selection - Same as RenewalPage */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
-                { id: '1_month', name: '1 Bulan', duration: 1, price: 50000, pricePerMonth: 50000, popular: false },
-                { id: '3_months', name: '3 Bulan', duration: 3, price: 150000, pricePerMonth: 50000, popular: false },
-                { id: '6_months', name: '6 Bulan', duration: 6, price: 250000, pricePerMonth: 41666, popular: true, discount: '17%' },
-                { id: '12_months', name: '12 Bulan', duration: 12, price: 500000, pricePerMonth: 41667, popular: false, discount: '17%' }
-              ].map((plan) => (
+              {HPP_PLANS.map((plan) => (
                 <div
                   key={plan.id}
                   onClick={() => setSelectedPlan(plan.id)}
@@ -382,28 +403,28 @@ const HPPSettings = () => {
                 >
                   {plan.popular && (
                     <span className="absolute -top-2 left-4 bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
-                      {t('popular') || 'Popular'}
+                      {t('popular')}
                     </span>
                   )}
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <h3 className="font-semibold text-lg">{plan.name}</h3>
+                      <h3 className="font-semibold text-lg">{formatPlanName(plan.months)}</h3>
                       {plan.discount && (
                         <span className="text-xs text-green-600 dark:text-green-400 font-medium">
-                          Hemat {plan.discount}
+                          {t('discount')} {plan.discount}
                         </span>
                       )}
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-bold">Rp {plan.price.toLocaleString('id-ID')}</p>
                       <p className="text-xs text-muted-foreground">
-                        Rp {plan.pricePerMonth.toLocaleString('id-ID')}/bulan
+                        Rp {plan.pricePerMonth.toLocaleString('id-ID')}{t('perMonth')}
                       </p>
                     </div>
                   </div>
                   {selectedPlan === plan.id && (
                     <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-                      ✓ {t('selected') || 'Selected'}
+                      <CheckCircle className="w-3 h-3 inline-block mr-1" />{t('selected')}
                     </div>
                   )}
                 </div>
@@ -412,10 +433,10 @@ const HPPSettings = () => {
 
             {/* Payment Method Selector */}
             <div className="space-y-2">
-              <Label>{t('paymentMethod') || 'Metode Pembayaran'}</Label>
+              <Label>{t('paymentMethod')}</Label>
               <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                 <SelectTrigger>
-                  <SelectValue placeholder={t('selectPaymentMethod') || "Pilih Metode Pembayaran"} />
+                  <SelectValue placeholder={t('selectPaymentMethod')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="M2">Mandiri Virtual Account</SelectItem>
@@ -439,16 +460,16 @@ const HPPSettings = () => {
             <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
                 {isSubscriptionActive ? (
-                  <>💡 {t('extendHPPAccessAfterTrial') || 'Extend HPP access after trial ends to continue using:'}</>
+                  <><span aria-hidden>💡 </span>{t('extendHPPAccessAfterTrial')}</>
                 ) : (
-                  <>💡 {t('afterPaymentHPPActive') || 'After successful payment, HPP feature will be active and you can access:'}</>
+                  <><span aria-hidden>💡 </span>{t('afterPaymentHPPActive')}</>
                 )}
               </p>
               <ul className="text-xs text-yellow-700 dark:text-yellow-300 mt-2 space-y-1">
-                <li>• {t('employeeMenuForSalary') || 'Employee menu for salary management'}</li>
-                <li>• {t('expenseMenuForTracking') || 'Expense menu for cost tracking'}</li>
-                <li>• {t('hppColumnInProducts') || 'HPP column in Products page'}</li>
-                <li>• {t('detailedProfitReports') || 'Detailed profit reports'}</li>
+                <li>• {t('employeeMenuForSalary')}</li>
+                <li>• {t('expenseMenuForTracking')}</li>
+                <li>• {t('hppColumnInProducts')}</li>
+                <li>• {t('detailedProfitReports')}</li>
               </ul>
             </div>
           </div>
@@ -459,7 +480,7 @@ const HPPSettings = () => {
               onClick={() => setIsPaymentDialogOpen(false)}
               disabled={isProcessing}
             >
-              {t('cancel') || 'Cancel'}
+              {t('cancel')}
             </Button>
             <Button
               onClick={handlePayment}
@@ -468,12 +489,12 @@ const HPPSettings = () => {
               {isProcessing ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  {t('processing') || 'Processing...'}
+                  {t('processing')}
                 </>
               ) : (
                 <>
                   <CreditCard className="w-4 h-4 mr-2" />
-                  {t('payNow') || 'Pay Now'}
+                  {t('payNow')}
                 </>
               )}
             </Button>

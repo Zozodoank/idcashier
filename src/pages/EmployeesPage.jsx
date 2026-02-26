@@ -1496,7 +1496,7 @@ const EmployeesPage = ({ user }) => {
           <DialogHeader>
             <DialogTitle>{t('addProfitShareRule') || 'Tambah Aturan Bagi Hasil'}</DialogTitle>
             <DialogDescription>
-              {t('configureProfitShareFor') || 'Konfigurasi bagi hasil untuk'} {selectedEmployee?.name}
+              {t('configureProfitShareFor').replace('{name}', selectedEmployee?.name || '')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

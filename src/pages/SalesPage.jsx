@@ -1247,7 +1247,7 @@ const SalesPage = () => {
       return;
     }
 
-    if (!window.confirm(`${t('confirmDeleteTransactions')} ${selectedTransactions.size} ${t('transactions')}. ${t('thisActionWillRestoreStock')} ${t('cannotBeUndone')}`)) {
+    if (!window.confirm(`${t('confirmDeleteTransactions')} ${selectedTransactions.size} ${t('transactionsCount')}. ${t('thisActionWillRestoreStock')} ${t('cannotBeUndone')}`)) {
       return;
     }
 

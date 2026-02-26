@@ -222,10 +222,10 @@ const ReportsPage = () => {
 
   // Time range presets
   const TIME_PRESETS = {
-    all: { label: t('time_preset_all'), start: '00:00', end: '23:59' },
-    morning: { label: t('time_preset_morning'), start: '06:00', end: '12:00' },
-    afternoon: { label: t('time_preset_afternoon'), start: '12:00', end: '18:00' },
-    night: { label: t('time_preset_night'), start: '18:00', end: '23:59' }
+    all: { label: t('timePresetAll'), start: '00:00', end: '23:59' },
+    morning: { label: t('timePresetMorning'), start: '06:00', end: '12:00' },
+    afternoon: { label: t('timePresetAfternoon'), start: '12:00', end: '18:00' },
+    night: { label: t('timePresetNight'), start: '18:00', end: '23:59' }
   };
 
   // Handle navigation parameters
@@ -270,7 +270,7 @@ const ReportsPage = () => {
 
         headerText: '',
 
-        footerText: t('receipt_footer'),
+        footerText: t('receiptFooter'),
 
         showAddress: true,
 
@@ -408,7 +408,7 @@ const ReportsPage = () => {
 
         headerText: mergedSettings.headerText || '',
 
-        footerText: mergedSettings.footerText || t('receipt_footer'),
+        footerText: mergedSettings.footerText || t('receiptFooter'),
 
         showAddress: mergedSettings.showAddress !== false,
 
@@ -467,7 +467,7 @@ const ReportsPage = () => {
 
         headerText: mergedSettings.headerText || '',
 
-        footerText: mergedSettings.footerText || t('receipt_footer'),
+        footerText: mergedSettings.footerText || t('receiptFooter'),
 
         showAddress: mergedSettings.showAddress !== false,
 
@@ -603,7 +603,7 @@ const ReportsPage = () => {
 
         toast({ 
 
-          title: t('authenticationRequired'), 
+          title: t('loginRequired'), 
 
           description: t('pleaseLoginToViewReports'), 
 
@@ -1096,7 +1096,7 @@ const ReportsPage = () => {
 
           title: t('authenticationError'), 
 
-          description: t('pleaseLoginAgain'), 
+          description: t('loginAgain'), 
 
           variant: 'destructive' 
 
@@ -1152,7 +1152,7 @@ const ReportsPage = () => {
 
           title: t('error'), 
 
-          description: `${t('failedLoadData')} ${retryAttempt} ${t('attempts')}. ${t('pleaseTryAgain')}`, 
+          description: `${t('failedLoadData')} ${retryAttempt} ${t('attempts')}. ${t('tryAgain')}`, 
 
           variant: 'destructive' 
 
@@ -1766,7 +1766,7 @@ const ReportsPage = () => {
 
 
 
-    if (!window.confirm(`${t('confirmDeleteTransactions')} ${selectedTransactions.size} ${t('transactions')}. ${t('thisActionWillRestoreStock')} ${t('cannotBeUndone')}`)) {
+    if (!window.confirm(`${t('confirmDeleteTransactions')} ${selectedTransactions.size} ${t('transactionsCount')}. ${t('thisActionWillRestoreStock')} ${t('cannotBeUndone')}`)) {
 
       return;
 
@@ -2918,7 +2918,7 @@ const ReportsPage = () => {
                 {timeRangePreset === 'custom' && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label className="text-xs">{t('custom_time_start')}</Label>
+                      <Label className="text-xs">{t('startTime')}</Label>
                       <Input
                         type="time"
                         value={customTimeStart}
@@ -2927,7 +2927,7 @@ const ReportsPage = () => {
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">{t('custom_time_end')}</Label>
+                      <Label className="text-xs">{t('endTime')}</Label>
                       <Input
                         type="time"
                         value={customTimeEnd}

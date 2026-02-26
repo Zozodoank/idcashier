@@ -17,7 +17,7 @@ export default function PaymentCallbackPage() {
   const { login, user } = useAuth(); // Removed refreshSession
   const { refreshHPPSetting } = useHPP();
   const [status, setStatus] = useState('processing');
-  const [message, setMessage] = useState(t('processingPayment'));
+  const [message, setMessage] = useState(t('paymentProcessing'));
   const isRegistration = params.get('register') === '1';
   const isRenewal = params.get('renewal') === '1';
   const isHPPActivation = params.get('hpp') === '1';
@@ -405,7 +405,7 @@ export default function PaymentCallbackPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-center">
-            {status === 'processing' && t('processingPayment')}
+            {status === 'processing' && t('paymentProcessing')}
             {status === 'success' && t('paymentSuccessful')}
             {status === 'failed' && t('paymentFailed')}
             {status === 'error' && t('error')}

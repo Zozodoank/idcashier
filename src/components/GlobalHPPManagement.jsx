@@ -10,8 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Plus, Edit, Trash2, Info } from 'lucide-react';
 import { globalHPPAPI } from '@/lib/api';
 
+const LOCALE_BY_LANGUAGE = {
+  id: 'id-ID',
+  en: 'en-US',
+  zh: 'zh-CN'
+};
+
 const GlobalHPPManagement = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
   const { token } = useAuth();
   
@@ -21,6 +27,8 @@ const GlobalHPPManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentHPP, setCurrentHPP] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const locale = LOCALE_BY_LANGUAGE[language] || LOCALE_BY_LANGUAGE.id;
 
   useEffect(() => {
     fetchHPPItems();
@@ -35,7 +43,7 @@ const GlobalHPPManagement = () => {
       console.error('Error fetching global HPP:', error);
       toast({ 
         title: t('error'), 
-        description: error.message || 'Failed to load global HPP', 
+        description: t('failedToLoadGlobalHPP'), 
         variant: 'destructive' 
       });
     } finally {
@@ -58,20 +66,20 @@ const GlobalHPPManagement = () => {
   };
 
   const handleDelete = async (id, label) => {
-    if (!window.confirm(`Hapus HPP global "${label}"?`)) return;
+    if (!window.confirm(t('confirmDeleteGlobalHPP').replace('{label}', label))) return;
     
     try {
       await globalHPPAPI.delete(id, token);
       toast({ 
         title: t('success'), 
-        description: 'HPP global berhasil dihapus.' 
+        description: t('globalHppDeleted') 
       });
       fetchHPPItems();
     } catch (error) {
       console.error('Error deleting global HPP:', error);
       toast({ 
         title: t('error'), 
-        description: error.message || 'Gagal menghapus HPP global.', 
+        description: t('failedToDeleteGlobalHPP'), 
         variant: 'destructive' 
       });
     }
@@ -81,7 +89,7 @@ const GlobalHPPManagement = () => {
     if (!currentHPP.label) {
       toast({ 
         title: t('error'), 
-        description: 'Label harus diisi.', 
+        description: t('labelRequired'), 
         variant: 'destructive' 
       });
       return;
@@ -101,7 +109,7 @@ const GlobalHPPManagement = () => {
       await globalHPPAPI.upsert(hppData, token);
       toast({ 
         title: t('success'), 
-        description: currentHPP.id ? 'HPP global berhasil diperbarui.' : 'HPP global berhasil ditambahkan.'
+        description: currentHPP.id ? t('globalHppUpdated') : t('globalHppAdded')
       });
 
       setIsDialogOpen(false);
@@ -111,7 +119,7 @@ const GlobalHPPManagement = () => {
       console.error('Error saving global HPP:', error);
       toast({ 
         title: t('error'), 
-        description: error.message || 'Gagal menyimpan HPP global.', 
+        description: t('failedToSaveGlobalHPP'), 
         variant: 'destructive' 
       });
     }
@@ -120,10 +128,9 @@ const GlobalHPPManagement = () => {
   const totalMonthly = hppItems.reduce((sum, item) => sum + parseFloat(item.monthly_amount || 0), 0);
   const dailyRate = totalMonthly / 30;
 
-  const months = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-  ];
+  const months = Array.from({ length: 12 }, (_, idx) =>
+    new Date(2000, idx, 1).toLocaleString(locale, { month: 'long' })
+  );
 
   return (
     <>
@@ -131,8 +138,8 @@ const GlobalHPPManagement = () => {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <CardTitle>{t('globalHPP') || 'HPP global'}</CardTitle>
-              <CardDescription>Biaya tetap bulanan</CardDescription>
+              <CardTitle>{t('globalHPP')}</CardTitle>
+              <CardDescription>{t('monthlyFixedCosts')}</CardDescription>
             </div>
             <div className="flex gap-2 items-center">
               <select 
@@ -161,7 +168,7 @@ const GlobalHPPManagement = () => {
             <div className="flex items-start gap-2">
               <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
               <p className="text-sm text-blue-900 dark:text-blue-100">
-                {t('globalHPPInfo') || 'biaya tetap bulanan (listrik, internet, sewa, dll) dibagi 30 hari untuk perhitungan profit harian'}
+                {t('globalHPPInfo')}
               </p>
             </div>
           </div>
@@ -169,15 +176,15 @@ const GlobalHPPManagement = () => {
           <div className="flex justify-between items-center">
             <Button onClick={handleAdd}>
               <Plus className="w-4 h-4 mr-2" />
-              Tambah Biaya
+              {t('addFixedCost')}
             </Button>
           </div>
 
           {loading ? (
-            <p className="text-center py-4 text-muted-foreground">Loading...</p>
+            <p className="text-center py-4 text-muted-foreground">{t('loadingData')}</p>
           ) : hppItems.length === 0 ? (
             <p className="text-center py-4 text-muted-foreground">
-              Belum ada HPP global untuk bulan ini.
+              {t('noGlobalHppThisMonth')}
             </p>
           ) : (
             <>
@@ -185,10 +192,10 @@ const GlobalHPPManagement = () => {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
-                      <th className="p-3 text-left">Label</th>
-                      <th className="p-3 text-left">{t('monthlyAmount') || 'biaya bulanan'}</th>
-                      <th className="p-3 text-left">{t('dailyRate') || 'biaya/hari'}</th>
-                      <th className="p-3 text-left">{t('actions') || 'aksi'}</th>
+                      <th className="p-3 text-left">{t('label')}</th>
+                      <th className="p-3 text-left">{t('monthlyAmount')}</th>
+                      <th className="p-3 text-left">{t('dailyRate')}</th>
+                      <th className="p-3 text-left">{t('actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -221,7 +228,7 @@ const GlobalHPPManagement = () => {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 font-bold bg-muted/30">
-                      <td className="p-3">Total</td>
+                      <td className="p-3">{t('total')}</td>
                       <td className="p-3">Rp {totalMonthly.toLocaleString('id-ID')}</td>
                       <td className="p-3">Rp {dailyRate.toLocaleString('id-ID', { 
                         minimumFractionDigits: 0,
@@ -241,21 +248,21 @@ const GlobalHPPManagement = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {currentHPP?.id ? 'Edit' : 'Tambah'} HPP Global
+              {currentHPP?.id ? t('edit') : t('add')} {t('globalHPP')}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="label">Label *</Label>
+              <Label htmlFor="label">{t('label')} *</Label>
               <Input
                 id="label"
                 value={currentHPP?.label || ''}
                 onChange={(e) => setCurrentHPP({ ...currentHPP, label: e.target.value })}
-                placeholder="contoh: listrik, internet, sewa"
+                placeholder={t('globalHppLabelPlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="amount">{t('monthlyAmount') || 'biaya bulanan'}</Label>
+              <Label htmlFor="amount">{t('monthlyAmount')}</Label>
               <Input
                 id="amount"
                 type="number"
@@ -266,7 +273,7 @@ const GlobalHPPManagement = () => {
               />
               {currentHPP?.monthly_amount > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  biaya per hari: Rp {(parseFloat(currentHPP.monthly_amount) / 30).toLocaleString('id-ID', { 
+                  {t('dailyRate')}: Rp {(parseFloat(currentHPP.monthly_amount) / 30).toLocaleString('id-ID', { 
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 0
                   })}
@@ -274,7 +281,7 @@ const GlobalHPPManagement = () => {
               )}
             </div>
             <div className="space-y-2">
-              <Label>Bulan</Label>
+              <Label>{t('month')}</Label>
               <Input
                 value={`${months[selectedMonth - 1]} ${selectedYear}`}
                 disabled
@@ -284,10 +291,10 @@ const GlobalHPPManagement = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              {t('cancel') || 'batal'}
+              {t('cancel')}
             </Button>
             <Button onClick={handleSubmit}>
-              {t('save') || 'simpan'}
+              {t('save')}
             </Button>
           </DialogFooter>
         </DialogContent>

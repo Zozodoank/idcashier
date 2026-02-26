@@ -105,7 +105,7 @@ const LoginPage = () => {
     if (params.get('verified') === 'true') {
       toast({
         title: t('verificationSuccess'),
-        description: `${t('verificationSuccessDesc')} Silahkan login kembali.`,
+          description: t('verificationSuccessDesc'),
         variant: "default",
         className: "bg-green-600 text-white border-green-600"
       });
@@ -134,8 +134,8 @@ const LoginPage = () => {
       // Payment pending (price-card registration not completed)
       if (!result.success && result.paymentPending) {
         toast({
-          title: 'Akun belum aktif',
-          description: result.error || 'Silakan selesaikan pembayaran untuk mengaktifkan akun.',
+          title: t('accountNotActive'),
+          description: result.error || t('completePaymentToActivateAccount'),
           variant: 'destructive',
         });
 
@@ -151,7 +151,7 @@ const LoginPage = () => {
       if (!result.success && result.subscriptionExpired) {
         toast({
           title: t('subscriptionExpired'),
-          description: result.error || t('subscriptionExpiredDesc'),
+          description: result.error || t('subscriptionInactiveMessage'),
           variant: 'destructive',
         });
 
@@ -540,7 +540,6 @@ const LoginPage = () => {
           </DialogHeader>
           <div className="space-y-2">
             <p>{t('verificationSuccessDesc')}</p>
-            <p className="font-medium">Silahkan login kembali.</p>
           </div>
           <DialogFooter>
             <Button type="button" onClick={() => setShowVerifiedModal(false)}>

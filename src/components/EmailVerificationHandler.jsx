@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CheckCircle, XCircle, Mail, RefreshCw } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -30,7 +29,7 @@ const EmailVerificationHandler = () => {
         
         if (!token || !emailParam) {
           setStatus('error');
-          setMessage('Verification link is invalid or missing parameters.');
+          setMessage(t('verificationLinkInvalidDesc'));
           return;
         }
 
@@ -43,11 +42,11 @@ const EmailVerificationHandler = () => {
         
         if (result.success) {
           setStatus('success');
-          setMessage(result.message || 'Email verified successfully!');
+          setMessage(result.message || t('verificationSuccessDesc'));
           
           toast({
-            title: 'Email Terverifikasi!',
-            description: 'Email Anda telah berhasil diverifikasi. Anda sekarang dapat login.',
+            title: t('verificationSuccess'),
+            description: result.message || t('verificationSuccessDesc'),
             variant: 'default',
             className: 'bg-green-600 text-white border-green-600'
           });
@@ -57,27 +56,27 @@ const EmailVerificationHandler = () => {
             navigate('/login?verified=true');
           }, 3000);
         } else {
-          throw new Error(result.message || 'Verification failed');
+          throw new Error(result.message || t('verificationFailed'));
         }
       } catch (error) {
         console.error('❌ Email verification failed:', error);
         
         let errorStatus = 'error';
-        let errorMessage = error.message;
+        let errorMessage = error.message || t('genericErrorTryAgain');
         
         // Handle specific error types
         if (error.message && error.message.toLowerCase().includes('expired')) {
           errorStatus = 'expired';
-          errorMessage = 'The verification link has expired. Please request a new verification email.';
+          errorMessage = t('verificationLinkExpiredDesc');
         } else if (error.message && error.message.toLowerCase().includes('invalid')) {
-          errorMessage = 'The verification link is invalid. Please check your email for the correct link.';
+          errorMessage = t('verificationLinkInvalidDesc');
         }
         
         setStatus(errorStatus);
         setMessage(errorMessage);
         
         toast({
-          title: 'Verifikasi Gagal',
+          title: t('verificationFailed'),
           description: errorMessage,
           variant: 'destructive'
         });
@@ -85,13 +84,13 @@ const EmailVerificationHandler = () => {
     };
 
     handleVerification();
-  }, [searchParams, verifyEmail, navigate, toast]);
+  }, [searchParams, verifyEmail, navigate, toast, t]);
 
   const handleResendEmail = async () => {
     if (!email) {
       toast({
-        title: 'Gagal',
-        description: 'Alamat email diperlukan untuk mengirim ulang verifikasi.',
+        title: t('emailRequired'),
+        description: t('emailRequiredDesc'),
         variant: 'destructive'
       });
       return;
@@ -102,15 +101,15 @@ const EmailVerificationHandler = () => {
       const result = await resendVerification(email);
       
       toast({
-        title: 'Email Terkirim',
-        description: result.message || 'Email verifikasi berhasil dikirim. Silakan cek email Anda.',
+        title: t('success'),
+        description: result.message || t('verificationEmailResent'),
         variant: 'default'
       });
       
     } catch (error) {
       toast({
-        title: 'Gagal Mengirim Ulang',
-        description: error.message || 'Gagal mengirim ulang email verifikasi. Silakan coba lagi.',
+        title: t('failed'),
+        description: error.message || t('failedToResendVerificationEmail'),
         variant: 'destructive'
       });
     } finally {
@@ -124,8 +123,8 @@ const EmailVerificationHandler = () => {
         return (
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-            <h2 className="text-xl font-semibold mb-2">Verifying Your Email...</h2>
-            <p className="text-gray-600">Please wait while we verify your email address.</p>
+            <h2 className="text-xl font-semibold mb-2">{t('verifyingEmailTitle')}</h2>
+            <p className="text-gray-600">{t('verifyingEmailDesc')}</p>
           </div>
         );
 
@@ -133,9 +132,9 @@ const EmailVerificationHandler = () => {
         return (
           <div className="text-center">
             <CheckCircle className="h-8 w-8 mx-auto mb-4 text-green-600" />
-            <h2 className="text-xl font-semibold mb-2 text-green-600">Email Verified Successfully!</h2>
+            <h2 className="text-xl font-semibold mb-2 text-green-600">{t('verificationSuccess')}</h2>
             <p className="text-gray-600 mb-4">{message}</p>
-            <p className="text-sm text-gray-500">Redirecting to login page...</p>
+            <p className="text-sm text-gray-500">{t('redirectingToLogin')}</p>
           </div>
         );
 
@@ -143,7 +142,7 @@ const EmailVerificationHandler = () => {
         return (
           <div className="text-center">
             <Mail className="h-8 w-8 mx-auto mb-4 text-yellow-600" />
-            <h2 className="text-xl font-semibold mb-2 text-yellow-600">Verification Link Expired</h2>
+            <h2 className="text-xl font-semibold mb-2 text-yellow-600">{t('verificationLinkExpiredTitle')}</h2>
             <p className="text-gray-600 mb-6">{message}</p>
             <Button 
               onClick={handleResendEmail} 
@@ -153,17 +152,17 @@ const EmailVerificationHandler = () => {
               {resendLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Sending...
+                  {t('sending')}
                 </>
               ) : (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Resend Verification Email
+                  {t('resendVerification')}
                 </>
               )}
             </Button>
             <p className="text-sm text-gray-500">
-              Verification email will be sent to: <strong>{email}</strong>
+              {t('verificationEmailWillBeSentTo').replace('{email}', email)}
             </p>
           </div>
         );
@@ -173,7 +172,7 @@ const EmailVerificationHandler = () => {
         return (
           <div className="text-center">
             <XCircle className="h-8 w-8 mx-auto mb-4 text-red-600" />
-            <h2 className="text-xl font-semibold mb-2 text-red-600">Verification Failed</h2>
+            <h2 className="text-xl font-semibold mb-2 text-red-600">{t('verificationFailed')}</h2>
             <p className="text-gray-600 mb-6">{message}</p>
             
             {email && (
@@ -186,12 +185,12 @@ const EmailVerificationHandler = () => {
                 {resendLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Sending...
+                    {t('sending')}
                   </>
                 ) : (
                   <>
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Resend Verification Email
+                    {t('resendVerification')}
                   </>
                 )}
               </Button>
@@ -203,14 +202,14 @@ const EmailVerificationHandler = () => {
                 variant="default"
                 className="w-full"
               >
-                Back to Login
+                {t('backToLogin')}
               </Button>
               <Button 
                 onClick={() => navigate('/register')} 
                 variant="outline"
                 className="w-full"
               >
-                Create New Account
+                {t('createNewAccount')}
               </Button>
             </div>
           </div>
@@ -228,23 +227,14 @@ const EmailVerificationHandler = () => {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
-            Email Verification
+            {t('emailVerificationTitle')}
           </CardTitle>
           <CardDescription>
-            Verify your email address to complete registration
+            {t('emailVerificationSubtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {renderContent()}
-          
-          {status === 'success' && (
-            <Alert className="mt-4">
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>
-                You will be redirected to the login page automatically.
-              </AlertDescription>
-            </Alert>
-          )}
         </CardContent>
       </Card>
     </div>

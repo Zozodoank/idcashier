@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase, ensureSession, clearStaleSession } from '@/lib/supabaseClient';
 import { toast } from 'react-hot-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 /**
  * Custom hook for calling Supabase Edge Functions with proper error handling
@@ -11,6 +12,7 @@ export const useEdgeFunction = (functionName) => {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const { t } = useLanguage();
 
   /**
    * Invoke Edge Function with automatic session handling
@@ -43,7 +45,9 @@ export const useEdgeFunction = (functionName) => {
         // No valid session or token, redirect to login
         clearStaleSession();
         window.location.href = '/login';
-        throw new Error('No valid session. Redirecting to login.');
+        const redirectError = new Error('No valid session. Redirecting to login.');
+        redirectError.__alreadyToasted = true;
+        throw redirectError;
       }
 
       // Use native fetch instead of supabase.functions.invoke to bypass potential client state issues
@@ -81,12 +85,14 @@ export const useEdgeFunction = (functionName) => {
           // Authentication error - token likely expired
           await clearStaleSession();
           window.location.href = '/login';
-          const errorMsg = 'Sesi Anda telah kedaluwarsa. Silakan login kembali.';
+          const errorMsg = t('sessionExpiredPleaseLoginAgain');
           toast.error(errorMsg);
-          throw new Error(errorMsg);
+          const authError = new Error(errorMsg);
+          authError.__alreadyToasted = true;
+          throw authError;
         } else {
           const errorText = await response.text();
-          let errorMessage = 'Terjadi kesalahan. Silakan coba lagi.';
+          let errorMessage = t('genericErrorTryAgain');
           try {
              const errorJson = JSON.parse(errorText);
              errorMessage = errorJson.error || errorJson.message || errorMessage;
@@ -95,7 +101,9 @@ export const useEdgeFunction = (functionName) => {
           }
           
           toast.error(errorMessage);
-          throw new Error(errorMessage);
+          const httpError = new Error(errorMessage);
+          httpError.__alreadyToasted = true;
+          throw httpError;
         }
       }
 
@@ -110,8 +118,8 @@ export const useEdgeFunction = (functionName) => {
       setError(err);
       
       // Show toast for user-facing errors if not already handled (redirects)
-      if (!err.message.includes('Redirecting to login') && !err.message.includes('Sesi Anda telah kedaluwarsa')) {
-        toast.error(err.message || 'Terjadi kesalahan. Silakan coba lagi.');
+      if (!err?.__alreadyToasted) {
+        toast.error(err?.message || t('genericErrorTryAgain'));
       }
       
       // Return error structure similar to supabase-js
@@ -119,7 +127,7 @@ export const useEdgeFunction = (functionName) => {
     } finally {
       setLoading(false);
     }
-  }, [functionName]);
+  }, [functionName, t]);
 
   return {
     data,

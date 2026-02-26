@@ -723,7 +723,7 @@ const ProductsPage = ({ user }) => {
                           onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                           disabled={currentPage === 1}
                         >
-                          {t('prev') || 'Prev'}
+                          {t('previous')}
                         </Button>
                         <Button
                           variant="outline"

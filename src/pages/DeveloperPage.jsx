@@ -22,7 +22,7 @@ const DeveloperPage = () => {
       setLoading(false);
       toast({ 
         title: t('error'), 
-        description: t('developerUsersTimeout') || 'Timeout memuat data users. Silakan refresh halaman.',
+        description: t('developerUsersTimeout'),
         variant: 'destructive' 
       });
     }, 30000);
@@ -136,7 +136,14 @@ const DeveloperPage = () => {
       await fetchUsers();
       toast({ 
         title: t('success'), 
-        description: operation === 'delete' ? t('userRemoved') : `User ${operation === 'unban' ? 'unblock' : operation}ed successfully`
+        description:
+          operation === 'delete'
+            ? t('userRemoved')
+            : operation === 'ban'
+              ? t('userBlocked')
+              : operation === 'unban'
+                ? t('userUnblocked')
+                : t('success')
       });
     } catch (error) {
       console.error(`Error ${operation} user:`, error);

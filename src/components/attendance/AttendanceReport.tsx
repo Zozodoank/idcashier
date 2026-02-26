@@ -9,11 +9,13 @@ import { useToast } from '@/components/ui/use-toast';
 import { EmployeeAttendance } from '@/types/attendance';
 import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const PAGE_SIZE = 20;
 
 export const AttendanceReport: React.FC = () => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [attendance, setAttendance] = useState<EmployeeAttendance[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
@@ -46,8 +48,8 @@ export const AttendanceReport: React.FC = () => {
           // Refresh data
           fetchAttendance();
           toast({
-            title: 'Kehadiran Baru',
-            description: 'Data kehadiran diperbarui dari perangkat.'
+            title: t('newAttendance'),
+            description: t('attendanceUpdatedFromDevice')
           });
         }
       )
@@ -88,7 +90,7 @@ export const AttendanceReport: React.FC = () => {
     } catch (error: any) {
       console.error('Error fetching attendance:', error);
       toast({
-        title: 'Gagal',
+        title: t('failed'),
         description: error.message,
         variant: 'destructive'
       });

@@ -7,9 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/components/ui/use-toast';
 import { Device } from '@/types/attendance';
 import { Loader2, Trash2 } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export const DeviceOnboardingForm: React.FC = () => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -36,7 +38,7 @@ export const DeviceOnboardingForm: React.FC = () => {
     } catch (error: any) {
       console.error('Error fetching devices:', error);
       toast({
-        title: 'Gagal',
+        title: t('failed'),
         description: error.message,
         variant: 'destructive'
       });
@@ -50,8 +52,8 @@ export const DeviceOnboardingForm: React.FC = () => {
 
     if (!deviceSerial.trim()) {
       toast({
-        title: 'Validasi Gagal',
-        description: 'Serial perangkat wajib diisi.',
+        title: t('validationFailed'),
+        description: t('deviceSerialRequired'),
         variant: 'destructive'
       });
       return;
@@ -69,8 +71,8 @@ export const DeviceOnboardingForm: React.FC = () => {
       if (error) throw error;
 
       toast({
-        title: 'Berhasil',
-        description: 'Perangkat berhasil didaftarkan.'
+        title: t('success'),
+        description: t('machineAdded')
       });
 
       // Reset form
@@ -83,7 +85,7 @@ export const DeviceOnboardingForm: React.FC = () => {
     } catch (error: any) {
       console.error('Error registering device:', error);
       toast({
-        title: 'Gagal',
+        title: t('failed'),
         description: error.message,
         variant: 'destructive'
       });
@@ -93,7 +95,7 @@ export const DeviceOnboardingForm: React.FC = () => {
   };
 
   const handleDeleteDevice = async (deviceId: string) => {
-    if (!confirm('Delete this device? This will remove all mappings and logs.')) return;
+    if (!window.confirm(t('confirmDeleteMachine'))) return;
 
     try {
       const { error } = await supabase
@@ -104,15 +106,15 @@ export const DeviceOnboardingForm: React.FC = () => {
       if (error) throw error;
 
       toast({
-        title: 'Berhasil',
-        description: 'Perangkat berhasil dihapus.'
+        title: t('success'),
+        description: t('machineDeleted')
       });
 
       fetchDevices();
     } catch (error: any) {
       console.error('Error deleting device:', error);
       toast({
-        title: 'Gagal',
+        title: t('failed'),
         description: error.message,
         variant: 'destructive'
       });

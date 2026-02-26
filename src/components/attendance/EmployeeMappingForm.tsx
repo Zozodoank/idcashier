@@ -8,9 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/components/ui/use-toast';
 import { Device, Employee, DeviceEmployeeMapping } from '@/types/attendance';
 import { Loader2, Trash2 } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export const EmployeeMappingForm: React.FC = () => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [devices, setDevices] = useState<Device[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [mappings, setMappings] = useState<DeviceEmployeeMapping[]>([]);
@@ -65,7 +67,7 @@ export const EmployeeMappingForm: React.FC = () => {
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast({
-        title: 'Gagal',
+        title: t('failed'),
         description: error.message,
         variant: 'destructive'
       });
@@ -79,8 +81,8 @@ export const EmployeeMappingForm: React.FC = () => {
 
     if (!selectedDeviceId || !deviceEmployeeId.trim() || !selectedEmployeeId) {
       toast({
-        title: 'Validasi Gagal',
-        description: 'Semua kolom wajib diisi.',
+        title: t('validationFailed'),
+        description: t('allFieldsRequired'),
         variant: 'destructive'
       });
       return;
@@ -98,8 +100,8 @@ export const EmployeeMappingForm: React.FC = () => {
       if (error) throw error;
 
       toast({
-        title: 'Berhasil',
-        description: 'Pemetaan karyawan berhasil dibuat.'
+        title: t('success'),
+        description: t('mappingCreated')
       });
 
       // Reset form
@@ -112,7 +114,7 @@ export const EmployeeMappingForm: React.FC = () => {
     } catch (error: any) {
       console.error('Error creating mapping:', error);
       toast({
-        title: 'Gagal',
+        title: t('failed'),
         description: error.message,
         variant: 'destructive'
       });
@@ -122,7 +124,7 @@ export const EmployeeMappingForm: React.FC = () => {
   };
 
   const handleDeleteMapping = async (mappingId: number) => {
-    if (!confirm('Delete this mapping?')) return;
+    if (!window.confirm(t('confirmDeleteMapping'))) return;
 
     try {
       const { error } = await supabase
@@ -133,15 +135,15 @@ export const EmployeeMappingForm: React.FC = () => {
       if (error) throw error;
 
       toast({
-        title: 'Berhasil',
-        description: 'Pemetaan berhasil dihapus.'
+        title: t('success'),
+        description: t('mappingDeleted')
       });
 
       fetchData();
     } catch (error: any) {
       console.error('Error deleting mapping:', error);
       toast({
-        title: 'Gagal',
+        title: t('failed'),
         description: error.message,
         variant: 'destructive'
       });
