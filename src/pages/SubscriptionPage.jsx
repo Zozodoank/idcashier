@@ -6,11 +6,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHPP } from '@/contexts/HPPContext';
 import { subscriptionAPI } from '@/lib/api';
+import { getSubscriptionDaysRemaining, isSubscriptionExpiringSoon } from '@/lib/utils';
 import { Calendar, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { differenceInDays } from 'date-fns';
 
 const SubscriptionPage = () => {
   const navigate = useNavigate();
@@ -47,14 +47,8 @@ const SubscriptionPage = () => {
         setSubscriptionData(subscription);
         
         if (subscription && subscription.has_subscription !== false) {
-          // Normalize dates to start of day (date-only) to avoid timezone boundary issues
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const endDate = new Date(subscription.end_date);
-          endDate.setHours(0, 0, 0, 0);
-          
-          // Check if subscription is active
-          const isActive = endDate >= today;
+          const daysRemaining = getSubscriptionDaysRemaining(subscription.end_date);
+          const isActive = daysRemaining !== null && daysRemaining >= 0;
           
           setIsSubscribed(isActive);
           setSubscriptionEndDate(subscription.end_date);
@@ -90,16 +84,12 @@ const SubscriptionPage = () => {
 
   // Calculate days remaining
   const getDaysRemaining = () => {
-    if (!subscriptionEndDate) return null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const endDate = new Date(subscriptionEndDate);
-    endDate.setHours(0, 0, 0, 0);
-    return differenceInDays(endDate, today);
+    return getSubscriptionDaysRemaining(subscriptionEndDate);
   };
 
   const daysRemaining = getDaysRemaining();
   const isExpired = daysRemaining !== null && daysRemaining < 0;
+  const isExpiringSoon = isSubscribed && isSubscriptionExpiringSoon(subscriptionEndDate);
 
   // Derive simple HPP status text for display
   const getHPPStatusText = () => {
@@ -133,6 +123,17 @@ const SubscriptionPage = () => {
           <h1 className="text-3xl font-bold mb-2">{t('subscription') || 'Langganan'}</h1>
           <p className="text-muted-foreground">{t('subscriptionSubtitle')}</p>
         </div>
+
+        {isExpiringSoon && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+            <p className="font-semibold">
+              {`${t('warning') || 'Peringatan'}: ${t('subscriptionExpiringSoon') || 'Langganan Anda akan berakhir dalam'} ${daysRemaining} ${t('days') || 'hari'}.`}
+            </p>
+            <p className="mt-1 text-sm">
+              {t('renewBeforeExpiry') || 'Segera lakukan perpanjangan agar akses tidak terputus.'}
+            </p>
+          </div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}

@@ -9,6 +9,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHPP } from '@/contexts/HPPContext';
 import { subscriptionAPI } from '@/lib/api';
+import { getSubscriptionDaysRemaining, isSubscriptionExpiringSoon } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import DashboardPage from '@/pages/DashboardPage';
 import SalesPage from '@/pages/SalesPage';
@@ -98,6 +99,11 @@ const DashboardLayout = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   // Email verification is disabled for all users - all users are auto-verified
   const logoUrl = "/logo.png";
+  const whitelistedEmails = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.com,jho.j80@gmail.com')
+    .split(',')
+    .map(e => String(e || '').trim().toLowerCase())
+    .filter(Boolean);
+  const isWhitelisted = whitelistedEmails.includes(String(user?.email || '').toLowerCase());
 
   // Hydrate currentPage from localStorage on mount
   useEffect(() => {
@@ -161,13 +167,6 @@ const DashboardLayout = () => {
 
     const fetchSub = async () => {
       try {
-        // Determine whitelist based on environment variable (demo/dev accounts)
-        const whitelist = (import.meta.env.VITE_APP_DEMO_DEV_WHITELIST || 'demo@idcashier.com,jho.j80@gmail.com')
-          .split(',')
-          .map(e => String(e || '').trim().toLowerCase())
-          .filter(Boolean);
-        const isWhitelisted = whitelist.includes(String(user.email || '').toLowerCase());
-
         if (isWhitelisted) {
           // Demo/dev accounts are always treated as active regardless of subscription rows
           setSubscriptionInactive(false);
@@ -177,22 +176,18 @@ const DashboardLayout = () => {
         let sub = null;
         try {
           if (subscriptionAPI && typeof subscriptionAPI.getCurrentUserSubscription === 'function') {
-            // Add cache-busting parameter if force refresh
-            const cacheBuster = forceRefresh ? `&_t=${Date.now()}` : '';
             sub = await subscriptionAPI.getCurrentUserSubscription(token);
           }
         } catch (_) { }
 
         if (sub && sub.end_date) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const endDate = new Date(sub.end_date);
-          endDate.setHours(0, 0, 0, 0);
-          const isActive = endDate >= today;
+          const daysRemaining = getSubscriptionDaysRemaining(sub.end_date);
+          const isActive = daysRemaining !== null && daysRemaining >= 0;
           setSubscriptionInactive(!isActive);
           setSubscriptionData(sub);
           console.log('📊 Subscription status updated:', {
             endDate: sub.end_date,
+            daysRemaining,
             isActive,
             isInactive: !isActive
           });
@@ -269,6 +264,12 @@ const DashboardLayout = () => {
     const ts = parseInt(renewalPendingTimestamp, 10);
     return !isNaN(ts) && (Date.now() - ts < 300000); // 5 minutes validity
   }, [renewalPendingTimestamp]);
+  const subscriptionDaysRemaining = getSubscriptionDaysRemaining(subscriptionData?.end_date);
+  const showSubscriptionExpiringSoonBanner =
+    !isWhitelisted &&
+    !subscriptionInactive &&
+    !isRenewalPending &&
+    isSubscriptionExpiringSoon(subscriptionData?.end_date);
 
   // Clean up flag if subscription becomes active OR if expired
   useEffect(() => {
@@ -417,6 +418,24 @@ const DashboardLayout = () => {
         // No email verification required for trial or paid users
         return null;
       })()}
+
+      {showSubscriptionExpiringSoonBanner && (
+        <div className="bg-amber-500 text-white px-4 py-3 relative z-40">
+          <div className="flex flex-col items-center justify-center gap-3 text-center sm:flex-row">
+            <span className="font-medium">
+              {`${t('warning') || 'Peringatan'}: ${t('subscriptionExpiringSoon') || 'Langganan Anda akan berakhir dalam'} ${subscriptionDaysRemaining} ${t('days') || 'hari'}. ${t('renewBeforeExpiry') || 'Segera lakukan perpanjangan agar akses tidak terputus.'}`}
+            </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="bg-white text-amber-600 hover:bg-amber-50"
+              onClick={() => handleMenuClick('subscription')}
+            >
+              {t('renewNow') || 'Perpanjang Sekarang'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Subscription Expired Warning Banner */}
       {(() => {

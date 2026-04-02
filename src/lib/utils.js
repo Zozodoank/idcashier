@@ -20,17 +20,51 @@ export function exportToExcel(data, fileName, options = {}) {
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 }
 
+function normalizeDateOnly(value) {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  if (typeof value === 'string') {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      const [, year, month, day] = match;
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+  }
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return null;
+
+  return new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+}
+
+export function getSubscriptionDaysRemaining(endDate) {
+  const normalizedEndDate = normalizeDateOnly(endDate);
+  if (!normalizedEndDate) return null;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffInMs = normalizedEndDate.getTime() - today.getTime();
+
+  return Math.round(diffInMs / (1000 * 60 * 60 * 24));
+}
+
 /**
  * Check if a subscription is still active
  * @param {string} endDate - End date in YYYY-MM-DD format
  * @returns {boolean} - True if subscription is active (endDate >= today)
  */
 export function isSubscriptionActive(endDate) {
-  if (!endDate) return false;
-  const end = new Date(endDate);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return end >= today;
+  const daysRemaining = getSubscriptionDaysRemaining(endDate);
+  return daysRemaining !== null && daysRemaining >= 0;
+}
+
+export function isSubscriptionExpiringSoon(endDate, warningDays = 10) {
+  const daysRemaining = getSubscriptionDaysRemaining(endDate);
+  return daysRemaining !== null && daysRemaining >= 1 && daysRemaining <= warningDays;
 }
 
 /**
