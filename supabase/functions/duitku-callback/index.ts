@@ -4,6 +4,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from '@supabase/supabase-js';
 import { md5 } from '../_shared/md5.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import {
+  calculateExtendedEndDate,
+  getDerivedSubscriptionStatus,
+  getEffectiveSubscription,
+  getRenewalStartDate,
+  toDateOnly,
+} from '../_shared/subscription.ts';
 
 // Duitku callback handler
 // Duitku callback handler
@@ -420,36 +427,30 @@ Deno.serve(async (req: Request) => {
         }
         
         // Find existing subscription or create new one
-        const { data: existingSubscription, error: subError } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', effectiveUserId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const { data: existingSubscription, error: subError } = await getEffectiveSubscription(
+          supabase,
+          effectiveUserId,
+          '*'
+        );
 
-        const newEndDate = new Date();
+        if (subError) {
+          console.error('Error selecting effective subscription:', subError);
+        }
+
+        const startDate = getRenewalStartDate(existingSubscription, new Date());
+        const newEndDate = calculateExtendedEndDate(
+          existingSubscription?.end_date,
+          extensionMonths,
+          new Date()
+        );
+        const subscriptionStatus = getDerivedSubscriptionStatus(toDateOnly(newEndDate), new Date());
         
         if (existingSubscription) {
-          // Extend existing subscription
-          const currentEndDate = new Date(existingSubscription.end_date);
-          // If current end date is in the past, start from today
-          if (currentEndDate < new Date()) {
-            newEndDate.setDate(newEndDate.getDate() + (extensionMonths * 30));
-          } else {
-            // Extend from current end date
-            newEndDate.setTime(currentEndDate.getTime() + (extensionMonths * 30 * 24 * 60 * 60 * 1000));
-          }
-          
-          // Determine status based on end_date
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const subscriptionStatus = newEndDate >= today ? 'active' : 'expired';
-          
           const { error: updateError } = await supabase
             .from('subscriptions')
             .update({
-              end_date: newEndDate.toISOString().split('T')[0],
+              start_date: toDateOnly(startDate),
+              end_date: toDateOnly(newEndDate),
               status: subscriptionStatus,
               updated_at: new Date().toISOString(),
               plan_name: paymentRecord?.product_details || planName,
@@ -464,13 +465,6 @@ Deno.serve(async (req: Request) => {
           }
         } else {
           // Create new subscription
-          newEndDate.setDate(newEndDate.getDate() + (extensionMonths * 30));
-          
-          // Determine status - new subscriptions should be active
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const subscriptionStatus = newEndDate >= today ? 'active' : 'expired';
-          
           const { error: insertError } = await supabase
             .from('subscriptions')
             .insert({
@@ -478,8 +472,8 @@ Deno.serve(async (req: Request) => {
               // Always provide id to avoid silent failures where payment is completed but subscription is missing.
               id: crypto.randomUUID(),
               user_id: effectiveUserId,
-              start_date: new Date().toISOString().split('T')[0],
-              end_date: newEndDate.toISOString().split('T')[0],
+              start_date: toDateOnly(startDate),
+              end_date: toDateOnly(newEndDate),
               status: subscriptionStatus,
               plan_name: paymentRecord?.product_details || planName,
               duration: extensionMonths
@@ -496,11 +490,14 @@ Deno.serve(async (req: Request) => {
           }
         }
         
-        // Auto-confirm user email on successful payment
+        // Auto-confirm user email on successful payment and clear pending-payment metadata
+        const { data: currentAuthUserData } = await supabase.auth.admin.getUserById(userId);
         const { error: confirmError } = await supabase.auth.admin.updateUserById(userId, {
           email_confirm: true,
           user_metadata: {
+            ...(currentAuthUserData?.user?.user_metadata || {}),
             payment_completed: true,
+            payment_pending: false,
             email_verified: true,
             is_trial_user: false
           }

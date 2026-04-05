@@ -1,6 +1,14 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from '@supabase/supabase-js';
+import {
+    calculateExtendedEndDate,
+    getDerivedSubscriptionStatus,
+    getEffectiveSubscription,
+    getPlanNameForDuration,
+    parseStoredDate,
+    toDateOnly,
+} from '../_shared/subscription.ts';
 
 // Supabase subscriptions table uses `id` as NOT NULL without default in this project.
 // Always generate an ID when inserting new subscriptions to avoid silent failures.
@@ -300,20 +308,28 @@ Deno.serve(async (req) => {
 
         // Handle Subscription
         // Check if subscription exists first
-        const { data: existingSub } = await supabase
-            .from('subscriptions')
-            .select('id, end_date, status, plan_name, duration')
-            .eq('user_id', userId)
-            .maybeSingle();
+        const { data: existingSub } = await getEffectiveSubscription(
+            supabase,
+            userId,
+            'id, start_date, end_date, status, plan_name, duration, created_at, updated_at'
+        );
 
         if (paymentCompleted) {
             // PAYMENT COMPLETED: Create or update subscription with selected duration
-            const startDate = new Date();
-            const endDate = new Date();
-
             // Calculate end date based on plan duration (default 1 month = 30 days)
             const durationMonths = planDuration || 1;
-            endDate.setDate(endDate.getDate() + (durationMonths * 30));
+            const requestedStartDate = new Date();
+            const requestedEndDate = calculateExtendedEndDate(null, durationMonths, requestedStartDate);
+            const currentEndDate = parseStoredDate(existingSub?.end_date);
+            const shouldPreserveExistingWindow =
+                !!currentEndDate && currentEndDate > requestedEndDate;
+            const startDate =
+                shouldPreserveExistingWindow && existingSub?.start_date
+                    ? parseStoredDate(existingSub.start_date) || requestedStartDate
+                    : requestedStartDate;
+            const endDate = shouldPreserveExistingWindow ? currentEndDate! : requestedEndDate;
+            const subscriptionStatus = getDerivedSubscriptionStatus(toDateOnly(endDate), new Date());
+            const planName = getPlanNameForDuration(durationMonths);
 
             console.log(`Creating/updating subscription for paid user: ${userId}, duration: ${durationMonths} months`);
 
@@ -322,17 +338,19 @@ Deno.serve(async (req) => {
                 const { error: updateSubError } = await supabase
                     .from('subscriptions')
                     .update({
-                        start_date: startDate.toISOString().split('T')[0],
-                        end_date: endDate.toISOString().split('T')[0],
-                        status: 'active',
-                        updated_at: new Date().toISOString()
+                        start_date: toDateOnly(startDate),
+                        end_date: toDateOnly(endDate),
+                        status: subscriptionStatus,
+                        updated_at: new Date().toISOString(),
+                        plan_name: planName,
+                        duration: durationMonths
                     })
                     .eq('id', existingSub.id);
 
                 if (updateSubError) {
                     console.error('Error updating subscription:', updateSubError);
                 } else {
-                    console.log(`Subscription updated for user ${userId} - active until ${endDate.toISOString().split('T')[0]}`);
+                    console.log(`Subscription updated for user ${userId} - active until ${toDateOnly(endDate)}`);
                 }
             } else {
                 // Create new subscription
@@ -346,35 +364,38 @@ Deno.serve(async (req) => {
                     .insert({
                         id: newId,
                         user_id: userId,
-                        start_date: startDate.toISOString().split('T')[0],
-                        end_date: endDate.toISOString().split('T')[0],
-                        status: 'active'
+                        start_date: toDateOnly(startDate),
+                        end_date: toDateOnly(endDate),
+                        status: subscriptionStatus,
+                        plan_name: planName,
+                        duration: durationMonths
                     });
 
                 if (subError) {
                     console.error('Error creating subscription:', subError);
                 } else {
-                    console.log(`New subscription created for user ${userId} - active until ${endDate.toISOString().split('T')[0]}`);
+                    console.log(`New subscription created for user ${userId} - active until ${toDateOnly(endDate)}`);
                 }
             }
 
-            // Also auto-confirm email for paid users
+            // Also auto-confirm email for paid users and clear pending-payment metadata
+            const { data: currentPaidAuthUser } = await supabase.auth.admin.getUserById(userId);
             await supabase.auth.admin.updateUserById(userId, {
                 email_confirm: true,
                 user_metadata: {
+                    ...(currentPaidAuthUser?.user?.user_metadata || {}),
                     payment_completed: true,
-                    email_verified: true
+                    payment_pending: false,
+                    email_verified: true,
+                    is_trial_user: false,
+                    is_price_card_registration: isPriceCardRegistration
                 }
             });
 
         } else if (!isPriceCardRegistration && !skipTrial) {
-            // TRIAL USER: Always ensure user gets a fresh trial window.
-            // Previously: trial was only created if no subscription existed.
-            // This caused "expired" for users who had an old/expired subscription (e.g. previous failed attempt).
-            // New behavior:
-            // - If no subscription exists: insert trial
-            // - If subscription exists but expired: update to new trial window from today
-            // - If subscription exists and still active (e.g. paid): do not override
+            // TRIAL USER: only create the default trial for a brand-new account.
+            // Existing subscription rows must be preserved so expired accounts do not
+            // become active again simply because this sync endpoint ran.
 
             const requestedTrialDays = typeof body.trialDays === 'number' ? body.trialDays : 7;
             const trialDays = requestedTrialDays > 0 ? requestedTrialDays : 7;
@@ -382,16 +403,6 @@ Deno.serve(async (req) => {
             const startDate = new Date();
             const endDate = new Date();
             endDate.setDate(endDate.getDate() + trialDays);
-
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const existingEnd = existingSub?.end_date ? new Date(existingSub.end_date) : null;
-            if (existingEnd && !isNaN(existingEnd.getTime())) {
-                existingEnd.setHours(0, 0, 0, 0);
-            }
-
-            const isExistingExpired = !existingSub || !existingEnd || existingEnd < today || existingSub.status === 'expired';
 
             if (!existingSub) {
                 const newId = generateUuid();
@@ -405,8 +416,8 @@ Deno.serve(async (req) => {
                     .insert({
                         id: newId,
                         user_id: userId,
-                        start_date: startDate.toISOString().split('T')[0],
-                        end_date: endDate.toISOString().split('T')[0],
+                        start_date: toDateOnly(startDate),
+                        end_date: toDateOnly(endDate),
                         status: 'active',
                         plan_name: 'trial',
                         duration: trialDays
@@ -425,7 +436,9 @@ Deno.serve(async (req) => {
                 } else {
                     console.log(`Trial subscription created for user ${userId} (${trialDays} days)`);
                 }
-            } else if (isExistingExpired) {
+            // Trial refresh is intentionally disabled so expired users do not
+            // become active again when this endpoint runs for sync/recovery.
+            } else if (false) {
                 const { error: updateTrialError } = await supabase
                     .from('subscriptions')
                     .update({

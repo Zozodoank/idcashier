@@ -3,6 +3,11 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from '@supabase/supabase-js'
 import { createResponse, createErrorResponse, handleOptions } from '../_shared/cors.ts'
 import { createSupabaseClient, getUserIdFromToken } from '../_shared/auth.ts'
+import {
+  getDerivedSubscriptionStatus,
+  getEffectiveSubscription,
+  isSubscriptionActive,
+} from '../_shared/subscription.ts'
 
 // @ts-ignore
 Deno.serve(async (req: Request) => {
@@ -94,12 +99,11 @@ Deno.serve(async (req: Request) => {
 
     // Get subscription for the user (or owner if cashier)
     // Use service role to bypass RLS restrictions
-    const { data: subscriptions, error } = await supabase
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', userId)  // Use owner's ID for cashiers
-      .order('created_at', { ascending: false })
-      .limit(1);
+    const { data: subscription, error } = await getEffectiveSubscription(
+      supabase,
+      userId,
+      '*'
+    );
 
     if (error) {
       console.error('Subscription query error:', error);
@@ -107,7 +111,7 @@ Deno.serve(async (req: Request) => {
       return createErrorResponse('Failed to fetch subscription data', 500);
     }
 
-    if (subscriptions.length === 0) {
+    if (!subscription) {
       // If no subscription found, return null to indicate no subscription
       return createResponse({
         user_id: userId,
@@ -116,26 +120,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const subscription = subscriptions[0];
-
-    // IMPORTANT:
-    // end_date in DB is stored as YYYY-MM-DD (date-only).
-    // When parsed as Date, it becomes local time 00:00:00. If we compare it to "now",
-    // the subscription will appear expired for the entire end date after midnight.
-    // Fix: Compare dates at start-of-day and make end_date inclusive by adding 1 day.
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const endDate = new Date(subscription.end_date);
-    if (!isNaN(endDate.getTime())) {
-      endDate.setHours(0, 0, 0, 0);
-      endDate.setDate(endDate.getDate() + 1); // inclusive
-    }
-
-    const isActive = !isNaN(endDate.getTime()) && endDate > today;
+    const isActive = isSubscriptionActive(subscription.end_date, new Date());
+    const normalizedStatus = getDerivedSubscriptionStatus(subscription.end_date, new Date());
 
     return createResponse({
       ...subscription,
+      status: normalizedStatus,
       is_active: isActive,
       has_subscription: true
     });

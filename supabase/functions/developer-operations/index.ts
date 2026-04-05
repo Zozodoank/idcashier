@@ -2,6 +2,108 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient, getUserEmailFromToken } from '../_shared/auth.ts';
+import {
+  deriveSubscriptionWindowFromPayment,
+  getDerivedSubscriptionStatus,
+  getEffectiveSubscription,
+  parseStoredDate,
+  toDateOnly,
+} from '../_shared/subscription.ts';
+
+const buildSubscriptionPayloadFromPayment = (existingSub: any, paymentWindow: NonNullable<ReturnType<typeof deriveSubscriptionWindowFromPayment>>) => {
+  const currentEndDate = parseStoredDate(existingSub?.end_date);
+  const effectiveEndDate =
+    currentEndDate && currentEndDate > paymentWindow.endDate ? currentEndDate : paymentWindow.endDate;
+  const effectiveStartDate =
+    parseStoredDate(existingSub?.start_date) || paymentWindow.startDate;
+
+  return {
+    start_date: toDateOnly(effectiveStartDate),
+    end_date: toDateOnly(effectiveEndDate),
+    status: getDerivedSubscriptionStatus(toDateOnly(effectiveEndDate)),
+    updated_at: new Date().toISOString(),
+    plan_name: paymentWindow.planName || existingSub?.plan_name,
+    duration: paymentWindow.durationMonths
+  };
+};
+
+const repairUserSubscriptionStatus = async (supabase: any, targetUserId: string) => {
+  const { data: payments, error: paymentsError } = await supabase
+    .from('payments')
+    .select('id, user_id, amount, product_details, subscription_start_date, subscription_end_date, created_at, updated_at')
+    .eq('user_id', targetUserId)
+    .eq('status', 'completed')
+    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (paymentsError) {
+    throw new Error(`Failed to fetch completed payments: ${paymentsError.message}`);
+  }
+
+  const latestPayment = (payments || []).find((payment: any) => deriveSubscriptionWindowFromPayment(payment));
+  if (!latestPayment) {
+    return { userId: targetUserId, repaired: false, reason: 'no_completed_subscription_payment' };
+  }
+
+  const paymentWindow = deriveSubscriptionWindowFromPayment(latestPayment);
+  if (!paymentWindow) {
+    return { userId: targetUserId, repaired: false, reason: 'payment_not_eligible' };
+  }
+
+  const { data: existingSub, error: subscriptionError } = await getEffectiveSubscription(
+    supabase,
+    targetUserId,
+    '*'
+  );
+
+  if (subscriptionError) {
+    throw new Error(`Failed to fetch effective subscription: ${subscriptionError.message}`);
+  }
+
+  const payload = buildSubscriptionPayloadFromPayment(existingSub, paymentWindow);
+
+  if (existingSub) {
+    const { error: updateError } = await supabase
+      .from('subscriptions')
+      .update(payload)
+      .eq('id', existingSub.id);
+
+    if (updateError) {
+      throw new Error(`Failed to update subscription: ${updateError.message}`);
+    }
+
+    return {
+      userId: targetUserId,
+      repaired: true,
+      action: 'updated',
+      subscriptionId: existingSub.id,
+      endDate: payload.end_date
+    };
+  }
+
+  const insertPayload = {
+    id: crypto.randomUUID(),
+    user_id: targetUserId,
+    ...payload
+  };
+
+  const { error: insertError } = await supabase
+    .from('subscriptions')
+    .insert(insertPayload);
+
+  if (insertError) {
+    throw new Error(`Failed to create subscription: ${insertError.message}`);
+  }
+
+  return {
+    userId: targetUserId,
+    repaired: true,
+    action: 'inserted',
+    subscriptionId: insertPayload.id,
+    endDate: payload.end_date
+  };
+};
 
 // @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
@@ -110,13 +212,7 @@ Deno.serve(async (req) => {
         }
 
         // Get current subscription or create new one
-        const { data: currentSub } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+        const { data: currentSub } = await getEffectiveSubscription(supabase, userId, '*');
 
         let newEndDate;
         if (currentSub) {
@@ -173,13 +269,7 @@ Deno.serve(async (req) => {
         yesterday.setDate(yesterday.getDate() - 1);
 
         // Get current subscription
-        const { data: banSub } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+        const { data: banSub } = await getEffectiveSubscription(supabase, userId, '*');
 
         if (banSub) {
           // Update existing subscription to expire yesterday
@@ -278,12 +368,85 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case 'repair_subscription_status': {
+        const resolvedUserIds = new Set<string>();
+
+        if (userId) {
+          resolvedUserIds.add(userId);
+        } else if (email) {
+          const { data: targetUser, error: targetUserError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', email)
+            .single();
+
+          if (targetUserError || !targetUser) {
+            return new Response(
+              JSON.stringify({ error: 'User not found for repair operation' }),
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 404
+              }
+            );
+          }
+
+          resolvedUserIds.add(targetUser.id);
+        } else {
+          const pageSize = 500;
+          let from = 0;
+
+          while (true) {
+            const { data: paymentPage, error: paymentPageError } = await supabase
+              .from('payments')
+              .select('user_id, amount, product_details, subscription_start_date, subscription_end_date, created_at, updated_at')
+              .eq('status', 'completed')
+              .order('updated_at', { ascending: false })
+              .order('created_at', { ascending: false })
+              .range(from, from + pageSize - 1);
+
+            if (paymentPageError) {
+              throw new Error(`Failed to scan completed payments: ${paymentPageError.message}`);
+            }
+
+            if (!paymentPage || paymentPage.length === 0) {
+              break;
+            }
+
+            for (const payment of paymentPage) {
+              if (payment.user_id && deriveSubscriptionWindowFromPayment(payment)) {
+                resolvedUserIds.add(payment.user_id);
+              }
+            }
+
+            if (paymentPage.length < pageSize) {
+              break;
+            }
+
+            from += pageSize;
+          }
+        }
+
+        const repairs = [];
+        for (const targetUserId of resolvedUserIds) {
+          repairs.push(await repairUserSubscriptionStatus(supabase, targetUserId));
+        }
+
+        result = {
+          totalUsers: resolvedUserIds.size,
+          repairedUsers: repairs.filter((item: any) => item.repaired).length,
+          skippedUsers: repairs.filter((item: any) => !item.repaired).length,
+          repairs
+        };
+        message = 'Subscription status repair completed';
+        break;
+      }
+
       // Removed 'ensure_testing_user' operation as account creation is now handled by the register page
       // All account creation should be done through the auth-register Edge Function or RegisterPage
 
       default:
         return new Response(
-          JSON.stringify({ error: 'Invalid operation. Supported: delete, extend, ban, reset_password' }),
+          JSON.stringify({ error: 'Invalid operation. Supported: delete, extend, ban, reset_password, repair_subscription_status' }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400

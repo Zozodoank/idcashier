@@ -12,10 +12,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from '@/components/ui/switch';
 import { Plus, Upload, Download, Edit, Trash2, Package } from 'lucide-react';
 import { exportToExcel } from '@/lib/utils';
+import {
+  buildProductExportRows,
+  formatProductImportErrors,
+  normalizeProductLookupName,
+  parseProductImportWorkbook,
+  PRODUCT_EXPORT_COLUMN_WIDTHS,
+} from '@/lib/productImport';
 import { productsAPI, categoriesAPI, suppliersAPI, settingsAPI, productHPPBreakdownAPI, rawMaterialsAPI, productRecipesAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHPP } from '@/contexts/HPPContext'; // Add HPP context
-import * as XLSX from 'xlsx';
 import HPPBreakdownInput from '@/components/HPPBreakdownInput';
 import RawMaterialsManagement from '@/components/RawMaterialsManagement';
 import RecipeInput from '@/components/RecipeInput';
@@ -69,6 +75,8 @@ const ProductsPage = ({ user }) => {
   
   // Loading state for form submission
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const normalizeEntityLookupName = (value) => normalizeProductLookupName(value);
 
   useEffect(() => {
     fetchData();
@@ -346,18 +354,33 @@ const ProductsPage = ({ user }) => {
   };
 
   // Helper function to get or create category
-  const getOrCreateCategory = async (categoryName, token) => {
+  const getOrCreateCategory = async (categoryName, token, categoryCache = null) => {
     try {
+      const normalizedCategoryName = normalizeEntityLookupName(categoryName);
+      if (!normalizedCategoryName) {
+        return null;
+      }
+
+      if (categoryCache?.has(normalizedCategoryName)) {
+        return categoryCache.get(normalizedCategoryName);
+      }
+
       // Check if category already exists in local state
-      const existingCategory = categories.find(cat => cat.name === categoryName);
+      const existingCategory = categories.find(
+        cat => normalizeEntityLookupName(cat.name) === normalizedCategoryName
+      );
       if (existingCategory) {
+        categoryCache?.set(normalizedCategoryName, existingCategory.id);
         return existingCategory.id;
       }
       
       // Create new category if not found
       const newCategory = await categoriesAPI.create({ name: categoryName }, token);
-      // Refresh categories to include the new one
-      await fetchData();
+      categoryCache?.set(normalizedCategoryName, newCategory.id);
+
+      if (!categoryCache) {
+        await fetchData();
+      }
       return newCategory.id;
     } catch (error) {
       console.error('Error creating category:', error);
@@ -366,11 +389,23 @@ const ProductsPage = ({ user }) => {
   };
 
   // Helper function to get or create supplier
-  const getOrCreateSupplier = async (supplierName, token) => {
+  const getOrCreateSupplier = async (supplierName, token, supplierCache = null) => {
     try {
+      const normalizedSupplierName = normalizeEntityLookupName(supplierName);
+      if (!normalizedSupplierName) {
+        return null;
+      }
+
+      if (supplierCache?.has(normalizedSupplierName)) {
+        return supplierCache.get(normalizedSupplierName);
+      }
+
       // Check if supplier already exists in local state
-      const existingSupplier = suppliers.find(sup => sup.name === supplierName);
+      const existingSupplier = suppliers.find(
+        sup => normalizeEntityLookupName(sup.name) === normalizedSupplierName
+      );
       if (existingSupplier) {
+        supplierCache?.set(normalizedSupplierName, existingSupplier.id);
         return existingSupplier.id;
       }
       
@@ -380,8 +415,11 @@ const ProductsPage = ({ user }) => {
         address: '',
         phone: ''
       }, token);
-      // Refresh suppliers to include the new one
-      await fetchData();
+      supplierCache?.set(normalizedSupplierName, newSupplier.id);
+
+      if (!supplierCache) {
+        await fetchData();
+      }
       return newSupplier.id;
     } catch (error) {
       console.error('Error creating supplier:', error);
@@ -394,86 +432,95 @@ const ProductsPage = ({ user }) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    try {
+      const data = await file.arrayBuffer();
+      const { rows, errors: parseErrors, missingHeaders } = parseProductImportWorkbook(data);
 
-        // Process imported data with Promise.all to wait for all operations
-        let successCount = 0;
-        let errorCount = 0;
-        
-        const importPromises = jsonData.map(async (item) => {
-          try {
-            // Enhanced column mapping to support both Indonesian and English column names
-            const name = item.Nama || item.nama || item.name || item.Name || '';
-            const barcode = item.Barcode || item.barcode || '';
-            const categoryName = item.Kategori || item.kategori || item.category || item.Category || '';
-            const supplierName = item.Supplier || item.supplier || '';
-            const price = item['Harga Jual'] || item.price || item.Price || 0;
-            const cost = item['Harga Modal'] || item.cost || item.Cost || 0;
-            const stock = item.Stock || item.stock || 0;
-            
-            // Get or create category
-            let categoryId = null;
-            if (categoryName) {
-              categoryId = await getOrCreateCategory(categoryName, token);
-            }
-            
-            // Get or create supplier
-            let supplierId = null;
-            if (supplierName) {
-              supplierId = await getOrCreateSupplier(supplierName, token);
-            }
-            
-            // Create product
-            await productsAPI.create({
-              name: name,
-              category_id: categoryId,
-              supplier_id: supplierId,
-              price: parseFloat(price),
-              cost: parseFloat(cost),
-              stock: parseInt(stock),
-              barcode: barcode
-            }, token);
-            
-            successCount++;
-            return { success: true };
-          } catch (error) {
-            console.error('Error importing product:', error);
-            errorCount++;
-            return { success: false, error: error.message };
-          }
+      if (missingHeaders.length > 0) {
+        toast({
+          title: t('error'),
+          description: `${t('requiredColumns')}${missingHeaders.join(', ')}`,
+          variant: "destructive",
         });
-        
-        // Wait for all import operations to complete
-        await Promise.all(importPromises);
-      } catch (error) {
-        console.error('Error reading Excel file:', error);
-        toast({ title: t('error'), description: t('failedReadExcel'), variant: "destructive" });
+        return;
       }
-    };
-    reader.readAsArrayBuffer(file);
+
+      let successCount = 0;
+      const importErrors = [...parseErrors];
+      const categoryCache = new Map(
+        categories
+          .filter(category => category?.name && category?.id)
+          .map(category => [normalizeEntityLookupName(category.name), category.id])
+      );
+      const supplierCache = new Map(
+        suppliers
+          .filter(supplier => supplier?.name && supplier?.id)
+          .map(supplier => [normalizeEntityLookupName(supplier.name), supplier.id])
+      );
+
+      for (const row of rows) {
+        try {
+          let categoryId = null;
+          if (row.data.categoryName) {
+            categoryId = await getOrCreateCategory(row.data.categoryName, token, categoryCache);
+          }
+
+          let supplierId = null;
+          if (row.data.supplierName) {
+            supplierId = await getOrCreateSupplier(row.data.supplierName, token, supplierCache);
+          }
+
+          await productsAPI.create({
+            name: row.data.name,
+            category_id: categoryId,
+            supplier_id: supplierId,
+            price: row.data.price,
+            cost: row.data.cost,
+            stock: row.data.stock,
+            barcode: row.data.barcode
+          }, token);
+
+          successCount++;
+        } catch (error) {
+          console.error('Error importing product:', error);
+          importErrors.push({
+            rowNumber: row.rowNumber,
+            reason: error.message || t('failedToImport'),
+          });
+        }
+      }
+
+      if (successCount > 0) {
+        await fetchData();
+      }
+
+      const errorCount = importErrors.length;
+      const summaryMessage = t('importSummary')
+        .replace('{success}', successCount)
+        .replace('{failed}', errorCount);
+      const errorDetails = formatProductImportErrors(importErrors);
+
+      toast({
+        title: successCount > 0 ? t('importSuccess') : t('failedToImport'),
+        description: errorDetails ? `${summaryMessage}. ${errorDetails}` : summaryMessage,
+        variant: successCount > 0 ? undefined : "destructive",
+      });
+    } catch (error) {
+      console.error('Error reading Excel file:', error);
+      toast({ title: t('error'), description: t('failedReadExcel'), variant: "destructive" });
+    } finally {
+      event.target.value = '';
+    }
   };
 
   // Function to export products to Excel
   const handleExport = () => {
-    // Transform products data to include only required columns in the specified order
-    const exportData = products.map(product => ({
-      'Nama': product.name,
-      'Barcode': product.barcode || '',
-      'Kategori': product.category,
-      'Supplier': product.supplier || '',
-      'Harga Jual': product.price,
-      'Harga Modal': product.cost,
-      'Stock': product.stock
-    }));
+    const exportData = buildProductExportRows(products);
     
-    exportToExcel(exportData, 'products');
+    exportToExcel(exportData, 'products', {
+      columnWidths: PRODUCT_EXPORT_COLUMN_WIDTHS,
+      sheetName: 'Products',
+    });
     toast({ title: t('exported'), description: t('exportSuccess') });
   };
 
@@ -609,19 +656,22 @@ const ProductsPage = ({ user }) => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <div className="flex gap-2">
-                  <label htmlFor="import-file">
-                    <Button variant="outline" asChild><span><Download className="w-4 h-4 mr-2" /> {t('import')}</span></Button>
-                    <input 
-                      id="import-file" 
-                      type="file" 
-                      accept=".xlsx,.xls" 
-                      className="hidden" 
-                      onChange={(e) => handleImport(e)} 
-                    />
-                  </label>
-                  <Button variant="outline" onClick={handleExport}><Upload className="w-4 h-4 mr-2" /> {t('export')}</Button>
-                  <Button onClick={handleAddProduct}><Plus className="w-4 h-4 mr-2" /> {t('addProduct')}</Button>
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex gap-2">
+                    <label htmlFor="import-file">
+                      <Button variant="outline" asChild><span><Download className="w-4 h-4 mr-2" /> {t('import')}</span></Button>
+                      <input 
+                        id="import-file" 
+                        type="file" 
+                        accept=".xlsx,.xls" 
+                        className="hidden" 
+                        onChange={(e) => handleImport(e)} 
+                      />
+                    </label>
+                    <Button variant="outline" onClick={handleExport}><Upload className="w-4 h-4 mr-2" /> {t('export')}</Button>
+                    <Button onClick={handleAddProduct}><Plus className="w-4 h-4 mr-2" /> {t('addProduct')}</Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-right">{t('supportedFormats')}</p>
                 </div>
               </CardHeader>
               <CardContent>

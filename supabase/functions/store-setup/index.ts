@@ -1,6 +1,13 @@
 // @ts-ignore: Deno is available in Supabase Edge Functions runtime
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from '@supabase/supabase-js';
+import {
+    deriveSubscriptionWindowFromPayment,
+    getDerivedSubscriptionStatus,
+    getEffectiveSubscription,
+    parseStoredDate,
+    toDateOnly,
+} from '../_shared/subscription.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -91,6 +98,7 @@ Deno.serve(async (req: Request) => {
                     store_name: storeName,
                     store_setup_completed: true,
                     payment_completed: true, // Ensure payment is marked complete here too
+                    payment_pending: false,
                 }
             }
         );
@@ -106,51 +114,47 @@ Deno.serve(async (req: Request) => {
             .select('*')
             .eq('user_id', user.id)
             .eq('status', 'completed')
+            .order('updated_at', { ascending: false })
             .order('created_at', { ascending: false })
-            .limit(1);
+            .limit(10);
 
-        if (!paymentsError && completedPayments && completedPayments.length > 0) {
+        const latestSubscriptionPayment = (completedPayments || []).find(payment =>
+            deriveSubscriptionWindowFromPayment(payment)
+        );
+
+        if (!paymentsError && latestSubscriptionPayment) {
             // User has completed payment, ensure subscription is active
-            const payment = completedPayments[0];
-            
-            // Calculate subscription duration based on payment_amount (more accurate than amount)
-            // payment_amount contains the actual payment amount
-        const paymentAmount = parseFloat(payment.amount) || 0;
-            let durationMonths = 1; // default
-            
-            if (paymentAmount >= 50000 && paymentAmount < 100000) durationMonths = 1;
-            else if (paymentAmount >= 100000 && paymentAmount < 200000) durationMonths = 3;
-            else if (paymentAmount >= 200000 && paymentAmount < 400000) durationMonths = 6;
-            else if (paymentAmount >= 400000) durationMonths = 12;
-            
-            // Use subscription dates from payment if available, otherwise calculate
-            let startDate = payment.subscription_start_date ? new Date(payment.subscription_start_date) : new Date();
-            let endDate = payment.subscription_end_date ? new Date(payment.subscription_end_date) : new Date();
-            
-            // If dates are not set in payment, calculate them
-            if (!payment.subscription_start_date || !payment.subscription_end_date) {
-                endDate.setMonth(startDate.getMonth() + durationMonths);
+            const payment = latestSubscriptionPayment;
+            const derivedWindow = deriveSubscriptionWindowFromPayment(payment);
+            if (!derivedWindow) {
+                throw new Error('Completed subscription payment could not be derived');
             }
+
+            const { startDate, endDate, durationMonths, planName } = derivedWindow;
             
             // Check if user already has a subscription
-            const { data: existingSub, error: existingSubError } = await supabaseAdmin
-                .from('subscriptions')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-            
+            const { data: existingSub, error: existingSubError } = await getEffectiveSubscription(
+                supabaseAdmin,
+                user.id,
+                '*'
+            );
+             
             if (existingSub) {
+                const currentEndDate = parseStoredDate(existingSub.end_date);
+                const effectiveEndDate =
+                    currentEndDate && currentEndDate > endDate ? currentEndDate : endDate;
+                const effectiveStartDate =
+                    parseStoredDate(existingSub.start_date) || startDate;
+
                 // Update existing subscription with payment info
                 const { error: updateSubError } = await supabaseAdmin
                     .from('subscriptions')
                     .update({
-                        start_date: startDate.toISOString().split('T')[0],
-                        end_date: endDate.toISOString().split('T')[0],
-                        status: 'active',
+                        start_date: toDateOnly(effectiveStartDate),
+                        end_date: toDateOnly(effectiveEndDate),
+                        status: getDerivedSubscriptionStatus(toDateOnly(effectiveEndDate)),
                         updated_at: new Date().toISOString(),
-                        plan_name: payment.product_details || existingSub.plan_name,
+                        plan_name: planName || existingSub.plan_name,
                         duration: durationMonths
                     })
                     .eq('id', existingSub.id);
@@ -163,11 +167,12 @@ Deno.serve(async (req: Request) => {
                 const { error: insertSubError } = await supabaseAdmin
                     .from('subscriptions')
                     .insert({
+                        id: crypto.randomUUID(),
                         user_id: user.id,
-                        start_date: startDate.toISOString().split('T')[0],
-                        end_date: endDate.toISOString().split('T')[0],
-                        status: 'active',
-                        plan_name: payment.product_details,
+                        start_date: toDateOnly(startDate),
+                        end_date: toDateOnly(endDate),
+                        status: getDerivedSubscriptionStatus(toDateOnly(endDate)),
+                        plan_name: planName,
                         duration: durationMonths
                     });
                 

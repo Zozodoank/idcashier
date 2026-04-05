@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from '@supabase/supabase-js'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { getEffectiveSubscription, isSubscriptionActive } from '../_shared/subscription.ts'
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin') || '';
@@ -209,13 +210,11 @@ Deno.serve(async (req) => {
         if (!effectiveUserId) {
           console.warn('No effectiveUserId found for subscription check', userData);
         } else {
-          const { data: subscription, error: subscriptionError } = await supabaseAdmin
-            .from('subscriptions')
-            .select('end_date')
-            .eq('user_id', effectiveUserId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          const { data: subscription, error: subscriptionError } = await getEffectiveSubscription(
+            supabaseAdmin,
+            effectiveUserId,
+            'end_date, status, updated_at, created_at'
+          );
 
           // Log subscription check for debugging
           console.log('Subscription check for user:', { effectiveUserId, subscription, subscriptionError });
@@ -229,18 +228,11 @@ Deno.serve(async (req) => {
           // Only check expiration if subscription exists and has end_date
           if (subscription && !subscriptionError && subscription.end_date) {
             try {
-              const today = new Date(); today.setHours(0, 0, 0, 0);
               const endDate = new Date(subscription.end_date);
-
-              // Validate date
               if (isNaN(endDate.getTime())) {
                 console.warn('Invalid subscription end_date:', subscription.end_date);
               } else {
-                endDate.setHours(0, 0, 0, 0);
-                // Add one day to endDate to include the end date as valid
-                endDate.setDate(endDate.getDate() + 1);
-
-                if (today >= endDate) {
+                if (!isSubscriptionActive(subscription.end_date, new Date())) {
                   console.log('User subscription expired but allowing login (warning only)');
                   subscriptionExpired = true;
                   // NON-BLOCKING: logic changed to allow login even if expired
