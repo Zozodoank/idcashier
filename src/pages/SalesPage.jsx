@@ -1532,9 +1532,9 @@ const SalesPage = () => {
             <CardHeader>
               <CardTitle>{t('salesCartTitle')}</CardTitle>
             </CardHeader>
-            <CardContent className="order-2 flex-1 overflow-y-auto border-t pt-4 space-y-3">
+            <CardContent className="space-y-3 overflow-y-auto max-h-[40vh] pb-4">
               {cart.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground">{t('cartEmpty')}</div>
+                <div className="flex items-center justify-center py-6 text-muted-foreground">{t('cartEmpty')}</div>
               ) : (
                 cart.map(item => (
                   <div key={item.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
@@ -1552,7 +1552,7 @@ const SalesPage = () => {
                 ))
               )}
             </CardContent>
-            <CardContent className="order-1 space-y-3 pb-4">
+            <CardContent className="border-t pt-4 space-y-3 pb-4">
               <div className="flex items-center justify-between">
                 <Label htmlFor="customer">{t('customer')}</Label>
                 <div className="flex items-center gap-2">
