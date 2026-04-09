@@ -5,6 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Printer } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Barcode from 'react-barcode';
+import {
+  getDefaultThermalMargin,
+  getThermalReceiptLayout,
+  resolveReceiptMargin,
+} from '@/lib/thermalReceiptLayout';
 
 const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAmount, taxPercent, taxAmount, total, paymentAmount, change, customer, paperSize, settings = {}, useTwoDecimals = true, t, transactionId, cashierName }, ref) => {
   const isA4 = paperSize === 'A4';
@@ -32,7 +37,7 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
     showQuantity: true,
     showPrice: true,
     showSubtotal: true,
-    itemSeparator: 'line',
+    itemSeparator: paperSize === 'A4' ? 'line' : 'none',
     
     // Financial
     showSubtotalLine: true,
@@ -48,7 +53,7 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
     lineSpacing: 'normal',
     boldHeader: true,
     boldTotal: true,
-    margin: 10,
+    margin: paperSize === 'A4' ? 10 : getDefaultThermalMargin(paperSize),
     
     // Additional
     showBarcode: false,
@@ -62,6 +67,9 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
     // Override with provided settings
     ...settings
   };
+
+  const thermalLayout = getThermalReceiptLayout(paperSize, mergedSettings.lineSpacing);
+  const resolvedMargin = resolveReceiptMargin(paperSize, mergedSettings.margin);
   
   // Get font size based on settings
   const getFontSize = () => {
@@ -75,18 +83,69 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
   
   // Get line spacing based on settings
   const getLineHeight = () => {
+    if (thermalLayout) {
+      return thermalLayout.lineHeight;
+    }
+
     switch (mergedSettings.lineSpacing) {
       case 'compact': return '1.2';
       case 'relaxed': return '1.8';
       default: return '1.5';
     }
   };
+
+  const getReceiptPadding = () => {
+    if (thermalLayout) {
+      return `${thermalLayout.verticalPaddingPx}px ${resolvedMargin}px`;
+    }
+
+    return `${resolvedMargin}px`;
+  };
   
   const styles = {
-    '58mm': { width: '58mm', fontSize: `${getFontSize()}px`, padding: `${mergedSettings.margin || 10}px`, lineHeight: getLineHeight() },
-    '80mm': { width: '80mm', fontSize: `${getFontSize()}px`, padding: `${mergedSettings.margin || 10}px`, lineHeight: getLineHeight() },
-    'A4': { width: '210mm', fontSize: '12px', padding: `${mergedSettings.margin || 10}px`, lineHeight: getLineHeight() },
+    '58mm': {
+      width: '58mm',
+      fontSize: `${getFontSize()}px`,
+      padding: getReceiptPadding(),
+      lineHeight: getLineHeight(),
+      boxSizing: 'border-box',
+    },
+    '80mm': {
+      width: '80mm',
+      fontSize: `${getFontSize()}px`,
+      padding: getReceiptPadding(),
+      lineHeight: getLineHeight(),
+      boxSizing: 'border-box',
+    },
+    'A4': {
+      width: '210mm',
+      fontSize: '12px',
+      padding: `${resolvedMargin}px`,
+      lineHeight: getLineHeight(),
+      boxSizing: 'border-box',
+    },
   };
+
+  const compactTextStyle = thermalLayout ? { margin: 0 } : undefined;
+  const compactRuleStyle = thermalLayout ? { margin: `${thermalLayout.hrMarginYpx}px 0` } : undefined;
+  const compactLogoStyle = thermalLayout ? { marginBottom: `${thermalLayout.noteGapPx}px` } : undefined;
+  const compactHeaderStyle = thermalLayout ? { margin: 0, lineHeight: thermalLayout.lineHeight } : undefined;
+  const compactSectionStyle = thermalLayout ? { display: 'flex', flexDirection: 'column', gap: 0 } : undefined;
+  const compactFinancialStyle = thermalLayout
+    ? { display: 'flex', flexDirection: 'column', gap: `${thermalLayout.itemLineGapPx}px` }
+    : undefined;
+  const compactFooterNoteStyle = thermalLayout
+    ? { marginTop: `${thermalLayout.noteGapPx}px` }
+    : undefined;
+  const compactBarcodeWrapperStyle = thermalLayout
+    ? { marginBottom: `${thermalLayout.barcodeMarginBottomPx}px` }
+    : undefined;
+  const compactItemNameStyle = thermalLayout
+    ? { ...compactTextStyle, minWidth: 0, overflowWrap: 'anywhere' }
+    : compactTextStyle;
+  const compactItemMetaStyle = thermalLayout
+    ? { margin: 0, justifySelf: 'end', textAlign: 'right', whiteSpace: 'nowrap' }
+    : undefined;
   
   // Get text alignment based on settings
   const getAlignment = () => {
@@ -106,6 +165,40 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
 
   const safeToLocaleString = (num) => {
     return formatNumber(num);
+  };
+
+  const getThermalItemDetail = (item) => {
+    if (shouldShowQuantity && shouldShowPrice) {
+      return `${item.quantity} x ${safeToLocaleString(item.price)}`;
+    }
+
+    if (shouldShowQuantity) {
+      return String(item.quantity);
+    }
+
+    if (shouldShowPrice) {
+      return safeToLocaleString(item.price);
+    }
+
+    return null;
+  };
+
+  const getThermalItemGridTemplateColumns = (detailLabel, subtotalLabel) => {
+    const columns = [];
+
+    if (shouldShowItemName) {
+      columns.push('minmax(0, 1fr)');
+    }
+
+    if (detailLabel) {
+      columns.push('auto');
+    }
+
+    if (subtotalLabel) {
+      columns.push('auto');
+    }
+
+    return columns.length > 0 ? columns.join(' ') : '1fr';
   };
 
   // Ensure logo is always displayed with a fallback
@@ -141,30 +234,35 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
   const shouldShowSubtotalPerItem = mergedSettings.showSubtotal !== false;
 
   return (
-    <div ref={ref} style={styles[paperSize]} className="receipt-printable bg-white text-black font-mono">
+    <div
+      ref={ref}
+      style={styles[paperSize]}
+      className="receipt-printable bg-white text-black font-mono"
+      data-receipt-paper-size={paperSize}
+    >
       {/* Header Section */}
-      <div className={getAlignment()}>
+      <div className={getAlignment()} style={compactSectionStyle}>
         {shouldShowLogo && (
-          <img src={getLogoSrc()} alt={t('logoAlt')} className="w-16 mx-auto mb-2" onError={(e) => {
+          <img src={getLogoSrc()} alt={t('logoAlt')} className="w-16 mx-auto mb-2" style={compactLogoStyle} data-thermal-logo={thermalLayout ? '' : undefined} onError={(e) => {
             e.target.style.display = 'none';
           }} />
         )}
-        <h2 className={`text-lg ${mergedSettings.boldHeader !== false ? 'font-bold' : ''}`}>{mergedSettings.name || t('defaultStoreName')}</h2>
-        {mergedSettings.showHeader !== false && mergedSettings.headerText && <p>{mergedSettings.headerText}</p>}
-        {shouldShowAddress && <p>{mergedSettings.address}</p>}
-        {shouldShowPhone && <p>{mergedSettings.phone}</p>}
-        {shouldShowEmail && <p>{mergedSettings.email}</p>}
-        <hr className="border-dashed border-black my-2" />
+        <h2 className={`text-lg ${mergedSettings.boldHeader !== false ? 'font-bold' : ''}`} style={compactHeaderStyle}>{mergedSettings.name || t('defaultStoreName')}</h2>
+        {mergedSettings.showHeader !== false && mergedSettings.headerText && <p style={compactTextStyle}>{mergedSettings.headerText}</p>}
+        {shouldShowAddress && <p style={compactTextStyle}>{mergedSettings.address}</p>}
+        {shouldShowPhone && <p style={compactTextStyle}>{mergedSettings.phone}</p>}
+        {shouldShowEmail && <p style={compactTextStyle}>{mergedSettings.email}</p>}
+        <hr className="border-dashed border-black my-2" style={compactRuleStyle} />
       </div>
       
       {/* Transaction Info Section */}
-      <div>
-        {shouldShowTransactionId && <p>{t('invoiceNumber')}: {transactionId || `INV/${new Date().getTime()}`}</p>}
-        {shouldShowCashier && <p>{t('cashierLabel')}: {cashierName || 'Admin'}</p>}
-        <p>{t('customerLabel')}: {customer?.name || t('generalCustomer')}</p>
-        {shouldShowDateTime && <p>{t('dateLabel')}: {new Date().toLocaleString('id-ID')}</p>}
+      <div style={compactSectionStyle}>
+        {shouldShowTransactionId && <p style={compactTextStyle}>{t('invoiceNumber')}: {transactionId || `INV/${new Date().getTime()}`}</p>}
+        {shouldShowCashier && <p style={compactTextStyle}>{t('cashierLabel')}: {cashierName || 'Admin'}</p>}
+        <p style={compactTextStyle}>{t('customerLabel')}: {customer?.name || t('generalCustomer')}</p>
+        {shouldShowDateTime && <p style={compactTextStyle}>{t('dateLabel')}: {new Date().toLocaleString('id-ID')}</p>}
       </div>
-      <hr className="border-dashed border-black my-2" />
+      <hr className="border-dashed border-black my-2" style={compactRuleStyle} />
       
       {/* Items Section */}
       {isA4 ? (
@@ -191,53 +289,74 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
           </tbody>
         </table>
       ) : (
-        cart.map(item => (
-          <div key={item.id} className={mergedSettings.itemSeparator === 'line' ? 'border-b border-dashed border-gray-300 pb-1 mb-1' : mergedSettings.itemSeparator === 'space' ? 'mb-2' : ''}>
-            {shouldShowItemName && <p>{item.name}</p>}
-            {shouldShowItemCode && item.barcode && <p className="text-xs text-gray-600">{item.barcode}</p>}
-            <div className="flex justify-between">
-              {shouldShowQuantity && shouldShowPrice && (
-                <span>{item.quantity} x {safeToLocaleString(item.price)}</span>
-              )}
-              {shouldShowSubtotalPerItem && (
-                <span>{safeToLocaleString(item.price * item.quantity)}</span>
+        cart.map((item, index) => {
+          const detailLabel = getThermalItemDetail(item);
+          const subtotalLabel = shouldShowSubtotalPerItem
+            ? safeToLocaleString(item.price * item.quantity)
+            : null;
+
+          return (
+            <div
+              key={item.id}
+              style={thermalLayout ? {
+                marginBottom: index === cart.length - 1 ? 0 : `${thermalLayout.itemLineGapPx}px`,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: shouldShowItemCode && item.barcode ? `${Math.max(1, thermalLayout.itemLineGapPx - 1)}px` : 0,
+              } : undefined}
+              data-thermal-item-row={thermalLayout ? '' : undefined}
+            >
+              <div
+                style={thermalLayout ? {
+                  display: 'grid',
+                  gridTemplateColumns: getThermalItemGridTemplateColumns(detailLabel, subtotalLabel),
+                  columnGap: `${thermalLayout.itemLineGapPx * 2}px`,
+                  alignItems: 'start',
+                } : undefined}
+              >
+                {shouldShowItemName && <p style={compactItemNameStyle}>{item.name}</p>}
+                {detailLabel && <span style={compactItemMetaStyle}>{detailLabel}</span>}
+                {subtotalLabel && <span style={compactItemMetaStyle}>{subtotalLabel}</span>}
+              </div>
+              {shouldShowItemCode && item.barcode && (
+                <p className="text-xs text-gray-600" style={compactTextStyle}>{item.barcode}</p>
               )}
             </div>
-          </div>
-        ))
+          );
+        })
       )}
-      <hr className="border-dashed border-black my-2" />
+      <hr className="border-dashed border-black my-2" style={compactRuleStyle} />
       
       {/* Financial Summary Section */}
-      <div className="space-y-1">
+      <div className={thermalLayout ? '' : 'space-y-1'} style={compactFinancialStyle}>
         {shouldShowSubtotalLine && (
-          <div className="flex justify-between"><p>{t('subtotalLabel')}:</p><p>{safeToLocaleString(subtotal)}</p></div>
+          <div className="flex justify-between"><p style={compactTextStyle}>{t('subtotalLabel')}:</p><p style={compactTextStyle}>{safeToLocaleString(subtotal)}</p></div>
         )}
         {shouldShowDiscount && discountAmount > 0 && (
-          <div className="flex justify-between"><p>{t('discountLabel')} ({discountPercent}%):</p><p>-{safeToLocaleString(discountAmount)}</p></div>
+          <div className="flex justify-between"><p style={compactTextStyle}>{t('discountLabel')} ({discountPercent}%):</p><p style={compactTextStyle}>-{safeToLocaleString(discountAmount)}</p></div>
         )}
         {shouldShowTax && taxAmount > 0 && (
-          <div className="flex justify-between"><p>{t('taxLabel')} ({taxPercent}%):</p><p>{safeToLocaleString(taxAmount)}</p></div>
+          <div className="flex justify-between"><p style={compactTextStyle}>{t('taxLabel')} ({taxPercent}%):</p><p style={compactTextStyle}>{safeToLocaleString(taxAmount)}</p></div>
         )}
-        <hr className="border-dashed border-black my-1" />
+        <hr className="border-dashed border-black my-1" style={compactRuleStyle} />
         {shouldShowTotal && (
           <div className={`flex justify-between ${mergedSettings.boldTotal !== false ? 'font-bold' : ''}`}>
-            <p>{t('totalLabel')}:</p><p>{safeToLocaleString(total)}</p>
+            <p style={compactTextStyle}>{t('totalLabel')}:</p><p style={compactTextStyle}>{safeToLocaleString(total)}</p>
           </div>
         )}
         {shouldShowPayment && paymentAmount > 0 && (
-          <div className="flex justify-between"><p>{t('payLabel')}:</p><p>{safeToLocaleString(paymentAmount)}</p></div>
+          <div className="flex justify-between"><p style={compactTextStyle}>{t('payLabel')}:</p><p style={compactTextStyle}>{safeToLocaleString(paymentAmount)}</p></div>
         )}
         {shouldShowChange && change > 0 && (
-          <div className="flex justify-between"><p>{t('changeLabel')}:</p><p>{safeToLocaleString(change)}</p></div>
+          <div className="flex justify-between"><p style={compactTextStyle}>{t('changeLabel')}:</p><p style={compactTextStyle}>{safeToLocaleString(change)}</p></div>
         )}
       </div>
-      <hr className="border-dashed border-black my-2" />
+      <hr className="border-dashed border-black my-2" style={compactRuleStyle} />
       
       {/* Footer Section */}
-      <div className={getAlignment()}>
-        {mergedSettings.showFooter !== false && mergedSettings.footerText && <p>{mergedSettings.footerText}</p>}
-        {shouldShowNotes && <p className="mt-2 text-sm">{mergedSettings.customNote}</p>}
+      <div className={getAlignment()} style={compactSectionStyle}>
+        {mergedSettings.showFooter !== false && mergedSettings.footerText && <p style={compactTextStyle}>{mergedSettings.footerText}</p>}
+        {shouldShowNotes && <p className="mt-2 text-sm" style={{ ...compactTextStyle, ...compactFooterNoteStyle }} data-thermal-note={thermalLayout ? '' : undefined}>{mergedSettings.customNote}</p>}
       </div>
       
       {/* Barcode Section - Only for thermal receipts */}
@@ -248,8 +367,8 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
         
         return (
           <>
-            <hr className="border-dashed border-black my-2" />
-            <div className="text-center mb-3">
+            <hr className="border-dashed border-black my-2" style={compactRuleStyle} />
+            <div className="text-center mb-3" style={compactBarcodeWrapperStyle} data-thermal-barcode={thermalLayout ? '' : undefined}>
               <div style={{ display: 'inline-block' }}>
                 <Barcode 
                   value={barcodeValue}
@@ -258,7 +377,7 @@ const ReceiptContent = forwardRef(({ cart, subtotal, discountPercent, discountAm
                   height={paperSize === '58mm' ? 35 : 45}
                   displayValue={true}
                   fontSize={10}
-                  margin={5}
+                  margin={thermalLayout ? thermalLayout.barcodeMarginPx : 5}
                   background="#ffffff"
                 />
               </div>

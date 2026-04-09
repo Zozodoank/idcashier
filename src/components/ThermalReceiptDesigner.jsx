@@ -13,6 +13,64 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Save, X, Settings, Layout, FileText, Table, Palette, MoreHorizontal } from 'lucide-react';
 import { storeSettingsAPI } from '@/lib/api';
 import PrintReceipt from './PrintReceipt';
+import { getDefaultThermalMargin } from '@/lib/thermalReceiptLayout';
+
+const createDefaultDesignSettings = (paperSize) => ({
+  // Header & Footer
+  headerText: '',
+  footerText: 'Terima kasih atas kunjungan Anda',
+  showHeader: true,
+  showFooter: true,
+  showAddress: true,
+  showPhone: true,
+  showEmail: false,
+
+  // Receipt Info
+  showDateTime: true,
+  showCashier: true,
+  showTransactionId: true,
+
+  // Items Table
+  showItemCode: false,
+  showItemName: true,
+  showQuantity: true,
+  showPrice: true,
+  showSubtotal: true,
+  itemSeparator: 'none',
+
+  // Financial
+  showSubtotalLine: true,
+  showDiscount: true,
+  showTax: true,
+  showTotal: true,
+  showPayment: true,
+  showChange: true,
+
+  // Layout & Styling
+  alignment: 'center',
+  fontSize: 'normal',
+  lineSpacing: 'normal',
+  boldHeader: true,
+  boldTotal: true,
+
+  // Margin & Spacing
+  margin: getDefaultThermalMargin(paperSize),
+  topMargin: 0,
+  bottomMargin: 0,
+
+  // Additional
+  showLogo: false,
+  showBarcode: false,
+  showQRCode: false,
+  showNotes: true,
+  customNote: '',
+
+  // Language & Format
+  language: 'id',
+  dateFormat: 'DD/MM/YYYY HH:mm',
+  currency: 'IDR',
+  decimalPlaces: 0,
+});
 
 const ThermalReceiptDesigner = ({ paperSize, storeSettings, initialSettings, onSave }) => {
   const { t } = useLanguage();
@@ -24,70 +82,15 @@ const ThermalReceiptDesigner = ({ paperSize, storeSettings, initialSettings, onS
   const [activeTab, setActiveTab] = useState('header');
   
   // Design settings state
-  const [designSettings, setDesignSettings] = useState({
-    // Header & Footer
-    headerText: '',
-    footerText: 'Terima kasih atas kunjungan Anda',
-    showHeader: true,
-    showFooter: true,
-    showAddress: true,
-    showPhone: true,
-    showEmail: false,
-    
-    // Receipt Info
-    showDateTime: true,
-    showCashier: true,
-    showTransactionId: true,
-    
-    // Items Table
-    showItemCode: false,
-    showItemName: true,
-    showQuantity: true,
-    showPrice: true,
-    showSubtotal: true,
-    itemSeparator: 'line', // 'line', 'space', 'none'
-    
-    // Financial
-    showSubtotalLine: true,
-    showDiscount: true,
-    showTax: true,
-    showTotal: true,
-    showPayment: true,
-    showChange: true,
-    
-    // Layout & Styling
-    alignment: 'center', // 'left', 'center', 'right'
-    fontSize: 'normal', // 'small', 'normal', 'large'
-    lineSpacing: 'normal', // 'compact', 'normal', 'relaxed'
-    boldHeader: true,
-    boldTotal: true,
-    
-    // Margin & Spacing
-    margin: 10,
-    topMargin: 0,
-    bottomMargin: 0,
-    
-    // Additional
-    showLogo: false,
-    showBarcode: false,
-    showQRCode: false,
-    showNotes: true,
-    customNote: '',
-    
-    // Language & Format
-    language: 'id',
-    dateFormat: 'DD/MM/YYYY HH:mm',
-    currency: 'IDR',
-    decimalPlaces: 0
-  });
+  const [designSettings, setDesignSettings] = useState(() => createDefaultDesignSettings(paperSize));
 
   // Settings are now passed via props, so internal loading is removed.
   useEffect(() => {
     // When initialSettings prop changes, update the internal state
     if (initialSettings) {
-      setDesignSettings(prev => ({ ...prev, ...initialSettings }));
+      setDesignSettings(prev => ({ ...prev, ...createDefaultDesignSettings(paperSize), ...initialSettings }));
     }
-  }, [initialSettings]);
+  }, [initialSettings, paperSize]);
 
   const handleSaveDesign = async () => {
     setIsSaving(true);
@@ -428,19 +431,6 @@ const ThermalReceiptDesigner = ({ paperSize, storeSettings, initialSettings, onS
                             checked={designSettings.showSubtotal} 
                             onCheckedChange={(checked) => handleContentChange('showSubtotal', checked)}
                           />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{t('itemSeparator') || 'Pemisah Item'}</Label>
-                          <Select value={designSettings.itemSeparator} onValueChange={(value) => handleContentChange('itemSeparator', value)}>
-                            <SelectTrigger className={`w-full ${theme === 'dark' ? 'bg-gray-700 border-gray-600' : ''}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="line">{t('line') || 'Garis'}</SelectItem>
-                              <SelectItem value="space">{t('space') || 'Spasi'}</SelectItem>
-                              <SelectItem value="none">{t('none') || 'Tidak Ada'}</SelectItem>
-                            </SelectContent>
-                          </Select>
                         </div>
                       </div>
                     </div>

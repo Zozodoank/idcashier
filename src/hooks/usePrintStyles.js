@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { getThermalReceiptLayout } from '@/lib/thermalReceiptLayout';
 
 /**
  * Custom hook untuk inject CSS print secara dinamis
@@ -8,6 +9,9 @@ import { useEffect } from 'react';
 export const usePrintStyles = (printType) => {
   useEffect(() => {
     if (!printType) return;
+
+    const thermal58 = getThermalReceiptLayout('58mm');
+    const thermal80 = getThermalReceiptLayout('80mm');
 
     const styles = {
       'invoice-a4': `
@@ -78,27 +82,58 @@ export const usePrintStyles = (printType) => {
           .receipt-printable {
             width: 58mm !important;
             margin: 0 !important;
-            padding: 5px !important;
+            padding: ${thermal58.verticalPaddingPx}px ${thermal58.defaultHorizontalPaddingPx}px !important;
             font-size: 10px !important;
+            line-height: ${thermal58.lineHeight} !important;
             font-family: 'Courier New', Courier, monospace !important;
             color: #000 !important;
             background: #fff !important;
+            box-sizing: border-box !important;
           }
 
           .receipt-printable img {
-            max-width: 48px !important;
+            max-width: ${thermal58.imageMaxWidthPx}px !important;
             margin: 0 auto !important;
+          }
+
+          .receipt-printable p,
+          .receipt-printable h1,
+          .receipt-printable h2,
+          .receipt-printable h3,
+          .receipt-printable table {
+            margin: 0 !important;
           }
 
           .receipt-printable table th,
           .receipt-printable table td {
-            padding: 2px 4px !important;
+            padding: ${thermal58.printTableCellPadding} !important;
             font-size: 9px !important;
             border: none !important;
           }
 
           .receipt-printable hr {
-            margin: 5px 0 !important;
+            margin: ${thermal58.hrMarginYpx}px 0 !important;
+          }
+
+          .receipt-printable [data-thermal-logo] {
+            margin-bottom: ${thermal58.noteGapPx}px !important;
+          }
+
+          .receipt-printable [data-thermal-item-separator="line"] {
+            padding-bottom: ${thermal58.itemLineGapPx}px !important;
+            margin-bottom: ${thermal58.itemLineGapPx}px !important;
+          }
+
+          .receipt-printable [data-thermal-item-separator="space"] {
+            margin-bottom: ${thermal58.itemSpaceGapPx}px !important;
+          }
+
+          .receipt-printable [data-thermal-note] {
+            margin-top: ${thermal58.noteGapPx}px !important;
+          }
+
+          .receipt-printable [data-thermal-barcode] {
+            margin-bottom: ${thermal58.barcodeMarginBottomPx}px !important;
           }
         }
       `,
@@ -113,27 +148,58 @@ export const usePrintStyles = (printType) => {
           .receipt-printable {
             width: 80mm !important;
             margin: 0 !important;
-            padding: 10px !important;
+            padding: ${thermal80.verticalPaddingPx}px ${thermal80.defaultHorizontalPaddingPx}px !important;
             font-size: 12px !important;
+            line-height: ${thermal80.lineHeight} !important;
             font-family: 'Courier New', Courier, monospace !important;
             color: #000 !important;
             background: #fff !important;
+            box-sizing: border-box !important;
           }
 
           .receipt-printable img {
-            max-width: 64px !important;
+            max-width: ${thermal80.imageMaxWidthPx}px !important;
             margin: 0 auto !important;
+          }
+
+          .receipt-printable p,
+          .receipt-printable h1,
+          .receipt-printable h2,
+          .receipt-printable h3,
+          .receipt-printable table {
+            margin: 0 !important;
           }
 
           .receipt-printable table th,
           .receipt-printable table td {
-            padding: 3px 5px !important;
+            padding: ${thermal80.printTableCellPadding} !important;
             font-size: 11px !important;
             border: none !important;
           }
 
           .receipt-printable hr {
-            margin: 8px 0 !important;
+            margin: ${thermal80.hrMarginYpx}px 0 !important;
+          }
+
+          .receipt-printable [data-thermal-logo] {
+            margin-bottom: ${thermal80.noteGapPx}px !important;
+          }
+
+          .receipt-printable [data-thermal-item-separator="line"] {
+            padding-bottom: ${thermal80.itemLineGapPx}px !important;
+            margin-bottom: ${thermal80.itemLineGapPx}px !important;
+          }
+
+          .receipt-printable [data-thermal-item-separator="space"] {
+            margin-bottom: ${thermal80.itemSpaceGapPx}px !important;
+          }
+
+          .receipt-printable [data-thermal-note] {
+            margin-top: ${thermal80.noteGapPx}px !important;
+          }
+
+          .receipt-printable [data-thermal-barcode] {
+            margin-bottom: ${thermal80.barcodeMarginBottomPx}px !important;
           }
         }
       `

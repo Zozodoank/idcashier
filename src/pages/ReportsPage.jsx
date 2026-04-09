@@ -184,6 +184,8 @@ const ReportsPage = () => {
   // Specific receipt settings for A4 and delivery note (includes invoicePrefix)
   const [receiptSettingsA4, setReceiptSettingsA4] = useState({});
   const [receiptSettingsDeliveryNote, setReceiptSettingsDeliveryNote] = useState({});
+  const [receiptSettings58mm, setReceiptSettings58mm] = useState({});
+  const [receiptSettings80mm, setReceiptSettings80mm] = useState({});
   
   // Delivery Note Design Settings
   const [deliveryNoteDesignSettings, setDeliveryNoteDesignSettings] = useState({});
@@ -432,6 +434,11 @@ const ReportsPage = () => {
       if (savedDeliveryNoteSettings) {
         setReceiptSettingsDeliveryNote(JSON.parse(savedDeliveryNoteSettings));
       }
+
+      const saved58mmDesign = JSON.parse(localStorage.getItem(`idcashier_receipt_58mm_design_${ownerId}`)) || {};
+      const saved80mmDesign = JSON.parse(localStorage.getItem(`idcashier_receipt_80mm_design_${ownerId}`)) || {};
+      setReceiptSettings58mm(saved58mmDesign);
+      setReceiptSettings80mm(saved80mmDesign);
       
       // Load enabled receipt types
       const savedEnabledTypes = localStorage.getItem(`idcashier_enabled_receipt_types_${ownerId}`);
@@ -4394,7 +4401,11 @@ const ReportsPage = () => {
                         <div className="receipt-printable">
                           <ReceiptContent 
                             {...transformSaleForThermal(selectedSaleForPrint)}
-                            settings={companyInfo}
+                            settings={
+                              receiptType === 'thermal-58mm'
+                                ? { ...companyInfo, ...receiptSettings58mm }
+                                : { ...companyInfo, ...receiptSettings80mm }
+                            }
                             paperSize={receiptType.replace('thermal-', '')}
                             useTwoDecimals={useTwoDecimals}
                             showBarcode={showBarcode}
