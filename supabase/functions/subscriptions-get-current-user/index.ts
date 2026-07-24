@@ -4,10 +4,67 @@ import { createClient } from '@supabase/supabase-js'
 import { createResponse, createErrorResponse, handleOptions } from '../_shared/cors.ts'
 import { createSupabaseClient, getUserIdFromToken } from '../_shared/auth.ts'
 import {
+  deriveSubscriptionWindowFromPayment,
   getDerivedSubscriptionStatus,
   getEffectiveSubscription,
   isSubscriptionActive,
+  parseStoredDate,
+  pickEffectiveSubscription,
+  toDateOnly,
 } from '../_shared/subscription.ts'
+
+const getPaymentBackedSubscription = async (supabase: any, userId: string, existingSubscription: any = null) => {
+  const { data: payments, error } = await supabase
+    .from('payments')
+    .select('id, user_id, amount, product_details, subscription_start_date, subscription_end_date, created_at, updated_at')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    throw new Error(`Failed to fetch completed payments: ${error.message}`);
+  }
+
+  const eligiblePayments = (payments || [])
+    .map((payment: any) => {
+      const window = deriveSubscriptionWindowFromPayment(payment);
+      return window ? { payment, window } : null;
+    })
+    .filter(Boolean);
+
+  if (eligiblePayments.length === 0) {
+    return null;
+  }
+
+  const candidates = eligiblePayments.map((item: any) => {
+    const currentEndDate = parseStoredDate(existingSubscription?.end_date);
+    const effectiveEndDate =
+      currentEndDate && currentEndDate > item.window.endDate ? currentEndDate : item.window.endDate;
+    const effectiveStartDate =
+      parseStoredDate(existingSubscription?.start_date) || item.window.startDate;
+    const endDate = toDateOnly(effectiveEndDate);
+
+    return {
+      ...(existingSubscription || {}),
+      id: existingSubscription?.id || item.payment.id,
+      user_id: userId,
+      payment_id: existingSubscription?.payment_id || item.payment.id,
+      amount: item.payment.amount,
+      plan_name: item.window.planName || existingSubscription?.plan_name,
+      duration: item.window.durationMonths,
+      start_date: toDateOnly(effectiveStartDate),
+      end_date: endDate,
+      status: getDerivedSubscriptionStatus(endDate),
+      created_at: existingSubscription?.created_at || item.payment.created_at,
+      updated_at: existingSubscription?.updated_at || item.payment.updated_at,
+      source: existingSubscription ? 'subscription_with_payment_fallback' : 'payment_fallback',
+    };
+  });
+
+  return pickEffectiveSubscription(candidates);
+};
 
 // @ts-ignore
 Deno.serve(async (req: Request) => {
@@ -30,7 +87,8 @@ Deno.serve(async (req: Request) => {
     const supabase = createSupabaseClient();
 
     // Get user ID from token (now properly awaited)
-    let userId = await getUserIdFromToken(token);
+    const originalUserId = await getUserIdFromToken(token);
+    let userId = originalUserId;
 
     // Get user email to check for test account
     const { data: userWithEmail, error: emailError } = await supabase
@@ -93,7 +151,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // If user is a cashier, use the owner's ID for subscription
-    if (userData.role === 'cashier') {
+    if (userData.role === 'cashier' && userData.tenant_id) {
       userId = userData.tenant_id;
     }
 
@@ -111,7 +169,31 @@ Deno.serve(async (req: Request) => {
       return createErrorResponse('Failed to fetch subscription data', 500);
     }
 
-    if (!subscription) {
+    let effectiveSubscription = subscription;
+    const subscriptionIsActive = isSubscriptionActive(subscription?.end_date, new Date());
+
+    if (!subscriptionIsActive) {
+      const paymentCandidateIds = [...new Set([userId, originalUserId].filter(Boolean))];
+      const paymentBackedSubscriptions = [];
+
+      for (const candidateUserId of paymentCandidateIds) {
+        const candidate = await getPaymentBackedSubscription(
+          supabase,
+          candidateUserId,
+          candidateUserId === userId ? subscription : null
+        );
+        if (candidate) {
+          paymentBackedSubscriptions.push(candidate);
+        }
+      }
+
+      const paymentBackedSubscription = pickEffectiveSubscription(paymentBackedSubscriptions);
+      if (paymentBackedSubscription && isSubscriptionActive(paymentBackedSubscription.end_date, new Date())) {
+        effectiveSubscription = paymentBackedSubscription;
+      }
+    }
+
+    if (!effectiveSubscription) {
       // If no subscription found, return null to indicate no subscription
       return createResponse({
         user_id: userId,
@@ -120,11 +202,11 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const isActive = isSubscriptionActive(subscription.end_date, new Date());
-    const normalizedStatus = getDerivedSubscriptionStatus(subscription.end_date, new Date());
+    const isActive = isSubscriptionActive(effectiveSubscription.end_date, new Date());
+    const normalizedStatus = getDerivedSubscriptionStatus(effectiveSubscription.end_date, new Date());
 
     return createResponse({
-      ...subscription,
+      ...effectiveSubscription,
       status: normalizedStatus,
       is_active: isActive,
       has_subscription: true
