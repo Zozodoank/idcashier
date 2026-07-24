@@ -7,6 +7,7 @@ import {
   getDerivedSubscriptionStatus,
   getEffectiveSubscription,
   parseStoredDate,
+  SUBSCRIPTION_PAYMENT_SELECT,
   toDateOnly,
 } from '../_shared/subscription.ts';
 
@@ -30,7 +31,7 @@ const buildSubscriptionPayloadFromPayment = (existingSub: any, paymentWindow: No
 const repairUserSubscriptionStatus = async (supabase: any, targetUserId: string) => {
   const { data: payments, error: paymentsError } = await supabase
     .from('payments')
-    .select('id, user_id, amount, product_details, subscription_start_date, subscription_end_date, created_at, updated_at')
+    .select(SUBSCRIPTION_PAYMENT_SELECT)
     .eq('user_id', targetUserId)
     .eq('status', 'completed')
     .order('updated_at', { ascending: false })
@@ -398,7 +399,7 @@ Deno.serve(async (req) => {
           while (true) {
             const { data: paymentPage, error: paymentPageError } = await supabase
               .from('payments')
-              .select('user_id, amount, product_details, subscription_start_date, subscription_end_date, created_at, updated_at')
+              .select(SUBSCRIPTION_PAYMENT_SELECT)
               .eq('status', 'completed')
               .order('updated_at', { ascending: false })
               .order('created_at', { ascending: false })

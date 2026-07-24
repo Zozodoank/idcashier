@@ -10,13 +10,14 @@ import {
   isSubscriptionActive,
   parseStoredDate,
   pickEffectiveSubscription,
+  SUBSCRIPTION_PAYMENT_SELECT,
   toDateOnly,
 } from '../_shared/subscription.ts'
 
 const getPaymentBackedSubscription = async (supabase: any, userId: string, existingSubscription: any = null) => {
   const { data: payments, error } = await supabase
     .from('payments')
-    .select('id, user_id, amount, product_details, subscription_start_date, subscription_end_date, created_at, updated_at')
+    .select(SUBSCRIPTION_PAYMENT_SELECT)
     .eq('user_id', userId)
     .eq('status', 'completed')
     .order('updated_at', { ascending: false })

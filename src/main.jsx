@@ -12,6 +12,8 @@ import '@/lib/api-monitor.js';
 // Validate environment variables
 validateEnv();
 
+console.info('idCashier build: subscription-fallback-20260724');
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <HelmetProvider>

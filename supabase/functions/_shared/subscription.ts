@@ -14,11 +14,13 @@ export interface SubscriptionRow {
 export interface PaymentLike {
   amount?: string | number | null;
   product_details?: string | null;
-  subscription_start_date?: string | null;
-  subscription_end_date?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
+
+// Keep subscription fallbacks aligned with the columns that exist in payments.
+export const SUBSCRIPTION_PAYMENT_SELECT =
+  'id, user_id, amount, product_details, created_at, updated_at';
 
 export function startOfDay(date: Date): Date {
   const next = new Date(date);
@@ -186,13 +188,10 @@ export function deriveSubscriptionWindowFromPayment(
 
   const durationMonths = getDurationMonthsFromPayment(payment) || 1;
   const startDate =
-    parseStoredDate(payment.subscription_start_date) ||
     parseStoredDate(payment.updated_at) ||
     parseStoredDate(payment.created_at) ||
     startOfDay(now);
-  const endDate =
-    parseStoredDate(payment.subscription_end_date) ||
-    calculateExtendedEndDate(toDateOnly(startDate), durationMonths, startDate);
+  const endDate = calculateExtendedEndDate(toDateOnly(startDate), durationMonths, startDate);
 
   return {
     startDate,

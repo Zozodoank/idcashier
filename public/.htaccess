@@ -16,4 +16,9 @@
   <If "%{REQUEST_URI} =~ m#^/assets/.*$#">
     Header set Cache-Control "public, max-age=604800"
   </If>
+
+  # The HTML entry point must always reference the newest hashed asset bundle.
+  <Files "index.html">
+    Header set Cache-Control "no-store, max-age=0"
+  </Files>
 </IfModule>

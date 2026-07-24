@@ -3,6 +3,7 @@ import {
   deriveSubscriptionWindowFromPayment,
   isSubscriptionActive,
   pickEffectiveSubscription,
+  SUBSCRIPTION_PAYMENT_SELECT,
   toDateOnly,
 } from './subscription';
 
@@ -54,6 +55,14 @@ describe('isSubscriptionActive', () => {
 });
 
 describe('deriveSubscriptionWindowFromPayment', () => {
+  it('uses only payment columns that exist in production', () => {
+    expect(SUBSCRIPTION_PAYMENT_SELECT).toBe(
+      'id, user_id, amount, product_details, created_at, updated_at'
+    );
+    expect(SUBSCRIPTION_PAYMENT_SELECT).not.toContain('subscription_start_date');
+    expect(SUBSCRIPTION_PAYMENT_SELECT).not.toContain('subscription_end_date');
+  });
+
   it('ignores HPP activation payments', () => {
     const window = deriveSubscriptionWindowFromPayment({
       amount: 50000,
@@ -74,5 +83,21 @@ describe('deriveSubscriptionWindowFromPayment', () => {
     expect(window?.durationMonths).toBe(12);
     expect(window ? toDateOnly(window.startDate) : null).toBe('2026-04-05');
     expect(window ? toDateOnly(window.endDate) : null).toBe('2027-03-31');
+  });
+
+  it('keeps an active payment fallback when the stored subscription is expired', () => {
+    const paymentWindow = deriveSubscriptionWindowFromPayment({
+      amount: 50000,
+      product_details: 'Perpanjangan Langganan 1 Bulan',
+      updated_at: '2026-07-20T10:00:00.000Z',
+    });
+
+    const effective = pickEffectiveSubscription([
+      { id: 'expired-subscription', end_date: '2026-06-30' },
+      { id: 'payment-fallback', end_date: toDateOnly(paymentWindow!.endDate) },
+    ]);
+
+    expect(effective?.id).toBe('payment-fallback');
+    expect(isSubscriptionActive(effective?.end_date, new Date('2026-07-24T12:00:00+07:00'))).toBe(true);
   });
 });
