@@ -96,15 +96,30 @@ export const AuthProvider = ({ children }) => {
 
         if (sessionResult.error) {
           console.error('Session error:', sessionResult.error.message);
-          if (mounted) {
-            setToken(null);
-            setUser(null);
-            localStorage.removeItem('idcashier_token');
-            localStorage.removeItem('idcashier_refresh_token');
-            // Security: Use dynamic project ref from environment instead of hardcoded
-            const projectRef = import.meta.env.VITE_SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
-            if (projectRef) {
-              localStorage.removeItem(`sb-${projectRef}-auth-token`);
+          const parsedStoredToken = parseTokenWithTimezone(storedToken);
+
+          if (storedToken && parsedStoredToken && !parsedStoredToken.isExpired) {
+            console.warn('Keeping valid app token after Supabase session check failed');
+            if (mounted) {
+              setToken(storedToken);
+              const fallbackUser = buildSessionFallbackUser(storedToken);
+              if (fallbackUser) {
+                setUser(fallbackUser);
+              }
+            }
+
+            await fetchUserProfileFast(storedToken, mounted, setUser);
+          } else {
+            if (mounted) {
+              setToken(null);
+              setUser(null);
+              localStorage.removeItem('idcashier_token');
+              localStorage.removeItem('idcashier_refresh_token');
+              // Security: Use dynamic project ref from environment instead of hardcoded
+              const projectRef = import.meta.env.VITE_SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+              if (projectRef) {
+                localStorage.removeItem(`sb-${projectRef}-auth-token`);
+              }
             }
           }
           if (mounted) setLoading(false);

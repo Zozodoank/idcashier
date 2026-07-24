@@ -47,8 +47,14 @@ const SalesPage = () => {
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [cart, setCart] = useState(() => {
-    const savedCart = localStorage.getItem('cart');
-    return savedCart ? JSON.parse(savedCart) : [];
+    try {
+      const savedCart = localStorage.getItem('cart');
+      return savedCart ? JSON.parse(savedCart) : [];
+    } catch (error) {
+      console.warn('Could not restore cart from localStorage:', error);
+      localStorage.removeItem('cart');
+      return [];
+    }
   });
   const [topProducts, setTopProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -296,7 +302,11 @@ const SalesPage = () => {
 
   // Persist cart to localStorage
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cart));
+    try {
+      localStorage.setItem('cart', JSON.stringify(cart));
+    } catch (error) {
+      console.warn('Could not persist cart to localStorage:', error);
+    }
   }, [cart]);
 
   // Calculate top products
@@ -738,10 +748,24 @@ const SalesPage = () => {
     }
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (product.barcode && product.barcode.includes(searchTerm))
-  );
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const filteredProducts = products.filter(product => {
+    const name = String(product?.name || '').toLowerCase();
+    const barcode = String(product?.barcode || '').toLowerCase();
+
+    return name.includes(normalizedSearchTerm) || barcode.includes(normalizedSearchTerm);
+  });
+
+  const buildCartItem = (product) => ({
+    id: product.id,
+    name: product.name,
+    barcode: product.barcode || null,
+    price: product.price || 0,
+    cost: product.cost || product.cost_price || 0,
+    hpp: product.hpp || product.cost || product.cost_price || 0,
+    stock: product.stock || 0,
+    quantity: 1
+  });
 
   const addToCart = (product) => {
     setCart(prevCart => {
@@ -753,7 +777,7 @@ const SalesPage = () => {
             : item
         );
       } else {
-        return [...prevCart, { ...product, quantity: 1 }];
+        return [...prevCart, buildCartItem(product)];
       }
     });
   };
@@ -1493,7 +1517,7 @@ const SalesPage = () => {
               ) : view === 'grid' ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {filteredProducts.map((product, index) => (
-                    <motion.div key={product.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.05 }}>
+                    <motion.div key={product.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: Math.min(index, 20) * 0.03 }}>
                       <Card onClick={() => addToCart(product)} className="cursor-pointer hover:border-primary transition-all group">
                         <CardContent className="p-4 flex flex-col items-center justify-center text-center">
                           <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center mb-2">
