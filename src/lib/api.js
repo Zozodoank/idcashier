@@ -2133,9 +2133,11 @@ export const subscriptionAPI = {
           headers: {
             'apikey': supabaseAnonKey,
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store'
           },
-          body: JSON.stringify({})
+          body: JSON.stringify({}),
+          cache: 'no-store'
         }
       );
 

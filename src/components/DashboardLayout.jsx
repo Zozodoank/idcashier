@@ -71,6 +71,20 @@ const storage = {
   }
 };
 
+const subscriptionCacheKey = (userId) => `idcashier_subscription_cache_${userId}`;
+
+const readCachedSubscription = (userId) => {
+  if (!userId) return null;
+
+  try {
+    const cached = JSON.parse(storage.get(subscriptionCacheKey(userId)) || 'null');
+    return cached?.end_date ? cached : null;
+  } catch (error) {
+    storage.remove(subscriptionCacheKey(userId));
+    return null;
+  }
+};
+
 // Helper function to resolve user role
 const resolveRole = (rawRole) => {
   const r = String(rawRole || 'owner').trim().toLowerCase();
@@ -86,9 +100,12 @@ const DashboardLayout = () => {
   // Add logout function from useAuth hook
   const { user, token, updateUser, logout } = useAuth();
   const { hppEnabled, refreshHPPSetting } = useHPP();
-  // IMPORTANT: default to true (fail-closed) to avoid giving access before we know subscription status.
+  // Keep the verification state separate from an actual expired subscription.
+  // A temporary network/API error must never be shown as "Masa Langganan Habis".
   const [subscriptionInactive, setSubscriptionInactive] = useState(true);
+  const [subscriptionCheckState, setSubscriptionCheckState] = useState('checking');
   const [subscriptionData, setSubscriptionData] = useState(null);
+  const [subscriptionRetryKey, setSubscriptionRetryKey] = useState(0);
 
   // Trial users must verify email before they can login.
   // Do not show verification toast in dashboard because unverified users won't reach dashboard.
@@ -140,6 +157,7 @@ const DashboardLayout = () => {
       // Clear any cached subscription data
       localStorage.removeItem('idcashier_subscription_cache');
       sessionStorage.removeItem('idcashier_subscription_cache');
+      storage.remove(subscriptionCacheKey(user.id));
     }
 
     // Handle HPP refresh flag
@@ -166,25 +184,36 @@ const DashboardLayout = () => {
     }
 
     const fetchSub = async () => {
+      setSubscriptionCheckState('checking');
       try {
         if (isWhitelisted) {
           // Demo/dev accounts are always treated as active regardless of subscription rows
           setSubscriptionInactive(false);
+          setSubscriptionCheckState('active');
           return;
         }
 
-        let sub = null;
-        try {
-          if (subscriptionAPI && typeof subscriptionAPI.getCurrentUserSubscription === 'function') {
-            sub = await subscriptionAPI.getCurrentUserSubscription(token);
-          }
-        } catch (_) { }
+        if (!subscriptionAPI || typeof subscriptionAPI.getCurrentUserSubscription !== 'function') {
+          throw new Error('Subscription service is unavailable');
+        }
 
-        if (sub && sub.end_date) {
+        const sub = await subscriptionAPI.getCurrentUserSubscription(token);
+
+        if (sub && sub.has_subscription !== false && sub.end_date) {
           const daysRemaining = getSubscriptionDaysRemaining(sub.end_date);
           const isActive = daysRemaining !== null && daysRemaining >= 0;
           setSubscriptionInactive(!isActive);
           setSubscriptionData(sub);
+          setSubscriptionCheckState(isActive ? 'active' : 'inactive');
+
+          if (isActive) {
+            storage.set(subscriptionCacheKey(user.id), JSON.stringify({
+              end_date: sub.end_date,
+              checked_at: new Date().toISOString(),
+            }));
+          } else {
+            storage.remove(subscriptionCacheKey(user.id));
+          }
           console.log('📊 Subscription status updated:', {
             endDate: sub.end_date,
             daysRemaining,
@@ -194,18 +223,29 @@ const DashboardLayout = () => {
         } else {
           setSubscriptionInactive(true);
           setSubscriptionData(null);
+          setSubscriptionCheckState('inactive');
         }
       } catch (e) {
         console.error('Error fetching subscription:', e);
-        // FAIL-CLOSED: if we cannot verify subscription, block access (except whitelisted)
-        setSubscriptionInactive(true);
-        setSubscriptionData(null);
+        const cachedSubscription = readCachedSubscription(user.id);
+        const cachedDaysRemaining = getSubscriptionDaysRemaining(cachedSubscription?.end_date);
+
+        if (cachedSubscription && cachedDaysRemaining !== null && cachedDaysRemaining >= 0) {
+          console.warn('Using last verified active subscription while verification is unavailable');
+          setSubscriptionInactive(false);
+          setSubscriptionData(cachedSubscription);
+          setSubscriptionCheckState('cached');
+        } else {
+          setSubscriptionInactive(true);
+          setSubscriptionData(null);
+          setSubscriptionCheckState('unavailable');
+        }
       }
     };
 
     // Call fetchSub
     fetchSub();
-  }, [user?.email, token]); // Only depend on email and token
+  }, [user?.id, user?.email, token, subscriptionRetryKey]);
 
   // Effect 2: Generate Menu Items
   useEffect(() => {
@@ -452,7 +492,7 @@ const DashboardLayout = () => {
         const isEmailVerified = user?.email_confirmed_at && !user?.user_metadata?.manual_verification_required;
 
         // Hide banner if renewal is pending (optimistic mode)
-        if (!isWhitelisted && subscriptionInactive && isEmailVerified && !isRenewalPending) {
+        if (!isWhitelisted && subscriptionCheckState === 'inactive' && subscriptionInactive && isEmailVerified && !isRenewalPending) {
           return (
             <div className="bg-red-500 text-white px-4 py-3 text-center relative z-40">
               <div className="flex items-center justify-center gap-2">
@@ -521,7 +561,31 @@ const DashboardLayout = () => {
               // 2. Subscription inactive
               // 3. Email verification is now disabled - all users are auto-verified
               // IMPORTANT: subscription status is the source of truth; payment_completed metadata MUST NOT bypass.
-              if (!bypass && subscriptionInactive) {
+              if (!bypass && subscriptionCheckState === 'checking') {
+                 return (
+                   <div className="flex min-h-[60vh] items-center justify-center p-6 text-center">
+                     <p className="text-muted-foreground">Memeriksa status langganan...</p>
+                   </div>
+                 );
+               }
+
+               if (!bypass && subscriptionCheckState === 'unavailable') {
+                 return (
+                   <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+                     <div className="max-w-md w-full p-8 rounded-xl border bg-card shadow-lg">
+                       <h2 className="text-2xl font-bold mb-3">Status Langganan Belum Dapat Diverifikasi</h2>
+                       <p className="mb-8 text-muted-foreground leading-relaxed">
+                         Koneksi ke layanan langganan sedang bermasalah. Akun Anda tidak dinyatakan habis; silakan coba periksa kembali.
+                       </p>
+                       <Button size="lg" className="w-full text-lg h-12" onClick={() => setSubscriptionRetryKey((value) => value + 1)}>
+                         Coba Lagi
+                       </Button>
+                     </div>
+                   </div>
+                 );
+               }
+
+               if (!bypass && subscriptionCheckState === 'inactive' && subscriptionInactive) {
                 return (
                   <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
                     <div className="max-w-md w-full p-8 rounded-xl border bg-card shadow-lg">
