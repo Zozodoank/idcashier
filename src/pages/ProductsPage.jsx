@@ -617,10 +617,13 @@ const ProductsPage = ({ user }) => {
 
   // Filtering & pagination untuk tabel produk
   const filteredProducts = products.filter(p => {
-    const term = searchTerm.toLowerCase();
+    const term = searchTerm.trim().toLowerCase();
+    const name = String(p?.name || '').toLowerCase();
+    const barcode = String(p?.barcode || '').toLowerCase();
+
     return (
-      p.name.toLowerCase().includes(term) ||
-      (p.barcode && p.barcode.toLowerCase().includes(term))
+      name.includes(term) ||
+      barcode.includes(term)
     );
   });
 

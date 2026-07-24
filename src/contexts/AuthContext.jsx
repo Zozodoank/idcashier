@@ -18,24 +18,20 @@ export const AuthProvider = ({ children }) => {
   const [connectionError, setConnectionError] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
 
-  // Fixed: Better token parsing with timezone awareness
+  // Fixed: Better token parsing.
+  // JWT exp is already a UTC Unix timestamp, so compare it directly with Date.now().
   const parseTokenWithTimezone = (token) => {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
 
-      // Convert exp to proper UTC timestamp and handle timezone
       const expiryTime = payload.exp * 1000; // Convert to milliseconds
       const currentTime = Date.now();
-      const utcOffset = new Date().getTimezoneOffset() * 60 * 1000; // Convert to milliseconds
-
-      // Adjust for timezone difference
-      const adjustedCurrentTime = currentTime + utcOffset;
-      const timeUntilExpiry = expiryTime - adjustedCurrentTime;
+      const timeUntilExpiry = expiryTime - currentTime;
 
       return {
         ...payload,
         expiryTime,
-        currentTime: adjustedCurrentTime,
+        currentTime,
         timeUntilExpiry,
         isExpired: timeUntilExpiry <= 0,
         expiresInMinutes: Math.ceil(timeUntilExpiry / (60 * 1000))
@@ -44,6 +40,35 @@ export const AuthProvider = ({ children }) => {
       console.error('Error parsing token:', error);
       return null;
     }
+  };
+
+  const buildSessionFallbackUser = (accessToken, authUser = null) => {
+    const parsedToken = accessToken ? parseTokenWithTimezone(accessToken) : null;
+    const metadata = authUser?.user_metadata || parsedToken?.user_metadata || {};
+    const appMetadata = authUser?.app_metadata || parsedToken?.app_metadata || {};
+    const email = authUser?.email || parsedToken?.email || metadata.email || null;
+    const id = authUser?.id || parsedToken?.sub || metadata.sub || email;
+
+    if (!id && !email) {
+      return null;
+    }
+
+    const tenantId = metadata.tenant_id || parsedToken?.tenant_id || parsedToken?.tenantId || null;
+
+    return {
+      id,
+      email,
+      name: metadata.full_name || metadata.name || email || 'User',
+      role: metadata.role || appMetadata.role || parsedToken?.user_role || 'cashier',
+      tenant_id: tenantId,
+      tenantId,
+      permissions: metadata.permissions || parsedToken?.permissions || {},
+      email_confirmed_at: authUser?.email_confirmed_at,
+      user_metadata: metadata,
+      tokenExpiry: parsedToken?.expiryTime,
+      expiresInMinutes: parsedToken?.expiresInMinutes,
+      isSessionFallback: true
+    };
   };
 
   // Initialize auth state from localStorage
@@ -94,6 +119,11 @@ export const AuthProvider = ({ children }) => {
           if (mounted) {
             setToken(session.access_token);
             localStorage.setItem('idcashier_token', session.access_token);
+
+            const fallbackUser = buildSessionFallbackUser(session.access_token, session.user);
+            if (fallbackUser) {
+              setUser(fallbackUser);
+            }
           }
 
           // Parse token with timezone awareness
@@ -115,6 +145,10 @@ export const AuthProvider = ({ children }) => {
             localStorage.removeItem('idcashier_refresh_token');
           } else if (mounted) {
             setToken(storedToken);
+            const fallbackUser = buildSessionFallbackUser(storedToken);
+            if (fallbackUser) {
+              setUser(fallbackUser);
+            }
             await fetchUserProfileFast(storedToken, mounted, setUser);
           }
         } else {
@@ -149,6 +183,11 @@ export const AuthProvider = ({ children }) => {
 
           setToken(session.access_token);
           localStorage.setItem('idcashier_token', session.access_token);
+
+          const fallbackUser = buildSessionFallbackUser(session.access_token, session.user);
+          if (fallbackUser) {
+            setUser(fallbackUser);
+          }
 
           if (session.refresh_token) {
             localStorage.setItem('idcashier_refresh_token', session.refresh_token);
@@ -233,6 +272,11 @@ export const AuthProvider = ({ children }) => {
               console.log('Token refreshed successfully');
               setToken(data.session.access_token);
               localStorage.setItem('idcashier_token', data.session.access_token);
+
+              const fallbackUser = buildSessionFallbackUser(data.session.access_token, data.session.user);
+              if (fallbackUser) {
+                setUser(fallbackUser);
+              }
 
               if (data.session.refresh_token) {
                 localStorage.setItem('idcashier_refresh_token', data.session.refresh_token);
@@ -454,12 +498,12 @@ export const AuthProvider = ({ children }) => {
 
       if (!supabaseUrl || !supabaseAnonKey) {
         console.error('❌ Missing Supabase environment variables');
-        return;
+        return null;
       }
 
       if (!token) {
         console.error('❌ No token provided for user profile fetch');
-        return;
+        return null;
       }
 
       const controller = new AbortController();
@@ -479,7 +523,7 @@ export const AuthProvider = ({ children }) => {
 
       if (!email) {
         console.error('❌ No email found for user profile fetch');
-        return;
+        return null;
       }
 
       console.log('🔍 DEBUG: Making fetch request to Supabase...');
@@ -740,7 +784,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     refreshSession: () => supabase.auth.refreshSession(),
-    isAuthenticated: !!user,
+    isAuthenticated: !!token || !!user,
     verifyEmail: async (email, token) => {
       try {
         console.log('🔍 AuthContext: Verifying email:', email);

@@ -57,6 +57,47 @@ if (supabaseUrl && supabaseAnonKey) {
   console.warn('Supabase credentials not found. Skipping Supabase client creation.');
 }
 
+function parseStoredAppToken(token) {
+  if (!token || typeof token !== 'string') return null;
+
+  try {
+    const payloadPart = token.split('.')[1];
+    if (!payloadPart) return null;
+
+    const normalizedPayload = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      '='
+    );
+    const payload = JSON.parse(atob(paddedPayload));
+
+    if (payload.exp && payload.exp * 1000 <= Date.now()) {
+      return null;
+    }
+
+    return {
+      access_token: token,
+      user: {
+        id: payload.sub || payload.user_id || payload.email || null,
+        email: payload.email || null,
+        user_metadata: payload.user_metadata || {}
+      }
+    };
+  } catch (error) {
+    console.warn('Could not parse stored app token:', error.message);
+    return null;
+  }
+}
+
+function getStoredAppSession() {
+  try {
+    return parseStoredAppToken(localStorage.getItem('idcashier_token'));
+  } catch (error) {
+    console.warn('Could not read stored app token:', error.message);
+    return null;
+  }
+}
+
 /**
  * Ensure session is valid and ready
  * Clears stale session if token is expired
@@ -70,12 +111,20 @@ export async function ensureSession() {
     
     if (error) {
       console.error('Session check failed:', error.message);
+      const appSession = getStoredAppSession();
+      if (appSession) {
+        return appSession;
+      }
       await clearStaleSession();
       return null;
     }
     
-    // If no session, clear any stale data
+    // If no Supabase session exists, keep a valid app token created by the login Edge Function.
     if (!session) {
+      const appSession = getStoredAppSession();
+      if (appSession) {
+        return appSession;
+      }
       await clearStaleSession();
       return null;
     }
@@ -83,6 +132,10 @@ export async function ensureSession() {
     return session;
   } catch (error) {
     console.error('Error ensuring session:', error);
+    const appSession = getStoredAppSession();
+    if (appSession) {
+      return appSession;
+    }
     await clearStaleSession();
     return null;
   }
