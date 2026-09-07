@@ -232,6 +232,7 @@ const distCleanupPlugin = () => ({
 				'diagnostic.html',
 				'test-pages-connection.html',
 				'llms.txt',
+				'_redirects',
 			];
 
 			for (const fileName of unnecessaryFiles) {
@@ -239,6 +240,13 @@ const distCleanupPlugin = () => ({
 				if (fs.existsSync(filePath)) {
 					fs.rmSync(filePath, { force: true });
 				}
+			}
+
+			// SPA fallback resmi Cloudflare Pages
+			const indexPath = path.join(distDir, 'index.html');
+			const fallbackPath = path.join(distDir, '200.html');
+			if (fs.existsSync(indexPath)) {
+				fs.copyFileSync(indexPath, fallbackPath);
 			}
 		} catch (error) {
 			// Jangan gagalkan build hanya karena gagal hapus file debug

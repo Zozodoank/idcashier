@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host :: --port 3000",
     "build": "node build-production-simple.js",
-    "build:raw": "vite build",
+    "build:raw": "node -e \"const fs=require('fs');if(fs.existsSync('dist')){fs.rmSync('dist',{recursive:true,force:true})}\" && vite build",
     "build:production": "node build-production.js",
     "build:simple": "node build-production-simple.js",
     "preview": "vite preview --host :: --port 3000",
