@@ -1,9 +1,0 @@
-lockfileVersion: 5.4
-
-specifiers:
-  '@supabase/supabase-js': ^2.44.2
-  md5: ^2.3.0
-
-dependencies:
-  '@supabase/supabase-js': 2.44.2
-  md5: 2.3.0
