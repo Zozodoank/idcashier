@@ -11,9 +11,11 @@ $root = Split-Path -Parent $PSScriptRoot
 $projectRef = 'eypfeiqtvfxxiimhtycc'
 $apiBase = "https://api.supabase.com/v1/projects/$projectRef"
 
-# --- credentials from workspace 'env' (names only are printed later) ---
+# --- credentials from workspace '.env' (falls back to legacy 'env'); names only are printed ---
+$envPath = Join-Path $root '.env'
+if (-not (Test-Path -LiteralPath $envPath)) { $envPath = Join-Path $root 'env' }
 $cfg = @{}
-foreach ($line in Get-Content -LiteralPath (Join-Path $root 'env')) {
+foreach ($line in Get-Content -LiteralPath $envPath) {
     $t = $line.Trim()
     if ($t -eq '' -or $t.StartsWith('#')) { continue }
     $i = $t.IndexOf('=')
@@ -26,7 +28,7 @@ foreach ($line in Get-Content -LiteralPath (Join-Path $root 'env')) {
     $cfg[$k] = $v
 }
 $token = $cfg['SUPABASE_ACCESS_TOKEN']
-if (-not $token) { Write-Error 'Missing SUPABASE_ACCESS_TOKEN in env'; exit 1 }
+if (-not $token) { Write-Error "Missing SUPABASE_ACCESS_TOKEN in $envPath"; exit 1 }
 $headers = @{ Authorization = "Bearer $token"; 'Content-Type' = 'application/json' }
 
 function Invoke-Sql([string]$sql) {
@@ -92,8 +94,11 @@ foreach ($slug in $targets) {
     Write-Host ("`n--- deploying {0} ({1}) ---" -f $slug, ($args -join ' '))
     & $cli @args *> $logPath
     $code = $LASTEXITCODE
-    Get-Content -LiteralPath $logPath | ForEach-Object { Write-Host "    $_" }
-    if ($code -ne 0) { $ErrorActionPreference = $prevEap; Write-Error "Deploy failed for $slug (exit $code)"; exit 2 }
+    $log = Get-Content -LiteralPath $logPath
+    $log | ForEach-Object { Write-Host "    $_" }
+    # CLI can exit non-zero on telemetry shutdown even after a successful deploy.
+    $deployed = ($log | Select-String -Pattern 'Deployed Functions on project' -Quiet)
+    if (-not $deployed) { $ErrorActionPreference = $prevEap; Write-Error "Deploy failed for $slug (exit $code)"; exit 2 }
 }
 $ErrorActionPreference = $prevEap
 

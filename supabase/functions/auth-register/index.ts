@@ -167,19 +167,23 @@ Deno.serve(async (req) => {
         const bearerToken = authHeader.toLowerCase().startsWith('bearer ')
             ? authHeader.slice(7).trim()
             : '';
-        const isAnonToken = !bearerToken || bearerToken === anonKey;
+        // Frontend mengirim kunci anon (legacy) sebagai bearer, sedangkan secret
+        // SUPABASE_ANON_KEY di runtime bisa berisi kunci publishable baru. Karena itu
+        // token yang bukan JWT 3-bagian tidak dianggap sesi, dan token yang gagal
+        // diverifikasi TIDAK langsung ditolak: ia hanya berarti "belum ada bukti
+        // sesi", lalu identitas tetap wajib lolos tier berikutnya (payment completed
+        // atau tautan signup baru) sebelum dipakai.
+        const looksLikeJwt = bearerToken.split('.').length === 3;
+        const isSessionCandidate = looksLikeJwt && bearerToken !== anonKey;
 
         let tokenUserId: string | null = null;
-        if (!isAnonToken) {
+        if (isSessionCandidate) {
             const { data: tokenUserResult, error: tokenError } = await supabase.auth.getUser(bearerToken);
             if (tokenError || !tokenUserResult?.user) {
-                console.error('Invalid session token:', tokenError?.message);
-                return new Response(
-                    JSON.stringify({ success: false, error: 'Invalid or expired session' }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-                );
+                console.warn('Bearer is not a valid session, falling back to payment/signup checks:', tokenError?.message);
+            } else {
+                tokenUserId = tokenUserResult.user.id;
             }
-            tokenUserId = tokenUserResult.user.id;
         }
 
         // Aktivasi berbayar hanya bila baris payments benar-benar 'completed'.
