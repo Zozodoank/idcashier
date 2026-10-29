@@ -20,6 +20,10 @@ export function exportToExcel(data, fileName, options = {}) {
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 }
 
+// Panjang free trial (hari). Hanya untuk teks UI — nilai yang mengikat ada di
+// server (supabase/functions/_shared/subscription.ts TRIAL_DAYS).
+export const TRIAL_DAYS = 7;
+
 function normalizeDateOnly(value) {
   if (!value) return null;
 

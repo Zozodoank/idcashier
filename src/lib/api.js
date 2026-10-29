@@ -212,7 +212,6 @@ export const authAPI = {
           email: normalizedEmail,
           password: password,
           role: role,
-          trialDays: 7, // Default trial when registering via API
           isPriceCardRegistration: false // API registration is typically trial
         })
       });

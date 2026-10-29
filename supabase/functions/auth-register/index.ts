@@ -3,12 +3,18 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from '@supabase/supabase-js';
 import {
     calculateExtendedEndDate,
+    ensureTrialSubscription,
     getDerivedSubscriptionStatus,
+    getDurationMonthsFromPayment,
     getEffectiveSubscription,
     getPlanNameForDuration,
     parseStoredDate,
     toDateOnly,
 } from '../_shared/subscription.ts';
+
+// Pemanggil anonim (alur signup email) hanya boleh menautkan akun yang baru
+// saja dibuat. Lihat canLinkFreshSignup().
+const SIGNUP_LINK_WINDOW_MS = 15 * 60 * 1000;
 
 // Supabase subscriptions table uses `id` as NOT NULL without default in this project.
 // Always generate an ID when inserting new subscriptions to avoid silent failures.
@@ -37,13 +43,20 @@ interface RegisterRequest {
     phone?: string;
     role?: string;
     isPriceCardRegistration?: boolean;
+    /** @deprecated Alias lama dari isPriceCardRegistration. Tetap diterima. */
     skipTrial?: boolean;
-    trialDays?: number; // Optional: explicit trial duration requested by client
+    /** @deprecated Diabaikan: durasi trial ditentukan server (TRIAL_DAYS). */
+    trialDays?: number;
     userId?: string; // Optional: provided for OAuth sync
     oauthUserId?: string; // Legacy OAuth field
     oauthProvider?: string; // Optional: to indicate OAuth flow
+    /** @deprecated Tidak dipercaya lagi: aktivasi berbayar wajib lewat merchantOrderId. */
     paymentCompleted?: boolean;
-    planDuration?: number; // Subscription duration in months
+    /** @deprecated Diabaikan: durasi berbayar diturunkan dari baris payments. */
+    planDuration?: number;
+    /** Wajib untuk aktivasi berbayar (diverifikasi ke tabel payments). */
+    merchantOrderId?: string;
+    useHPP?: boolean;
 }
 
 type RegisterResponse = {
@@ -56,6 +69,31 @@ type RegisterResponse = {
   error?: string;
   details?: any;
 };
+
+// Pemanggil anonim tidak punya sesi (signup email). Akun hanya boleh ditautkan
+// bila: email sama, akun baru dibuat (< 15 menit), dan belum punya subscription.
+// Ini menutup penyalahgunaan userId dari body (defect #3) tanpa memutus alur
+// signup email yang sekarang berjalan.
+async function canLinkFreshSignup(supabase: any, userId: string, email: string): Promise<boolean> {
+    try {
+        const { data, error } = await supabase.auth.admin.getUserById(userId);
+        if (error || !data?.user) return false;
+
+        const authEmail = String(data.user.email || '').toLowerCase().trim();
+        if (!authEmail || authEmail !== String(email || '').toLowerCase().trim()) return false;
+
+        const createdAt = new Date(data.user.created_at).getTime();
+        if (!Number.isFinite(createdAt) || Date.now() - createdAt > SIGNUP_LINK_WINDOW_MS) {
+            return false;
+        }
+
+        const { data: existingSub } = await getEffectiveSubscription(supabase, userId, 'id');
+        return !existingSub;
+    } catch (error: any) {
+        console.error('canLinkFreshSignup failed:', error?.message || error);
+        return false;
+    }
+}
 
 // @ts-ignore: Deno is available in Supabase Edge Functions runtime
 Deno.serve(async (req) => {
@@ -76,23 +114,20 @@ Deno.serve(async (req) => {
             skipTrial = false,
             userId: providedUserId,
             oauthProvider,
-            paymentCompleted,
-            planDuration = 1
+            merchantOrderId,
         } = body;
 
-        const resolvedUserId = providedUserId || body.oauthUserId || (body as any).user_id;
+        const requestedUserId = providedUserId || body.oauthUserId || (body as any).user_id;
 
         // Validate input
-        if (!email || (!password && !resolvedUserId) || !name) {
+        if (!email || !name) {
             return new Response(
                 JSON.stringify({
                     success: false,
-                    error: 'Email, name, and (password OR userId) are required',
+                    error: 'Email and name are required',
                     received: {
                         email: !!email,
                         name: !!name,
-                        hasPassword: !!password,
-                        resolvedUserId: resolvedUserId || null
                     }
                 }),
                 {
@@ -101,6 +136,12 @@ Deno.serve(async (req) => {
                 }
             );
         }
+
+        // Alur price-card berhenti sebelum trial; flag ini hanya "routing hint",
+        // bukan penentu durasi (durasi selalu dari server).
+        const isPaidFlow = isPriceCardRegistration || skipTrial;
+        const normalizedMerchantOrderId =
+            typeof merchantOrderId === 'string' && merchantOrderId.trim() ? merchantOrderId.trim() : null;
 
         const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
         const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -116,9 +157,90 @@ Deno.serve(async (req) => {
           auth: { autoRefreshToken: false, persistSession: false }
         });
 
-        let userId = resolvedUserId;
+        // ------------------------------------------------------------------
+        // Resolusi identitas (defect #3)
+        // config.toml menandai verify_jwt = true, tetapi workflow deploy memakai
+        // --no-verify-jwt, sehingga kepercayaan pada body HARUS diverifikasi di
+        // dalam function ini.
+        // ------------------------------------------------------------------
+        const authHeader = req.headers.get('Authorization') ?? '';
+        const bearerToken = authHeader.toLowerCase().startsWith('bearer ')
+            ? authHeader.slice(7).trim()
+            : '';
+        const isAnonToken = !bearerToken || bearerToken === anonKey;
 
-        // If userId is NOT provided, we need to create the auth user
+        let tokenUserId: string | null = null;
+        if (!isAnonToken) {
+            const { data: tokenUserResult, error: tokenError } = await supabase.auth.getUser(bearerToken);
+            if (tokenError || !tokenUserResult?.user) {
+                console.error('Invalid session token:', tokenError?.message);
+                return new Response(
+                    JSON.stringify({ success: false, error: 'Invalid or expired session' }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+                );
+            }
+            tokenUserId = tokenUserResult.user.id;
+        }
+
+        // Aktivasi berbayar hanya bila baris payments benar-benar 'completed'.
+        let paidPayment: any = null;
+        if (normalizedMerchantOrderId) {
+            const { data: paymentRow, error: paymentLookupError } = await supabase
+                .from('payments')
+                .select('id, user_id, amount, product_details, status, created_at, updated_at')
+                .eq('merchant_order_id', normalizedMerchantOrderId)
+                .maybeSingle();
+
+            if (paymentLookupError) {
+                console.error('Payment lookup error:', paymentLookupError);
+            }
+
+            if (paymentRow && paymentRow.status === 'completed') {
+                paidPayment = paymentRow;
+            } else {
+                console.log('Payment not completed yet for merchantOrderId', normalizedMerchantOrderId);
+            }
+        }
+
+        // Dibaca oleh blok metadata & trial di bawah (nilai sudah terverifikasi).
+        const paymentCompleted = !!paidPayment;
+
+        let userId: string | null = null;
+
+        if (tokenUserId) {
+            // Sesi Supabase = bukti identitas terkuat.
+            if (requestedUserId && requestedUserId !== tokenUserId) {
+                return new Response(
+                    JSON.stringify({ success: false, error: 'Session does not match the requested user' }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+                );
+            }
+            userId = tokenUserId;
+        } else if (paidPayment) {
+            // Pembayaran yang sudah 'completed' membuktikan pemilik akun.
+            if (requestedUserId && requestedUserId !== paidPayment.user_id) {
+                return new Response(
+                    JSON.stringify({ success: false, error: 'Payment does not belong to the requested user' }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+                );
+            }
+            userId = paidPayment.user_id;
+        } else if (requestedUserId) {
+            // Signup email: user auth dibuat oleh client beberapa detik lalu dan
+            // belum punya sesi, jadi divalidasi lewat email + umur akun + belum
+            // punya subscription.
+            const canLink = await canLinkFreshSignup(supabase, requestedUserId, email);
+            if (!canLink) {
+                console.warn('Rejected unverified identity', { requestedUserId, email });
+                return new Response(
+                    JSON.stringify({ success: false, error: 'Unverified identity' }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+                );
+            }
+            userId = requestedUserId;
+        }
+
+        // If userId is NOT resolved above, we need to create the auth user
         if (!userId) {
             if (!password) {
                 return new Response(
@@ -150,7 +272,6 @@ Deno.serve(async (req) => {
                 const isTrialEmailSignup = !isPriceCardRegistration && !paymentCompleted;
                 let authData: any = null;
                 let authError: any = null;
-                let requiresEmailVerification = false;
 
                 if (isTrialEmailSignup) {
                   const siteUrl = Deno.env.get('SITE_URL') || Deno.env.get('VITE_SITE_URL') || 'https://idcashier.com';
@@ -172,7 +293,6 @@ Deno.serve(async (req) => {
                   authData = data;
                   authError = error;
                   // Supabase signUp returns user even if unconfirmed.
-                  requiresEmailVerification = true;
                 } else {
                   const { data, error } = await supabase.auth.admin.createUser({
                     email: email.toLowerCase().trim(),
@@ -239,22 +359,22 @@ Deno.serve(async (req) => {
                 } else {
                     userId = authData.user.id;
                 }
-
-                // Attach verification flags to request body for response
-                (body as any).__requiresEmailVerification = requiresEmailVerification;
             }
         } else {
             // OAuth Case: User already exists in Auth, just update metadata if needed
             console.log(`Syncing existing user ${userId} to public tables`);
 
-            // Optionally update metadata to ensure consistency
+            // Merge, jangan ganti seluruh user_metadata (defect #7): field dari
+            // Google seperti full_name/avatar_url/picture harus tetap ada.
+            const { data: currentAuthUser } = await supabase.auth.admin.getUserById(userId);
             await supabase.auth.admin.updateUserById(userId, {
                 user_metadata: {
+                    ...(currentAuthUser?.user?.user_metadata || {}),
                     name,
                     phone: phone || '',
                     role,
                     is_trial_user: !isPriceCardRegistration && !paymentCompleted,
-                    payment_completed: paymentCompleted || false,
+                    payment_completed: paymentCompleted,
                     payment_pending: isPriceCardRegistration && !paymentCompleted,
                     is_price_card_registration: isPriceCardRegistration,
                     oauth_provider: oauthProvider
@@ -276,9 +396,11 @@ Deno.serve(async (req) => {
 
         if (!existingProfile) {
             // Create user in public.users table
+            // upsert + ignoreDuplicates: aman terhadap race dengan duitku-callback
+            // yang bisa membuat baris yang sama secara paralel (defect #14).
             const { error: userError } = await supabase
                 .from('users')
-                .insert({
+                .upsert({
                     id: userId,
                     name,
                     email: email.toLowerCase().trim(),
@@ -286,7 +408,7 @@ Deno.serve(async (req) => {
                     role: role || 'owner',
                     tenant_id: userId, // Self-reference for owner
                     // status: isPriceCardRegistration ? 'inactive' : 'active'
-                });
+                }, { onConflict: 'id', ignoreDuplicates: true });
 
             if (userError) {
                 console.error('User table error:', userError);
@@ -314,10 +436,10 @@ Deno.serve(async (req) => {
             'id, start_date, end_date, status, plan_name, duration, created_at, updated_at'
         );
 
-        if (paymentCompleted) {
-            // PAYMENT COMPLETED: Create or update subscription with selected duration
-            // Calculate end date based on plan duration (default 1 month = 30 days)
-            const durationMonths = planDuration || 1;
+        if (paidPayment) {
+            // PAID: aktivasi hanya boleh berasal dari baris payments berstatus
+            // 'completed' (defect #2). Durasi diturunkan dari payment, bukan body.
+            const durationMonths = getDurationMonthsFromPayment(paidPayment) || 1;
             const requestedStartDate = new Date();
             const requestedEndDate = calculateExtendedEndDate(null, durationMonths, requestedStartDate);
             const currentEndDate = parseStoredDate(existingSub?.end_date);
@@ -392,86 +514,20 @@ Deno.serve(async (req) => {
                 }
             });
 
-        } else if (!isPriceCardRegistration && !skipTrial) {
-            // TRIAL USER: only create the default trial for a brand-new account.
-            // Existing subscription rows must be preserved so expired accounts do not
-            // become active again simply because this sync endpoint ran.
-
-            const requestedTrialDays = typeof body.trialDays === 'number' ? body.trialDays : 7;
-            const trialDays = requestedTrialDays > 0 ? requestedTrialDays : 7;
-
-            const startDate = new Date();
-            const endDate = new Date();
-            endDate.setDate(endDate.getDate() + trialDays);
-
-            if (!existingSub) {
-                const newId = generateUuid();
-                if (!newId) {
-                    console.error('❌ Failed to generate UUID for trial subscription insert');
-                    throw new Error('Failed to generate subscription id');
-                }
-
-                const { error: subError } = await supabase
-                    .from('subscriptions')
-                    .insert({
-                        id: newId,
-                        user_id: userId,
-                        start_date: toDateOnly(startDate),
-                        end_date: toDateOnly(endDate),
-                        status: 'active',
-                        plan_name: 'trial',
-                        duration: trialDays
-                    });
-
-                if (subError) {
-                    console.error('Subscription error:', subError);
-                    return new Response(
-                      JSON.stringify({
-                        success: false,
-                        error: 'Failed to create trial subscription',
-                        details: (subError as any)?.message || subError
-                      }),
-                      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-                    );
-                } else {
-                    console.log(`Trial subscription created for user ${userId} (${trialDays} days)`);
-                }
-            // Trial refresh is intentionally disabled so expired users do not
-            // become active again when this endpoint runs for sync/recovery.
-            } else if (false) {
-                const { error: updateTrialError } = await supabase
-                    .from('subscriptions')
-                    .update({
-                        start_date: startDate.toISOString().split('T')[0],
-                        end_date: endDate.toISOString().split('T')[0],
-                        status: 'active',
-                        // When refreshing trial we always reset to trial metadata
-                        plan_name: 'trial',
-                        duration: trialDays,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', existingSub.id);
-
-                if (updateTrialError) {
-                    console.error('❌ Error updating trial subscription:', updateTrialError);
-                    return new Response(
-                      JSON.stringify({
-                        success: false,
-                        error: 'Failed to refresh trial subscription',
-                        details: (updateTrialError as any)?.message || updateTrialError
-                      }),
-                      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-                    );
-                } else {
-                    console.log(`✅ Trial subscription refreshed for user ${userId} (${trialDays} days)`);
-                }
-            } else {
-                console.log('ℹ️ Existing subscription still active; not overriding with trial', {
-                    userId,
-                    existingEndDate: existingSub.end_date,
-                    existingStatus: existingSub.status
-                });
-            }
+        } else if (normalizedMerchantOrderId) {
+            // Pembayaran tercatat tetapi belum 'completed': jangan sentuh
+            // subscription sama sekali. Aktivasi dituntaskan duitku-callback.
+            console.log('Payment pending, subscription activation deferred', {
+                userId,
+                merchantOrderId: normalizedMerchantOrderId
+            });
+        } else if (!isPaidFlow) {
+            // FREE TRIAL (defect #1, #6, #8, #10, #14): durasi, idempotensi, dan
+            // syarat verifikasi email seluruhnya ditentukan server.
+            const trialResult = await ensureTrialSubscription(supabase, userId, {
+                requireVerifiedEmail: true
+            });
+            console.log('Trial handling result:', { userId, trialResult });
         } else {
             console.log('Skipping trial subscription for price card registration (will be activated after payment)');
         }
@@ -480,11 +536,32 @@ Deno.serve(async (req) => {
             userId,
             email,
             isPriceCardRegistration,
-            skipTrial,
-            isOAuthSync: !!resolvedUserId
+            isPaidFlow,
+            merchantOrderId: normalizedMerchantOrderId,
+            paymentCompleted
         });
 
-        const requiresEmailVerification = Boolean((body as any).__requiresEmailVerification);
+        // Pembayaran belum tuntas: klien (PaymentCallbackPage) melakukan polling
+        // subscriptions-get-current-user, dan duitku-callback menuntaskan aktivasi.
+        if (normalizedMerchantOrderId && !paidPayment) {
+            return new Response(
+                JSON.stringify({
+                    success: true,
+                    message: 'Payment is being processed',
+                    userId,
+                    subscription: 'pending',
+                    requiresEmailVerification: false
+                }),
+                {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 202,
+                }
+            );
+        }
+
+        // Nilainya sama dengan perilaku nyata hari ini (email konfirmasi dikirim
+        // oleh client), tetapi tidak lagi lewat side-channel body (defect #13).
+        const requiresEmailVerification = !isPaidFlow && !paymentCompleted;
         const responseBody: RegisterResponse = {
           success: true,
           message: isPriceCardRegistration

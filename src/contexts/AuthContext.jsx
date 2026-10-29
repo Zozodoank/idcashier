@@ -644,6 +644,9 @@ export const AuthProvider = ({ children }) => {
 
           if (supabaseUrl && supabaseAnonKey && authUser?.id && authUser?.email) {
             const functionUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/auth-register`;
+            // Server memutuskan sendiri apakah akun ini berhak atas trial
+            // (ensureTrialSubscription). Field trialDays/paymentCompleted/planDuration
+            // tidak lagi dikirim karena tidak dipercaya server (defect #2, #12).
             const requestBody = {
               name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
               email: authUser.email,
@@ -651,17 +654,17 @@ export const AuthProvider = ({ children }) => {
               role: 'owner',
               oauthProvider: 'google',
               oauthUserId: authUser.id,
-              paymentCompleted: false,
               // Not necessarily price card here; we just want to ensure profile exists.
-              isPriceCardRegistration: false,
-              skipTrial: true
+              isPriceCardRegistration: false
             };
 
             const regRes = await fetch(functionUrl, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseAnonKey}`,
+                // Sesi asli dikirim agar auth-register bisa memverifikasi identitas
+                // pemanggil (defect #3).
+                'Authorization': `Bearer ${accessToken}`,
                 'apikey': supabaseAnonKey
               },
               body: JSON.stringify(requestBody)

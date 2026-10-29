@@ -175,6 +175,135 @@ export function isSubscriptionPaymentRecord(payment: PaymentLike): boolean {
   return getDurationMonthsFromPayment(payment) !== null;
 }
 
+// ---------------------------------------------------------------------------
+// Free trial
+// ---------------------------------------------------------------------------
+
+// Satu-satunya sumber kebenaran durasi free trial di sisi server.
+// Client TIDAK boleh mengirim durasi trial (lihat auth-register).
+export const TRIAL_DAYS = 7;
+export const TRIAL_PLAN_NAME = 'trial';
+
+/**
+ * Window trial yang inklusif: [startDate, startDate + TRIAL_DAYS - 1].
+ * isSubscriptionActive() menambahkan 1 hari sebelum membandingkan, sehingga
+ * rumus ini menghasilkan tepat TRIAL_DAYS hari kalender akses.
+ */
+export function getTrialWindow(now = new Date()): { startDate: Date; endDate: Date } {
+  const startDate = startOfDay(now);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + TRIAL_DAYS - 1);
+  return { startDate, endDate };
+}
+
+export type TrialGrantResult =
+  | 'granted'
+  | 'already_granted'
+  | 'ineligible'
+  | 'skipped_existing'
+  | 'failed';
+
+function isMissingTrialColumn(error: any): boolean {
+  const code = String(error?.code || '');
+  const message = String(error?.message || '').toLowerCase();
+  return code === '42703' || code === 'PGRST204' || message.includes('trial_granted_at');
+}
+
+/**
+ * Berikan trial sekali per akun (idempoten & aman untuk pemanggilan paralel).
+ *
+ * Urutan langkah penting:
+ * 1. Trial hanya untuk akun yang benar-benar bisa dipakai (email terverifikasi).
+ * 2. Klaim atomik pada users.trial_granted_at -> penentu tunggal "pernah dapat
+ *    trial atau belum", jadi trial tidak pernah dobel dan tidak pernah diulang.
+ * 3. Baris subscription yang sudah ada selalu dipertahankan (trial yang sudah
+ *    kedaluwarsa tidak pernah diperpanjang).
+ */
+export async function ensureTrialSubscription(
+  supabase: any,
+  userId: string,
+  opts: { requireVerifiedEmail?: boolean } = {}
+): Promise<TrialGrantResult> {
+  if (!userId) return 'failed';
+  const { requireVerifiedEmail = true } = opts;
+
+  const { data: authUserResult, error: authUserError } = await supabase.auth.admin.getUserById(userId);
+  if (authUserError || !authUserResult?.user) {
+    console.error('ensureTrialSubscription: auth user lookup failed', authUserError?.message);
+    return 'failed';
+  }
+
+  if (requireVerifiedEmail && !authUserResult.user.email_confirmed_at) {
+    console.log('ensureTrialSubscription: email not verified yet, trial deferred', { userId });
+    return 'ineligible';
+  }
+
+  // Akun yang didaftarkan lewat link paket berbayar tidak berhak atas trial.
+  // Tanpa guard ini, pengguna yang membatalkan pembayaran akan mendapat trial
+  // gratis saat login berikutnya (regresi alur price card).
+  const userMeta = (authUserResult.user.user_metadata || {}) as Record<string, any>;
+  if (userMeta.is_price_card_registration === true || userMeta.payment_pending === true) {
+    console.log('ensureTrialSubscription: price-card account, trial not applicable', { userId });
+    return 'ineligible';
+  }
+
+  const claimedAt = new Date().toISOString();
+  const { data: claimed, error: claimError } = await supabase
+    .from('users')
+    .update({ trial_granted_at: claimedAt })
+    .eq('id', userId)
+    .is('trial_granted_at', null)
+    .select('id');
+
+  let hasClaim = Array.isArray(claimed) && claimed.length > 0;
+
+  if (claimError) {
+    if (!isMissingTrialColumn(claimError)) {
+      console.error('ensureTrialSubscription: claim failed', claimError.message);
+      return 'failed';
+    }
+    // Migrasi belum dijalankan: kembali ke guard lama (hanya bila belum ada baris)
+    // supaya pembuatan trial tidak mati total saat rollout.
+    console.warn('ensureTrialSubscription: users.trial_granted_at belum ada, memakai guard lama');
+    hasClaim = true;
+  }
+
+  const { data: existingSub } = await getEffectiveSubscription(
+    supabase,
+    userId,
+    'id, end_date, status, plan_name'
+  );
+
+  if (existingSub) {
+    return hasClaim ? 'skipped_existing' : 'already_granted';
+  }
+  if (!hasClaim) return 'already_granted';
+
+  const { startDate, endDate } = getTrialWindow();
+  const { error: insertError } = await supabase
+    .from('subscriptions')
+    .insert({
+      id: crypto.randomUUID(),
+      user_id: userId,
+      start_date: toDateOnly(startDate),
+      end_date: toDateOnly(endDate),
+      status: 'active',
+      plan_name: TRIAL_PLAN_NAME,
+      // Kolom lama: untuk baris trial, pembeda utamanya tetap plan_name.
+      duration: TRIAL_DAYS,
+    });
+
+  if (insertError) {
+    console.error('ensureTrialSubscription: insert failed', insertError.message);
+    // Lepas klaim agar percobaan berikutnya masih bisa mendapat trial.
+    await supabase.from('users').update({ trial_granted_at: null }).eq('id', userId);
+    return 'failed';
+  }
+
+  console.log(`ensureTrialSubscription: trial granted to ${userId} (${TRIAL_DAYS} hari)`);
+  return 'granted';
+}
+
 export function deriveSubscriptionWindowFromPayment(
   payment: PaymentLike,
   now = new Date()

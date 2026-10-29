@@ -51,7 +51,8 @@ export default function PaymentCallbackPage() {
           setMessage(t('paymentSuccessful'));
 
           // Payment successful - Activate subscription via auth-register
-          // User sudah diregister sebelumnya, tapi perlu call auth-register dengan paymentCompleted=true
+          // User sudah diregister sebelumnya, tapi perlu panggil auth-register dengan merchantOrderId
+          // agar server memverifikasi pembayaran (payments.status = 'completed')
           // untuk aktivasi subscription
           if (isRegistration) {
             let pendingRegistration = null;
@@ -85,7 +86,9 @@ export default function PaymentCallbackPage() {
               oauthProvider: pendingRegistration.oauthProvider
             });
 
-            // Call auth-register dengan paymentCom pleted=true untuk aktivasi subscription
+            // Aktivasi subscription: server memverifikasi merchantOrderId terhadap baris
+            // payments berstatus 'completed'. paymentCompleted/planDuration tidak dikirim lagi
+            // karena tidak dipercaya server (defect #2).
             // Error "already registered" akan diabaikan karena memang sudah diregister sebelumnya
             try {
               const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -98,6 +101,16 @@ export default function PaymentCallbackPage() {
               // For OAuth registrations, we must send oauthUserId/userId because password is null.
               // auth-register validates: (password OR userId) must exist.
               let oauthUserId = pendingRegistration.oauthUserId;
+              let sessionToken = null;
+              // Sesi (bila ada) dikirim sebagai Bearer agar identitas terverifikasi server (defect #3).
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                sessionToken = session?.access_token || null;
+                if (!oauthUserId) oauthUserId = session?.user?.id || null;
+              } catch (e) {
+                sessionToken = null;
+              }
+
               if (!oauthUserId) {
                 try {
                   const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -113,11 +126,8 @@ export default function PaymentCallbackPage() {
                 password: pendingRegistration.password,
                 // Send oauth user id for OAuth activations
                 oauthUserId: oauthUserId || undefined,
-                planDuration: pendingRegistration.planDuration,
                 useHPP: pendingRegistration.useHPP || false,
                 merchantOrderId: pendingRegistration.merchantOrderId,
-                paymentCompleted: true, // PENTING: Ini yang aktivasi subscription
-                skipTrial: true,
                 isPriceCardRegistration: true,
                 role: pendingRegistration.role || 'owner',
                 oauthProvider: pendingRegistration.oauthProvider
@@ -129,7 +139,7 @@ export default function PaymentCallbackPage() {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${supabaseAnonKey}`,
+                  'Authorization': `Bearer ${sessionToken || supabaseAnonKey}`,
                   'apikey': supabaseAnonKey
                 },
                 body: JSON.stringify(registerRequestBody)
@@ -147,7 +157,33 @@ export default function PaymentCallbackPage() {
               }
 
               // Ignore "already registered" error - ini expected karena user sudah diregister sebelum payment
-              if (!registerRes.ok) {
+              if (registerRes.status === 202 || regJson?.subscription === 'pending') {
+                // Baris payments belum 'completed' (callback Duitku bisa terlambat).
+                // Polling sebentar; aktivasi tetap akan dituntaskan backend.
+                console.log('⏳ Payment still pending on server, polling subscription...');
+                setMessage('Pembayaran diterima, aktivasi sedang diproses...');
+                toast({
+                  title: 'Pembayaran Diterima',
+                  description: 'Aktivasi langganan sedang diproses. Mohon tunggu sebentar.',
+                });
+
+                if (sessionToken) {
+                  try {
+                    const { subscriptionAPI } = await import('@/lib/api');
+                    for (let attempt = 0; attempt < 5; attempt++) {
+                      await new Promise((resolve) => setTimeout(resolve, 3000));
+                      const subData = await subscriptionAPI.getCurrentUserSubscription(sessionToken);
+                      const isActiveNow = subData?.is_active === true || subData?.subscription?.is_active === true;
+                      if (isActiveNow) {
+                        console.log('✅ Subscription active after polling');
+                        break;
+                      }
+                    }
+                  } catch (pollError) {
+                    console.warn('Subscription polling failed:', pollError.message);
+                  }
+                }
+              } else if (!registerRes.ok) {
                 const isAlreadyRegistered = regJson.error && (
                   regJson.error.toLowerCase().includes('already') ||
                   regJson.error.toLowerCase().includes('exists') ||

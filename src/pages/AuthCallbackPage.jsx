@@ -253,7 +253,24 @@ const AuthCallbackPage = () => {
 
         // 🔧 FIXED: Cek apakah ini alur registrasi berbayar via price card
         // Enhanced check dengan multiple sources untuk memastikan price card detection
-        const pendingOAuthPlan = localStorage.getItem('pendingOAuthPlan');
+        // Baca sekali lalu langsung bersihkan (defect #9): data basi dari
+        // percobaan price-card yang ditinggalkan tidak boleh membuat signup
+        // Google biasa kehilangan trial.
+        const pendingOAuthPlanRaw = localStorage.getItem('pendingOAuthPlan');
+        localStorage.removeItem('pendingOAuthPlan');
+        let pendingOAuthPlan = pendingOAuthPlanRaw;
+        if (pendingOAuthPlanRaw) {
+          try {
+            const parsedPendingPlan = JSON.parse(pendingOAuthPlanRaw);
+            const planAgeMs = Date.now() - Number(parsedPendingPlan?.ts || 0);
+            if (!parsedPendingPlan?.planName || planAgeMs > 30 * 60 * 1000) {
+              console.warn('⚠️ Mengabaikan pendingOAuthPlan yang sudah basi/tidak lengkap');
+              pendingOAuthPlan = null;
+            }
+          } catch {
+            pendingOAuthPlan = null;
+          }
+        }
         const isFromPriceCard = urlParams.get('plan') !== null || !!pendingOAuthPlan;
         isFromPriceCardFlag = isFromPriceCard;
 
@@ -288,12 +305,9 @@ const AuthCallbackPage = () => {
               email: email,
               password: null,
               role: 'owner',
-              paymentCompleted: false,
               oauthProvider: 'google',
               oauthUserId: user.id,
-              isPriceCardRegistration: true,
-              skipTrial: true,
-              trialDays: 0
+              isPriceCardRegistration: true
             };
 
             pendingPlan = {
@@ -309,16 +323,14 @@ const AuthCallbackPage = () => {
             if (!pendingPlan.planDuration) pendingPlan.planDuration = storedPlan.planDuration;
             if (!pendingPlan.paymentMethod) pendingPlan.paymentMethod = storedPlan.paymentMethod;
 
-            if (pendingPlan.planDuration) {
-              requestBody.planDuration = parseInt(pendingPlan.planDuration, 10);
-            }
-
             const response = await withTimeout(
               fetch(functionUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${supabaseAnonKey}`,
+                  // Sesi OAuth sudah tersedia: pakai token user agar server dapat
+                  // memverifikasi identitas pemanggil (defect #3).
+                  'Authorization': `Bearer ${token}`,
                   'apikey': supabaseAnonKey
                 },
                 body: JSON.stringify(requestBody)
@@ -337,7 +349,7 @@ const AuthCallbackPage = () => {
             // Non-price-card OAuth:
             // Always best-effort sync via auth-register to ensure:
             // - public.users exists
-            // - trial subscription exists (7 days)
+            // - trial subscription exists (durasi ditentukan server: TRIAL_DAYS)
             // Why: previously we only called auth-register when profile missing.
             // If profile existed but subscription missing, user became "expired".
 
@@ -350,38 +362,56 @@ const AuthCallbackPage = () => {
               email: email,
               password: null, // OAuth
               role: 'owner',
-              paymentCompleted: false,
               oauthProvider: 'google',
               oauthUserId: user.id,
-              isPriceCardRegistration: false,
-              skipTrial: false,
-              trialDays: 7
+              isPriceCardRegistration: false
             };
 
-            try {
-              const resp = await withTimeout(
-                fetch(functionUrl, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${supabaseAnonKey}`,
-                    'apikey': supabaseAnonKey
-                  },
-                  body: JSON.stringify(requestBody)
-                }),
-                10000,
-                'auth-register-oauth-trial'
-              );
+            // Sinkronisasi ini yang menentukan user punya baris subscription /
+            // trial. Jangan ditelan error-nya (defect #4): coba 2x, lalu berhenti
+            // dengan pesan jelas alih-alih lanjut ke dashboard yang ter-paywall.
+            let syncError = null;
+            for (let attempt = 1; attempt <= 2; attempt += 1) {
+              try {
+                const resp = await withTimeout(
+                  fetch(functionUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`,
+                      'apikey': supabaseAnonKey
+                    },
+                    body: JSON.stringify(requestBody)
+                  }),
+                  10000,
+                  'auth-register-oauth-trial'
+                );
 
-              const data = await resp.clone().json().catch(() => ({}));
-              console.log('📩 auth-register (oauth trial) response:', { status: resp.status, body: data });
+                const data = await resp.clone().json().catch(() => ({}));
+                console.log('📩 auth-register (oauth trial) response:', { status: resp.status, body: data });
 
-              if (!resp.ok && resp.status !== 422) {
-                throw new Error(data.error || `Auth-register oauth trial failed (${resp.status})`);
+                if (!resp.ok && resp.status !== 422 && resp.status !== 202) {
+                  throw new Error(data.error || `Auth-register oauth trial failed (${resp.status})`);
+                }
+                syncError = null;
+                break;
+              } catch (e) {
+                syncError = e;
+                console.warn(`⚠️ auth-register oauth trial gagal (percobaan ${attempt}):`, e.message);
+                if (attempt < 2) await new Promise(r => setTimeout(r, 800));
               }
-            } catch (e) {
-              console.warn('⚠️ auth-register oauth trial best-effort failed:', e.message);
-              // Continue anyway; user may already have subscription.
+            }
+
+            if (syncError) {
+              finished = true;
+              clearTimeout(failSafe);
+              setStatus('error');
+              toast({
+                title: 'Gagal menyiapkan akun',
+                description: 'Kami tidak dapat menyiapkan langganan trial Anda. Silakan coba login lagi.',
+                variant: 'destructive',
+              });
+              return;
             }
 
             // Fetch profile after sync (best-effort)
@@ -405,112 +435,6 @@ const AuthCallbackPage = () => {
           if (userProfile && userProfile.id) {
             // Success - Existing User
             console.log('✅ Login successful for existing user');
-          } else {
-            // No profile found, assumes new user -> REGISTER
-            console.log('📝 New OAuth user detected. Registering...');
-
-            const cleanUrl = supabaseUrl.replace(/\/$/, '');
-            const functionUrl = `${cleanUrl}/functions/v1/auth-register`;
-
-            // 🔧 FIXED: Enhanced request body with explicit price card flag
-            const requestBody = {
-              name: name,
-              email: email,
-              password: null, // OAuth
-              role: 'owner',
-              paymentCompleted: false,
-              oauthProvider: 'google',
-              oauthUserId: user.id,
-              isPriceCardRegistration: isFromPriceCard
-            };
-
-            // If from price card, skip trial and redirect to payment
-            if (isFromPriceCard) {
-              requestBody.skipTrial = true;
-              requestBody.trialDays = 0; // Explicitly set trial days to 0
-
-              // Get plan details from localStorage or URL params
-              let pendingPlan = JSON.parse(pendingOAuthPlan || '{}');
-
-              // Fallback to URL params if localStorage is empty but URL has params
-              if (!pendingPlan.planName && urlParams.get('plan')) {
-                pendingPlan = {
-                  planName: urlParams.get('plan'),
-                  planPrice: urlParams.get('price'),
-                  planDuration: urlParams.get('duration')
-                };
-              }
-
-              if (pendingPlan.planDuration) {
-                requestBody.planDuration = parseInt(pendingPlan.planDuration, 10);
-              }
-            } else {
-              // Only give trial for non-price-card registrations
-              requestBody.trialDays = 7;
-            }
-
-            console.log('📋 Request body:', requestBody);
-
-            const response = await withTimeout(
-              fetch(functionUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${supabaseAnonKey}`,
-                  'apikey': supabaseAnonKey
-                },
-                body: JSON.stringify(requestBody)
-              }),
-              10000,
-              'auth-register'
-            );
-
-            // Clone response to avoid "body stream already read" error
-            const responseClone = response.clone();
-
-            let data;
-            try {
-              data = await response.json();
-            } catch (jsonError) {
-              console.warn('Response body already read, using clone:', jsonError.message);
-              data = await responseClone.json();
-            }
-
-            console.log('📩 auth-register response:', { status: response.status, body: data });
-
-            if (!response.ok) {
-              // Ignore "already registered" errors for OAuth - this means race condition or temporary fetch failure
-              if (response.status !== 422 &&
-                !data.error?.includes('already registered') &&
-                !data.error?.includes('already exists')) {
-                throw new Error(data.error || `Auth-register failed (${response.status})`);
-              }
-              console.log('ℹ️ User likely already exists (backend handled conflict)');
-            } else if (data?.success === false) {
-              throw new Error(data.error || 'Auth-register returned success=false');
-            } else {
-              console.log('✅ Registration successful:', data);
-            }
-
-            // Assuming registration succeeded (or user exists), we can proceed.
-            // We don't strictly need to fetch the profile again if we trust the registration/login flow.
-            // But we'll do a quick check to set userProfile for consistency, but won't block on it.
-            try {
-              // Wait a moment for DB propagation
-              await new Promise(r => setTimeout(r, 800));
-              const fetchedProfile = await withTimeout(
-                authAPI.getCurrentUser(token),
-                3000,
-                'getCurrentUserAfterRegister'
-              );
-              if (fetchedProfile) {
-                userProfile = fetchedProfile;
-              }
-            } catch (e) {
-              console.warn('⚠️ Could not fetch profile immediately after reg, but proceeding:', e.message);
-              // Keep stub profile; auth-register already succeeded
-              userProfile = userProfile || { id: user.id, email: email, name: name, role: 'owner' };
-            }
           }
 
           // Final success check
@@ -548,7 +472,6 @@ const AuthCallbackPage = () => {
                   params.append('plan', pendingPlan.planName);
                   params.append('price', pendingPlan.planPrice);
                   params.append('duration', pendingPlan.planDuration);
-                  localStorage.removeItem('pendingOAuthPlan');
                   setTimeout(() => {
                     window.location.href = `/register?${params.toString()}`;
                   }, 2000);
@@ -566,7 +489,6 @@ const AuthCallbackPage = () => {
                   params.append('plan', pendingPlan.planName);
                   params.append('price', pendingPlan.planPrice);
                   params.append('duration', pendingPlan.planDuration);
-                  localStorage.removeItem('pendingOAuthPlan');
 
                   setTimeout(() => {
                     window.location.href = `/register?${params.toString()}`;
@@ -581,7 +503,6 @@ const AuthCallbackPage = () => {
                   description: 'Silakan pilih paket langganan kembali.',
                   variant: 'default'
                 });
-                localStorage.removeItem('pendingOAuthPlan');
                 setTimeout(() => {
                   window.location.href = '/';
                 }, 1500);

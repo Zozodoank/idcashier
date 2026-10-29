@@ -193,7 +193,8 @@ export default function RegisterPage() {
           throw new Error('Registration succeeded but user id is missing');
         }
 
-        // Sync to public tables + create trial subscription
+        // Sync to public tables (trial dibuat server saat login pertama
+        // setelah email diverifikasi, lihat ensureTrialSubscription)
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -210,16 +211,13 @@ export default function RegisterPage() {
             role: 'owner',
             userId: newAuthUserId,
             oauthProvider: 'email',
-            isPriceCardRegistration: false,
-            skipTrial: false,
-            trialDays: 7,
-            paymentCompleted: false
+            isPriceCardRegistration: false
           })
         });
 
         const syncJson = await syncRes.clone().json().catch(() => ({}));
         if (!syncRes.ok) {
-          throw new Error(syncJson.error || syncJson.message || `Failed to setup trial (${syncRes.status})`);
+          throw new Error(syncJson.error || syncJson.message || `Failed to prepare account (${syncRes.status})`);
         }
 
         toast({

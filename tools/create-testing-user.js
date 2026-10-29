@@ -45,8 +45,7 @@ async function createTestingUser() {
         email: testUser.email,
         password: testUser.password,
         role: testUser.role,
-        paymentCompleted: false,
-        trialDays: 7
+        paymentCompleted: false
       })
     });
 

@@ -5,6 +5,7 @@ import { createResponse, createErrorResponse, handleOptions } from '../_shared/c
 import { createSupabaseClient, getUserIdFromToken } from '../_shared/auth.ts'
 import {
   deriveSubscriptionWindowFromPayment,
+  ensureTrialSubscription,
   getDerivedSubscriptionStatus,
   getEffectiveSubscription,
   isSubscriptionActive,
@@ -191,6 +192,21 @@ Deno.serve(async (req: Request) => {
       const paymentBackedSubscription = pickEffectiveSubscription(paymentBackedSubscriptions);
       if (paymentBackedSubscription && isSubscriptionActive(paymentBackedSubscription.end_date, new Date())) {
         effectiveSubscription = paymentBackedSubscription;
+      }
+    }
+
+    if (!effectiveSubscription) {
+      // Self-heal: akun tanpa baris subscription (mis. sinkronisasi saat signup
+      // gagal) mendapat trial-nya di sini. Idempoten, jadi tidak pernah dobel
+      // dan tidak pernah memperpanjang trial yang sudah kedaluwarsa.
+      const trialResult = await ensureTrialSubscription(supabase, userId, {
+        requireVerifiedEmail: true
+      });
+      if (trialResult === 'granted') {
+        const { data: healedSubscription } = await getEffectiveSubscription(supabase, userId, '*');
+        if (healedSubscription) {
+          effectiveSubscription = healedSubscription;
+        }
       }
     }
 

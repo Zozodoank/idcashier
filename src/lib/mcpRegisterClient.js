@@ -38,11 +38,10 @@ class MCPRegisterClient {
         tenant_id: userData.tenant_id
       };
 
-      // If skipTrial is true, explicitly set it to skip trial subscription
+      // If skipTrial is true, mark the registration as a price-card flow.
+      // Durasi & kelayakan trial ditentukan server, jadi trialDays tidak dikirim lagi.
       if (userData.skipTrial === true) {
-        requestBody.skipTrial = true;
         requestBody.isPriceCardRegistration = userData.isPriceCardRegistration || true;
-        requestBody.trialDays = 0; // Explicitly set trial days to 0 to prevent fallback
       }
 
       // If planDuration is provided (for price card registration), include it
@@ -87,7 +86,7 @@ class MCPRegisterClient {
   /**
    * Register a new user with trial subscription
    * @param {Object} userData - User registration data
-   * @param {number} trialDays - Number of trial days (negative for expired trials)
+   * @param {number} trialDays - Diabaikan; durasi trial ditentukan server (TRIAL_DAYS)
    * @returns {Promise} - Promise resolving to registration results
    */
   async registerUserWithTrial(userData, trialDays = 7) {
@@ -109,8 +108,7 @@ class MCPRegisterClient {
           email: userData.email,
           password: userData.password,
           role: userData.role || 'owner',
-          tenant_id: userData.tenant_id,
-          trialDays: trialDays
+          tenant_id: userData.tenant_id
         })
       });
 
@@ -148,8 +146,7 @@ class MCPRegisterClient {
         data: {
           minPasswordLength: 6,
           allowedRoles: ['owner', 'cashier'],
-          defaultRole: 'owner',
-          trialDays: 7 // Default 7 days trial
+          defaultRole: 'owner'
         }
       };
     } catch (error) {

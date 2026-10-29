@@ -45,8 +45,7 @@ async function createExpiredTrialUser() {
         email: testUser.email,
         password: testUser.password,
         role: testUser.role,
-        paymentCompleted: false, // Trial user
-        trialDays: 7
+        paymentCompleted: false // Trial user
       })
     });
 

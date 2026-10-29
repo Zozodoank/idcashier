@@ -3,7 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from '@supabase/supabase-js'
 import { getCorsHeaders } from '../_shared/cors.ts'
-import { getEffectiveSubscription, isSubscriptionActive } from '../_shared/subscription.ts'
+import { ensureTrialSubscription, getEffectiveSubscription, isSubscriptionActive } from '../_shared/subscription.ts'
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin') || '';
@@ -200,6 +200,7 @@ Deno.serve(async (req) => {
 
     let subscriptionExpired = false;
     let paymentPending = false;
+    let subscriptionMissing = false;
 
     // Subscription check (skip for whitelist accounts)
     if (!isWhitelistAccount) {
@@ -210,19 +211,42 @@ Deno.serve(async (req) => {
         if (!effectiveUserId) {
           console.warn('No effectiveUserId found for subscription check', userData);
         } else {
-          const { data: subscription, error: subscriptionError } = await getEffectiveSubscription(
+          let { data: subscription, error: subscriptionError } = await getEffectiveSubscription(
             supabaseAdmin,
             effectiveUserId,
             'end_date, status, updated_at, created_at'
           );
 
+          // Tidak ada baris subscription sama sekali: akun baru yang email-nya
+          // baru diverifikasi mendapat trial-nya di titik ini (defect #8).
+          // ensureTrialSubscription idempoten, jadi aman dipanggil tiap login.
+          if (!subscription && !subscriptionError) {
+            const trialResult = await ensureTrialSubscription(supabaseAdmin, effectiveUserId, {
+              requireVerifiedEmail: true
+            });
+            if (trialResult === 'granted') {
+              const refetched = await getEffectiveSubscription(
+                supabaseAdmin,
+                effectiveUserId,
+                'end_date, status, updated_at, created_at'
+              );
+              subscription = refetched.data;
+              subscriptionError = refetched.error;
+              console.log('Free trial granted on first verified login', { effectiveUserId });
+            }
+          }
+
           // Log subscription check for debugging
           console.log('Subscription check for user:', { effectiveUserId, subscription, subscriptionError });
 
-          // If there is no subscription row at all, treat it as payment pending (no app access yet)
+          // Tidak ada baris subscription: bedakan "belum bayar" dari "baris
+          // hilang" supaya pesan ke user tidak menyesatkan (defect #11).
           if (!subscription && !subscriptionError) {
-            paymentPending = true;
-            subscriptionExpired = true;
+            const { data: authUserForFlags } = await supabaseAdmin.auth.admin.getUserById(effectiveUserId);
+            const meta = authUserForFlags?.user?.user_metadata || {};
+            paymentPending = Boolean((meta as any)?.payment_pending);
+            subscriptionMissing = !paymentPending;
+            subscriptionExpired = !paymentPending;
           }
 
           // Only check expiration if subscription exists and has end_date
@@ -255,7 +279,8 @@ Deno.serve(async (req) => {
           ...userData,
           tenantId: userData.tenant_id,
           subscriptionExpired: subscriptionExpired,
-          paymentPending: paymentPending
+          paymentPending: paymentPending,
+          subscriptionMissing: subscriptionMissing
         },
         token: authData.session.access_token,
         session: {
@@ -266,6 +291,7 @@ Deno.serve(async (req) => {
         },
         subscriptionExpired: subscriptionExpired, // Top level also for convenience
         paymentPending: paymentPending,
+        subscriptionMissing: subscriptionMissing,
         message: subscriptionExpired ? 'Login successful (Subscription Expired)' : 'Login successful'
       }),
       { headers: corsHeaders, status: 200 }

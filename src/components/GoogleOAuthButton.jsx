@@ -8,7 +8,8 @@ export const performGoogleOAuth = async ({ planName, planPrice, planDuration, pa
   try {
     // If plan details are provided, store them before redirecting
     if (planName && planPrice && planDuration) {
-      const planDetails = { planName, planPrice, planDuration, paymentMethod };
+      // ts dipakai AuthCallbackPage untuk menolak rencana yang sudah basi (defect #9)
+      const planDetails = { planName, planPrice, planDuration, paymentMethod, ts: Date.now() };
       localStorage.setItem('pendingOAuthPlan', JSON.stringify(planDetails));
       console.log('📝 Storing pending OAuth plan details:', planDetails);
     }
