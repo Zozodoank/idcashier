@@ -67,6 +67,39 @@ import {
 
 import { useHPP } from '@/contexts/HPPContext';
 
+const toInputDate = (d) => (d instanceof Date && !isNaN(d) ? format(d, 'yyyy-MM-dd') : '');
+const fromInputDate = (v) => {
+  if (!v) return undefined;
+  const [y, m, d] = v.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+// Two separate date fields: start date and end date
+const DateRangeFields = ({ dateRange, setDateRange, t }) => (
+  <div className="grid grid-cols-2 gap-2">
+    <div>
+      <span className="text-[10px] text-muted-foreground">{t('startDate')}</span>
+      <Input
+        type="date"
+        className="text-sm p-2"
+        value={toInputDate(dateRange?.from)}
+        max={toInputDate(dateRange?.to) || undefined}
+        onChange={(e) => setDateRange((prev) => ({ ...prev, from: fromInputDate(e.target.value) }))}
+      />
+    </div>
+    <div>
+      <span className="text-[10px] text-muted-foreground">{t('endDate')}</span>
+      <Input
+        type="date"
+        className="text-sm p-2"
+        value={toInputDate(dateRange?.to)}
+        min={toInputDate(dateRange?.from) || undefined}
+        onChange={(e) => setDateRange((prev) => ({ ...prev, to: fromInputDate(e.target.value) }))}
+      />
+    </div>
+  </div>
+);
+
 const ReportsPage = () => {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -87,7 +120,7 @@ const ReportsPage = () => {
   const [globalHPPTotal] = useState(0);
   const [returnsData, setReturnsData] = useState([]);
 
-  const [dateRange, setDateRange] = useState({ from: new Date(2025, 9, 20), to: new Date(2025, 9, 26) });
+  const [dateRange, setDateRange] = useState(() => { const now = new Date(); return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: new Date(now.getFullYear(), now.getMonth(), now.getDate()) }; });
 
   const [selectedProduct, setSelectedProduct] = useState(t('allProducts'));
 
@@ -800,6 +833,7 @@ const ReportsPage = () => {
             itemId: `${sale.id}-0`,
 
             date: format(new Date(sale.created_at), 'yyyy-MM-dd'),
+            created_at: sale.created_at,
 
             product: t('noItems'),
 
@@ -943,6 +977,7 @@ const ReportsPage = () => {
             itemId: `${sale.id}-${index}`,
 
             date: format(new Date(sale.created_at), 'yyyy-MM-dd'),
+            created_at: sale.created_at,
 
             product: product,
 
@@ -1206,14 +1241,14 @@ const ReportsPage = () => {
     return;
   };
 
-  const applyFilters = () => {
+  const applyFilters = (silent = false) => {
 
     let data = allSalesData;
 
-    if (dateRange.from && dateRange.to) {
-
-      data = data.filter(item => new Date(item.date) >= dateRange.from && new Date(item.date) <= dateRange.to);
-
+    const fromStr = dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : null;
+    const toStr = dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : null;
+    if (fromStr || toStr) {
+      data = data.filter(item => (!fromStr || item.date >= fromStr) && (!toStr || item.date <= toStr));
     }
 
     // Time range filter
@@ -1250,11 +1285,17 @@ const ReportsPage = () => {
 
     setFilteredData(data);
 
-    toast({ title: t('filterApplied'), description: t('reportUpdated') });
+    if (silent !== true) toast({ title: t('filterApplied'), description: t('reportUpdated') });
 
   };
 
 
+
+  // Re-apply filters automatically whenever any filter or the source data changes
+  useEffect(() => {
+    applyFilters(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allSalesData, dateRange, timeRangePreset, customTimeStart, customTimeEnd, selectedProduct, selectedCustomer, selectedSupplier, selectedPaymentMethod, hideCorruptData]);
 
   const profitLossData = useMemo(() => {
 
@@ -2397,7 +2438,7 @@ const ReportsPage = () => {
 
                   <div className="flex gap-1.5">
 
-                    <Button size="sm" onClick={applyFilters} variant="outline">
+                    <Button size="sm" onClick={() => applyFilters()} variant="outline">
 
                       <Search className="w-4 h-4 mr-2" />
 
@@ -2420,49 +2461,7 @@ const ReportsPage = () => {
                   <div>
 
                     <Label className="text-xs">{t('dateRange')}</Label>
-
-                    <Popover>
-
-                      <PopoverTrigger asChild>
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={cn("w-full justify-start text-left font-normal text-sm p-2")}
-                        >
-
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-
-                          {dateRange.from ? (
-                            dateRange.to ? (
-                              <>
-                                {format(dateRange.from, "dd/MM/yyyy")} - {format(dateRange.to, "dd/MM/yyyy")}
-                              </>
-                            ) : (
-                              format(dateRange.from, "dd/MM/yyyy")
-                            )
-                          ) : (
-                            <span className="text-xs">{t('pickDateRange')}</span>
-                          )}
-
-                        </Button>
-
-                      </PopoverTrigger>
-
-                      <PopoverContent className="w-auto p-0" align="start">
-
-                        <Calendar
-                          initialFocus
-                          mode="range"
-                          defaultMonth={dateRange.from}
-                          selected={dateRange}
-                          onSelect={setDateRange}
-                          numberOfMonths={2}
-                        />
-
-                      </PopoverContent>
-
-                    </Popover>
+<DateRangeFields dateRange={dateRange} setDateRange={setDateRange} t={t} />
 
                   </div>
 
@@ -2700,7 +2699,7 @@ const ReportsPage = () => {
 
                   <div className="flex gap-1.5">
 
-                    <Button size="sm" onClick={applyFilters} variant="outline">
+                    <Button size="sm" onClick={() => applyFilters()} variant="outline">
 
                       <Search className="w-4 h-4 mr-2" />
 
@@ -2729,70 +2728,7 @@ const ReportsPage = () => {
                   <div>
 
                     <Label className="text-xs">{t('dateRange')}</Label>
-
-                    <Popover>
-
-                      <PopoverTrigger asChild>
-
-                        <Button
-
-                          variant="outline"
-
-                          size="sm"
-
-                          className={cn("w-full justify-start text-left font-normal text-sm p-2")}
-
-                        >
-
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-
-                          {dateRange.from ? (
-
-                            dateRange.to ? (
-
-                              <>
-
-                                {format(dateRange.from, "dd/MM/yyyy")} - {format(dateRange.to, "dd/MM/yyyy")}
-
-                              </>
-
-                            ) : (
-
-                              format(dateRange.from, "dd/MM/yyyy")
-
-                            )
-
-                          ) : (
-
-                            <span className="text-xs">{t('pickDateRange')}</span>
-
-                          )}
-
-                        </Button>
-
-                      </PopoverTrigger>
-
-                      <PopoverContent className="w-auto p-0" align="start">
-
-                        <Calendar
-
-                          initialFocus
-
-                          mode="range"
-
-                          defaultMonth={dateRange.from}
-
-                          selected={dateRange}
-
-                          onSelect={setDateRange}
-
-                          numberOfMonths={2}
-
-                        />
-
-                      </PopoverContent>
-
-                    </Popover>
+<DateRangeFields dateRange={dateRange} setDateRange={setDateRange} t={t} />
 
                   </div>
 
@@ -3265,7 +3201,7 @@ const ReportsPage = () => {
                           <div>
                             <p className="font-semibold text-gray-900">{t('totalForPeriod') || 'Total Periode Ini'}</p>
                             <p className="text-xs text-muted-foreground">
-                              {Math.ceil((dateRange.to - dateRange.from) / (1000 * 60 * 60 * 24)) + 1} hari × 
+                              {dateRange.from && dateRange.to ? Math.round((dateRange.to - dateRange.from) / (1000 * 60 * 60 * 24)) + 1 : 0} hari × 
                               Rp {(globalHPPData.reduce((sum, item) => sum + parseFloat(item.monthly_amount || 0), 0) / 30).toLocaleString('id-ID', { 
                                 minimumFractionDigits: 0,
                                 maximumFractionDigits: 0
@@ -3852,7 +3788,7 @@ const ReportsPage = () => {
                     {t('financialReport')}
                   </CardTitle>
                   <div className="flex gap-1.5">
-                    <Button size="sm" onClick={applyFilters} variant="outline">
+                    <Button size="sm" onClick={() => applyFilters()} variant="outline">
                       <Search className="w-4 h-4 mr-2" />
                       {t('applyFilters')}
                     </Button>
@@ -3875,41 +3811,7 @@ const ReportsPage = () => {
                   {/* Date Range Filter */}
                   <div>
                     <Label className="text-xs">{t('dateRange')}</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !dateRange && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateRange?.from ? (
-                            dateRange.to ? (
-                              <>
-                                {format(dateRange.from, "dd MMM yyyy")} - {format(dateRange.to, "dd MMM yyyy")}
-                              </>
-                            ) : (
-                              format(dateRange.from, "dd MMM yyyy")
-                            )
-                          ) : (
-                            <span>{t('pickDateRange')}</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          initialFocus
-                          mode="range"
-                          defaultMonth={dateRange?.from}
-                          selected={dateRange}
-                          onSelect={setDateRange}
-                          numberOfMonths={2}
-                        />
-                      </PopoverContent>
-                    </Popover>
+<DateRangeFields dateRange={dateRange} setDateRange={setDateRange} t={t} />
                   </div>
 
                   {/* Payment Status Filter */}
